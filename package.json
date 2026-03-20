@@ -1,0 +1,31 @@
+{
+  "name": "artsee",
+  "version": "0.1.0",
+  "description": "Artsee - 发现、收藏和分享艺术品的最佳平台",
+  "private": true,
+  "workspaces": [
+    "web"
+  ],
+  "scripts": {
+    "dev:web": "cd web && npm run dev",
+    "build:web": "cd web && npm run build",
+    "start:web": "cd web && npm run start",
+    "lint:web": "cd web && npm run lint",
+    "dev:app": "cd app && flutter run",
+    "build:app": "cd app && flutter build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/artsee-platform/artsee.git"
+  },
+  "keywords": [
+    "art",
+    "gallery",
+    "flutter",
+    "nextjs",
+    "supabase"
+  ],
+  "author": "Artsee Team",
+  "license": "MIT"
+}
