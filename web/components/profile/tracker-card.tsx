@@ -1,5 +1,5 @@
-import type { ApplicationTracker } from "@/lib/mock-data";
-import { statusLabel, statusColor, tierLabel, tierColor } from "@/lib/mock-data";
+import type { ApplicationTracker } from "@/lib/supabase/types";
+import { statusLabel, statusColor, tierLabel, tierColor } from "@/lib/utils";
 import { ChevronRight } from "lucide-react";
 
 const statusStep = ["planning", "preparing", "submitted", "interview", "admitted"];
@@ -14,12 +14,12 @@ export function TrackerCard({ tracker }: { tracker: ApplicationTracker }) {
       <div className="flex items-center justify-between mb-2">
         <div>
           <div className="flex items-center gap-1.5">
-            <h3 className="text-sm font-semibold text-gray-900">{tracker.schoolName}</h3>
+            <h3 className="text-sm font-semibold text-gray-900">{tracker.school_name}</h3>
             <span className={`text-[9px] font-bold ${tierColor[tracker.tier]}`}>
               [{tierLabel[tracker.tier]}]
             </span>
           </div>
-          <p className="text-[10px] text-gray-500">{tracker.programName}</p>
+          <p className="text-[10px] text-gray-500">{tracker.program_name}</p>
         </div>
         <div className="flex items-center gap-1">
           <span className={`text-[9px] font-medium px-2 py-0.5 rounded-full ${statusColor[tracker.status]}`}>
@@ -47,7 +47,7 @@ export function TrackerCard({ tracker }: { tracker: ApplicationTracker }) {
       {/* 截止日期 */}
       <div className="flex items-center justify-between mt-2">
         <span className="text-[10px] text-gray-400">
-          截止：{tracker.deadline}
+          截止：{tracker.deadline ?? '—'}
         </span>
         {isFinished && tracker.status === "admitted" && (
           <span className="text-[10px] text-green-600 font-medium">🎉 恭喜录取！</span>

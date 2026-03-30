@@ -1,7 +1,10 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import { Search, Bell } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Search, Bell, LogIn } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { useEffect, useState } from "react";
+import type { User } from "@supabase/supabase-js";
 
 const pageTitles: Record<string, string> = {
   "/":        "艺见心",
@@ -13,13 +16,23 @@ const pageTitles: Record<string, string> = {
 
 export function TopBar() {
   const pathname = usePathname();
+  const router = useRouter();
   const title = pageTitles[pathname] ?? "艺见心";
   const isHome = pathname === "/";
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   return (
     <header className="flex-shrink-0 bg-white border-b border-gray-100">
       <div className="flex items-center justify-between h-14 px-4">
-        {/* Logo / 页面标题 */}
         {isHome ? (
           <div className="flex items-center gap-1.5">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#FF6A00] to-[#FF9A3C] flex items-center justify-center">
@@ -36,15 +49,24 @@ export function TopBar() {
           <h1 className="text-base font-semibold text-gray-900">{title}</h1>
         )}
 
-        {/* 右侧图标 */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors">
             <Search size={18} className="text-gray-600" />
           </button>
-          <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors relative">
-            <Bell size={18} className="text-gray-600" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-[#FF6A00] rounded-full" />
-          </button>
+          {user ? (
+            <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors relative">
+              <Bell size={18} className="text-gray-600" />
+              <span className="absolute top-1 right-1 w-2 h-2 bg-[#FF6A00] rounded-full" />
+            </button>
+          ) : (
+            <button
+              onClick={() => router.push('/auth/login')}
+              className="flex items-center gap-1 text-xs font-medium text-[#FF6A00] bg-orange-50 px-2.5 py-1.5 rounded-full"
+            >
+              <LogIn size={13} />
+              登录
+            </button>
+          )}
         </div>
       </div>
     </header>

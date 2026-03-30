@@ -1,82 +1,97 @@
-import { MapPin, Clock, BookOpen, GraduationCap, ChevronRight } from "lucide-react";
-import type { University } from "@/lib/mock-data";
+import Link from "next/link";
+import { MapPin, Clock, BookOpen, ChevronRight, Star } from "lucide-react";
+import { getSchoolGradient, getSchoolInitial } from "@/lib/utils";
+import type { Program } from "@/lib/supabase/types";
 
-export function UniversityCard({ uni }: { uni: University }) {
+export function UniversityCard({ program }: { program: Program }) {
+  const school = program.schools
+  const admission = Array.isArray(program.program_admissions) ? program.program_admissions[0] : program.program_admissions
+  const fee = Array.isArray(program.program_fees) ? program.program_fees[0] : program.program_fees
+  const gradient = school ? getSchoolGradient(school.name_zh) : 'from-gray-400 to-gray-600'
+  const initial = school ? getSchoolInitial(school.name_zh) : '?'
+
+  const tuition = fee?.international_tuition_fee
+    ? `£${Math.round(Number(fee.international_tuition_fee) / 1000)}k/年`
+    : '面议'
+
+  const ielts = admission?.ielts_overall ? `${admission.ielts_overall}` : '---'
+  const deadline = admission?.regular_deadline
+    ? admission.regular_deadline.slice(5)
+    : '滚动'
+
   return (
-    <article className="mx-4 mb-3 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-      {/* 顶部彩色条 + 院校信息 */}
-      <div className="flex items-center gap-3 p-3">
-        {/* 院校 Logo（彩色圆圈） */}
-        <div
-          className={`w-12 h-12 rounded-xl bg-gradient-to-br ${uni.color} flex items-center justify-center flex-shrink-0`}
-        >
-          <span className="text-white text-[10px] font-bold text-center leading-tight">
-            {uni.initial}
-          </span>
-        </div>
-
-        {/* 院校名称 + 专业 */}
-        <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-semibold text-gray-900 truncate">{uni.nameCn}</h3>
-          <p className="text-xs text-gray-500 truncate">{uni.program}</p>
-          <div className="flex items-center gap-1 mt-0.5">
-            <MapPin size={10} className="text-gray-400" />
-            <span className="text-[10px] text-gray-400">{uni.city}，{uni.country}</span>
+    <Link href={`/explore/${program.id}`}>
+      <article className="mx-4 mb-3 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden active:scale-[0.99] transition-transform">
+        <div className="flex items-center gap-3 p-3">
+          <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center flex-shrink-0`}>
+            <span className="text-white text-[10px] font-bold text-center leading-tight">{initial}</span>
           </div>
-        </div>
-
-        <ChevronRight size={16} className="text-gray-300 flex-shrink-0" />
-      </div>
-
-      {/* 关键数据条 */}
-      <div className="flex items-center border-t border-gray-50 divide-x divide-gray-100">
-        <div className="flex-1 flex flex-col items-center py-2">
-          <div className="flex items-center gap-1">
-            <GraduationCap size={11} className="text-[#FF6A00]" />
-            <span className="text-[10px] font-semibold text-gray-700">{uni.gpaMin}</span>
-          </div>
-          <span className="text-[9px] text-gray-400 mt-0.5">GPA 要求</span>
-        </div>
-        <div className="flex-1 flex flex-col items-center py-2">
-          <div className="flex items-center gap-1">
-            <BookOpen size={11} className="text-blue-500" />
-            <span className="text-[10px] font-semibold text-gray-700">{uni.ielts}</span>
-          </div>
-          <span className="text-[9px] text-gray-400 mt-0.5">IELTS</span>
-        </div>
-        <div className="flex-1 flex flex-col items-center py-2">
-          <div className="flex items-center gap-1">
-            <Clock size={11} className="text-green-500" />
-            <span className="text-[10px] font-semibold text-gray-700">{uni.duration}</span>
-          </div>
-          <span className="text-[9px] text-gray-400 mt-0.5">学制</span>
-        </div>
-        <div className="flex-1 flex flex-col items-center py-2">
-          <span className="text-[10px] font-semibold text-gray-700">
-            {uni.rolling ? (
-              <span className="text-green-600">滚动</span>
-            ) : (
-              <span className="text-orange-600">{uni.deadline.slice(5)}</span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <h3 className="text-sm font-semibold text-gray-900 truncate">{school?.name_zh ?? '未知院校'}</h3>
+              {school?.qs_art_rank && (
+                <span className="flex-shrink-0 flex items-center gap-0.5 text-[9px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full">
+                  <Star size={8} />QS #{school.qs_art_rank}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 truncate mt-0.5">{program.program_name}</p>
+            {school && (
+              <div className="flex items-center gap-1 mt-0.5">
+                <MapPin size={10} className="text-gray-400" />
+                <span className="text-[10px] text-gray-400">{school.city ?? ''}，{school.country ?? ''}</span>
+              </div>
             )}
-          </span>
-          <span className="text-[9px] text-gray-400 mt-0.5">截止日期</span>
+          </div>
+          <ChevronRight size={16} className="text-gray-300 flex-shrink-0" />
         </div>
-      </div>
 
-      {/* 底部标签 */}
-      <div className="flex items-center gap-2 px-3 pb-3 pt-1">
-        {uni.hasInterview && (
-          <span className="text-[9px] bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full">
-            需要面试
-          </span>
-        )}
-        <span className="text-[9px] bg-gray-50 text-gray-500 border border-gray-200 px-2 py-0.5 rounded-full">
-          推荐信 ×{uni.recommenders}
-        </span>
-        <span className="text-[9px] bg-blue-50 text-blue-600 border border-blue-200 px-2 py-0.5 rounded-full">
-          {uni.programEn.split(" ").slice(-1)[0]}
-        </span>
-      </div>
-    </article>
+        <div className="flex items-center border-t border-gray-50 divide-x divide-gray-100">
+          <div className="flex-1 flex flex-col items-center py-2">
+            <div className="flex items-center gap-1">
+              <BookOpen size={11} className="text-blue-500" />
+              <span className="text-[10px] font-semibold text-gray-700">{ielts}</span>
+            </div>
+            <span className="text-[9px] text-gray-400 mt-0.5">IELTS</span>
+          </div>
+          <div className="flex-1 flex flex-col items-center py-2">
+            <div className="flex items-center gap-1">
+              <Clock size={11} className="text-green-500" />
+              <span className="text-[10px] font-semibold text-gray-700 truncate max-w-[60px] text-center">{program.duration_text ?? '---'}</span>
+            </div>
+            <span className="text-[9px] text-gray-400 mt-0.5">学制</span>
+          </div>
+          <div className="flex-1 flex flex-col items-center py-2">
+            <span className="text-[10px] font-semibold text-gray-700">{tuition}</span>
+            <span className="text-[9px] text-gray-400 mt-0.5">国际学费</span>
+          </div>
+          <div className="flex-1 flex flex-col items-center py-2">
+            <span className={`text-[10px] font-semibold ${deadline === '滚动' ? 'text-green-600' : 'text-orange-600'}`}>
+              {deadline}
+            </span>
+            <span className="text-[9px] text-gray-400 mt-0.5">截止日期</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 px-3 pb-3 pt-1 flex-wrap">
+          {program.requires_interview && (
+            <span className="text-[9px] bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full">需要面试</span>
+          )}
+          {program.requires_portfolio && (
+            <span className="text-[9px] bg-purple-50 text-purple-600 border border-purple-200 px-2 py-0.5 rounded-full">需作品集</span>
+          )}
+          {admission?.reference_count && (
+            <span className="text-[9px] bg-gray-50 text-gray-500 border border-gray-200 px-2 py-0.5 rounded-full">
+              推荐信 ×{admission.reference_count}
+            </span>
+          )}
+          {program.degree_type && (
+            <span className="text-[9px] bg-blue-50 text-blue-600 border border-blue-200 px-2 py-0.5 rounded-full">
+              {program.degree_type}
+            </span>
+          )}
+        </div>
+      </article>
+    </Link>
   );
 }
