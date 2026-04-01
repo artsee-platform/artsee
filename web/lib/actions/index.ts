@@ -91,25 +91,6 @@ export async function toggleFavorite(programId: number) {
 }
 
 // ─── 追踪相关 ─────────────────────────────────────────────
-export async function addTracker(formData: FormData) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: '请先登录' }
-
-  const { error } = await supabase.from('application_tracker').insert({
-    user_id: user.id,
-    school_name: formData.get('school_name') as string,
-    program_name: formData.get('program_name') as string,
-    tier: formData.get('tier') as string,
-    status: 'planning',
-    deadline: formData.get('deadline') as string || null,
-  })
-
-  if (error) return { error: error.message }
-  revalidatePath('/profile')
-  return { success: true }
-}
-
 export async function updateTrackerStatus(id: string, status: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -123,8 +104,100 @@ export async function updateTrackerStatus(id: string, status: string) {
   return { success: true }
 }
 
+export async function createTrackerEntry(formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: '请先登录' }
+
+  const school_name = formData.get('school_name') as string
+  const program_name = formData.get('program_name') as string
+  const tier = formData.get('tier') as string
+  const status = formData.get('status') as string
+
+  const { error } = await supabase.from('application_tracker').insert({
+    user_id: user.id,
+    school_name,
+    program_name,
+    tier,
+    status,
+  })
+
+  if (error) return { error: error.message }
+  revalidatePath('/profile')
+  return { success: true }
+}
+
 export async function signOut() {
   const supabase = await createClient()
   await supabase.auth.signOut()
   revalidatePath('/')
+}
+
+// ─── 点赞相关 ─────────────────────────────────────────────
+export async function toggleLike(targetId: string, targetType: 'case' | 'post') {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: '请先登录' }
+
+  const { data: existing } = await supabase
+    .from('likes')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('target_id', targetId)
+    .eq('target_type', targetType)
+    .single()
+
+  if (existing) {
+    await supabase.from('likes').delete().eq('id', existing.id)
+    if (targetType === 'case') {
+      await supabase.rpc('decrement_case_like', { case_id: targetId })
+    } else {
+      await supabase.rpc('decrement_post_like', { post_id: targetId })
+    }
+    return { liked: false }
+  } else {
+    await supabase.from('likes').insert({ user_id: user.id, target_id: targetId, target_type: targetType })
+    if (targetType === 'case') {
+      await supabase.rpc('increment_case_like', { case_id: targetId })
+    } else {
+      await supabase.rpc('increment_post_like', { post_id: targetId })
+    }
+    return { liked: true }
+  }
+}
+
+export async function checkLiked(targetId: string, targetType: 'case' | 'post') {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { liked: false }
+
+  const { data } = await supabase
+    .from('likes')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('target_id', targetId)
+    .eq('target_type', targetType)
+    .single()
+
+  return { liked: !!data }
+}
+
+// ─── 编辑资料 ─────────────────────────────────────────────
+export async function updateProfile(formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: '请先登录' }
+
+  const nickname = formData.get('nickname') as string
+  const bio = formData.get('bio') as string
+  const location = formData.get('location') as string
+
+  const { error } = await supabase
+    .from('user_profiles')
+    .update({ nickname, bio, location, updated_at: new Date().toISOString() })
+    .eq('id', user.id)
+
+  if (error) return { error: error.message }
+  revalidatePath('/profile')
+  return { success: true }
 }

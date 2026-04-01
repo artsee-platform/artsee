@@ -62,11 +62,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-purple-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#FF6A00] to-[#FF9A3C] flex items-center justify-center mb-3 shadow-lg">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#1A4B8C] to-[#4A90D9] flex items-center justify-center mb-3 shadow-lg">
             <span className="text-white text-2xl font-bold">艺</span>
           </div>
           <h1 className="text-2xl font-bold text-gray-900">艺见心</h1>
@@ -99,7 +99,7 @@ export default function LoginPage() {
                   value={nickname}
                   onChange={e => setNickname(e.target.value)}
                   placeholder="你的昵称（可后续修改）"
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#FF6A00] transition-colors"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#1A4B8C] transition-colors"
                 />
               </div>
             )}
@@ -112,7 +112,7 @@ export default function LoginPage() {
                 onChange={e => setEmail(e.target.value)}
                 placeholder="your@email.com"
                 required
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#FF6A00] transition-colors"
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#1A4B8C] transition-colors"
               />
             </div>
 
@@ -126,7 +126,7 @@ export default function LoginPage() {
                   placeholder={mode === 'register' ? '至少6位' : '请输入密码'}
                   required
                   minLength={6}
-                  className="w-full px-4 py-3 pr-10 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#FF6A00] transition-colors"
+                  className="w-full px-4 py-3 pr-10 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#1A4B8C] transition-colors"
                 />
                 <button
                   type="button"
@@ -152,7 +152,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-gradient-to-r from-[#FF6A00] to-[#FF9A3C] text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-60 transition-opacity"
+              className="w-full py-3 bg-gradient-to-r from-[#1A4B8C] to-[#4A90D9] text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-60 transition-opacity"
             >
               {loading && <Loader2 size={16} className="animate-spin" />}
               {mode === 'login' ? '登录' : '创建账号'}
@@ -161,8 +161,8 @@ export default function LoginPage() {
 
           <p className="text-center text-xs text-gray-400 mt-4">
             继续即表示同意
-            <span className="text-[#FF6A00]">用户协议</span>和
-            <span className="text-[#FF6A00]">隐私政策</span>
+            <span className="text-[#1A4B8C]">用户协议</span>和
+            <span className="text-[#1A4B8C]">隐私政策</span>
           </p>
         </div>
 

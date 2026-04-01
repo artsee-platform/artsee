@@ -35,13 +35,13 @@ export function TopBar() {
       <div className="flex items-center justify-between h-14 px-4">
         {isHome ? (
           <div className="flex items-center gap-1.5">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#FF6A00] to-[#FF9A3C] flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#1A4B8C] to-[#4A90D9] flex items-center justify-center">
               <span className="text-white text-xs font-bold">艺</span>
             </div>
             <span className="text-lg font-bold text-gray-900 font-[family-name:var(--font-poppins)]">
               艺见心
             </span>
-            <span className="text-[10px] text-[#FF6A00] font-medium border border-[#FF6A00]/30 rounded px-1 ml-0.5">
+            <span className="text-[10px] text-[#1A4B8C] font-medium border border-[#1A4B8C]/30 rounded px-1 ml-0.5">
               BETA
             </span>
           </div>
@@ -56,12 +56,12 @@ export function TopBar() {
           {user ? (
             <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors relative">
               <Bell size={18} className="text-gray-600" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-[#FF6A00] rounded-full" />
+              <span className="absolute top-1 right-1 w-2 h-2 bg-[#1A4B8C] rounded-full" />
             </button>
           ) : (
             <button
-              onClick={() => router.push('/auth/login')}
-              className="flex items-center gap-1 text-xs font-medium text-[#FF6A00] bg-orange-50 px-2.5 py-1.5 rounded-full"
+              onClick={() => router.push(`/auth/login?redirect=${encodeURIComponent(pathname)}`)}
+              className="flex items-center gap-1 text-xs font-medium text-[#1A4B8C] bg-blue-50 px-2.5 py-1.5 rounded-full"
             >
               <LogIn size={13} />
               登录

@@ -8,6 +8,23 @@ export default async function ProfilePage() {
 
   if (!user) redirect('/auth/login?redirect=/profile')
 
+  // 确保 user_profiles 行存在（首次登录或直接注册的用户可能没有记录）
+  const { data: existingProfile } = await supabase
+    .from('user_profiles')
+    .select('id')
+    .eq('id', user.id)
+    .single()
+
+  if (!existingProfile) {
+    const emailPrefix = user.email?.split('@')[0] ?? '艺见用户'
+    await supabase.from('user_profiles').upsert({
+      id: user.id,
+      nickname: emailPrefix,
+      bio: null,
+      location: null,
+    }, { onConflict: 'id' })
+  }
+
   const [
     { data: profile },
     { data: trackers },

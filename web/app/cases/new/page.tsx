@@ -68,7 +68,7 @@ export default function NewCasePage() {
             {(['admitted','waitlisted','rejected'] as const).map(r => (
               <label key={r} className="flex-1">
                 <input type="radio" name="result" value={r} className="sr-only peer" defaultChecked={r==='admitted'} />
-                <div className={`text-center py-2 rounded-xl border text-xs font-medium cursor-pointer peer-checked:border-[#FF6A00] peer-checked:bg-orange-50 peer-checked:text-[#FF6A00] border-gray-200 text-gray-500`}>
+                <div className={`text-center py-2 rounded-xl border text-xs font-medium cursor-pointer peer-checked:border-[#1A4B8C] peer-checked:bg-blue-50 peer-checked:text-[#1A4B8C] border-gray-200 text-gray-500`}>
                   {r === 'admitted' ? '🎉 录取' : r === 'waitlisted' ? '⏳ 等候' : '❌ 拒绝'}
                 </div>
               </label>
@@ -101,7 +101,7 @@ export default function NewCasePage() {
         {error && <div className="bg-red-50 text-red-600 text-xs px-3 py-2 rounded-lg">{error}</div>}
 
         <button type="submit" disabled={loading}
-          className="w-full py-3 bg-gradient-to-r from-[#FF6A00] to-[#FF9A3C] text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-60">
+          className="w-full py-3 bg-gradient-to-r from-[#1A4B8C] to-[#4A90D9] text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-60">
           {loading && <Loader2 size={15} className="animate-spin" />}
           发布案例
         </button>
@@ -110,7 +110,7 @@ export default function NewCasePage() {
   )
 }
 
-const inputCls = 'w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#FF6A00] transition-colors bg-white'
+const inputCls = 'w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#1A4B8C] transition-colors bg-white'
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (

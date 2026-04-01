@@ -204,7 +204,7 @@ export const universities: University[] = [
     deadline: "2025-03-31",
     rolling: false,
     tuition: "£26,200/年",
-    color: "from-orange-500 to-amber-600",
+    color: "from-blue-500 to-indigo-600",
     initial: "CSM",
   },
   {
@@ -332,7 +332,7 @@ export const cases: Case[] = [
     targetProgram: "MA Fine Art",
     result: "admitted",
     excerpt: "CSM 录取！GPA 不高照样上名校，文书和视频任务才是制胜关键，分享我的备考思路...",
-    coverGradient: "from-amber-400 via-orange-500 to-red-500",
+    coverGradient: "from-blue-400 via-indigo-500 to-violet-600",
     tags: ["插画", "CSM", "视频任务"],
     likeCount: 445,
     commentCount: 72,
@@ -539,7 +539,7 @@ export const feedItems: FeedItem[] = [
     type: "topic",
     title: "#作品集改稿记录 一个装置艺术系列的诞生",
     excerpt: "从最初的草稿到最终提交给牛津的版本，记录三个月的改稿历程，每次修改的原因都写清楚了...",
-    coverGradient: "from-amber-400 via-orange-500 to-red-500",
+    coverGradient: "from-blue-400 via-indigo-500 to-violet-600",
     schoolTag: "#作品集话题",
     authorName: "装置艺术家K",
     authorAvatar: "🔮",
@@ -577,7 +577,7 @@ export const stories = [
   { id: "s2", name: "剑桥", initial: "Cam", color: "from-sky-500 to-blue-600" },
   { id: "s3", name: "帝国+RCA", initial: "IDE", color: "from-purple-600 to-violet-700" },
   { id: "s4", name: "UCL", initial: "UCL", color: "from-emerald-500 to-teal-600" },
-  { id: "s5", name: "CSM", initial: "CSM", color: "from-orange-500 to-amber-600" },
+  { id: "s5", name: "CSM", initial: "CSM", color: "from-blue-500 to-indigo-600" },
   { id: "s6", name: "爱丁堡", initial: "Edin", color: "from-rose-500 to-pink-600" },
 ];
 

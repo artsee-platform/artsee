@@ -36,7 +36,7 @@ export function TrackerCard({ tracker }: { tracker: ApplicationTracker }) {
             <div key={step} className="flex items-center flex-1">
               <div
                 className={`w-full h-1 rounded-full transition-colors ${
-                  i <= currentStep ? "bg-[#FF6A00]" : "bg-gray-200"
+                  i <= currentStep ? "bg-[#1A4B8C]" : "bg-gray-200"
                 }`}
               />
             </div>

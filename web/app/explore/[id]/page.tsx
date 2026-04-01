@@ -43,8 +43,16 @@ export default async function ProgramDetailPage({ params }: { params: Promise<{ 
     ? program.program_fees[0]
     : program.program_fees
 
-  const gradient = school ? getSchoolGradient(school.name_zh) : 'from-gray-500 to-slate-600'
-  const initial = school ? getSchoolInitial(school.name_zh) : '?'
+  // 占位学校名降级显示英文名
+  const isPlaceholder = !school?.name_zh || school.name_zh === '综合艺术院校'
+  const schoolDisplayName = isPlaceholder
+    ? (school?.name_en ?? '未知院校')
+    : school!.name_zh
+  const cityDisplay = school?.city === 'Various' ? '' : (school?.city ?? '')
+  const countryDisplay = school?.country === 'Various' ? '英国' : (school?.country ?? '')
+
+  const gradient = school ? getSchoolGradient(schoolDisplayName) : 'from-gray-500 to-slate-600'
+  const initial = school ? getSchoolInitial(schoolDisplayName) : '?'
 
   return (
     <div className="pb-6">
@@ -59,8 +67,8 @@ export default async function ProgramDetailPage({ params }: { params: Promise<{ 
           </div>
           <div className="flex-1">
             <h1 className="text-white font-bold text-base leading-snug">{program.program_name}</h1>
-            <p className="text-white/80 text-xs mt-0.5">{school?.name_zh}</p>
-            <p className="text-white/60 text-[10px] mt-0.5">{school?.city}，{school?.country}</p>
+            <p className="text-white/80 text-xs mt-0.5">{schoolDisplayName}</p>
+            <p className="text-white/60 text-[10px] mt-0.5">{[cityDisplay, countryDisplay].filter(Boolean).join('，')}</p>
           </div>
         </div>
 
@@ -100,7 +108,7 @@ export default async function ProgramDetailPage({ params }: { params: Promise<{ 
 
       {/* 项目简介 */}
       {program.program_overview && (
-        <Section title="项目简介" icon={<FileText size={14} className="text-[#FF6A00]" />}>
+        <Section title="项目简介" icon={<FileText size={14} className="text-[#1A4B8C]" />}>
           <p className="text-xs text-gray-600 leading-relaxed">{program.program_overview}</p>
         </Section>
       )}
@@ -166,7 +174,7 @@ export default async function ProgramDetailPage({ params }: { params: Promise<{ 
 
       {/* 学费详情 */}
       {fee && (
-        <Section title="费用信息" icon={<Clock size={14} className="text-orange-500" />}>
+        <Section title="费用信息" icon={<Clock size={14} className="text-blue-700" />}>
           <div className="space-y-2">
             {fee.international_tuition_fee && (
               <ReqRow label="国际生学费" value={`${fee.currency_code ?? 'GBP'} ${Number(fee.international_tuition_fee).toLocaleString()}`} />
@@ -200,7 +208,7 @@ function ReqRow({ label, value, highlight }: { label: string; value: string; hig
   return (
     <div className="flex items-start justify-between gap-2">
       <span className="text-[11px] text-gray-500 flex-shrink-0">{label}</span>
-      <span className={`text-[11px] font-medium text-right ${highlight ? 'text-[#FF6A00]' : 'text-gray-700'}`}>{value}</span>
+      <span className={`text-[11px] font-medium text-right ${highlight ? 'text-[#1A4B8C]' : 'text-gray-700'}`}>{value}</span>
     </div>
   )
 }
@@ -208,7 +216,7 @@ function ReqRow({ label, value, highlight }: { label: string; value: string; hig
 function Tag({ children, color }: { children: React.ReactNode; color: string }) {
   const colorMap: Record<string, string> = {
     blue: 'bg-blue-50 text-blue-600 border-blue-200',
-    amber: 'bg-amber-50 text-amber-600 border-amber-200',
+    amber: 'bg-blue-50 text-blue-700 border-blue-200',
     purple: 'bg-purple-50 text-purple-600 border-purple-200',
     green: 'bg-green-50 text-green-600 border-green-200',
   }

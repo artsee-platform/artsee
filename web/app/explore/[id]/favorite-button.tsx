@@ -31,7 +31,7 @@ export function FavoriteButton({ programId, initialFavorited, isLoggedIn }: {
       disabled={loading}
       className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-medium shadow-sm transition-all ${
         favorited
-          ? 'bg-[#FF6A00] text-white'
+          ? 'bg-[#1A4B8C] text-white'
           : 'border border-gray-200 bg-white text-gray-600'
       }`}
     >

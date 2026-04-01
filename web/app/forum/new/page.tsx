@@ -12,7 +12,7 @@ const typeOptions = [
   { value: 'news', label: '📰 资讯', desc: '分享行业资讯和最新消息' },
 ] as const
 
-const inputCls = 'w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#FF6A00] transition-colors bg-white'
+const inputCls = 'w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#1A4B8C] transition-colors bg-white'
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -57,15 +57,15 @@ export default function NewPostPage() {
           <div className="space-y-2">
             {typeOptions.map(opt => (
               <label key={opt.value} className="flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors peer"
-                style={{ borderColor: type === opt.value ? '#FF6A00' : '#e5e7eb', backgroundColor: type === opt.value ? '#fff7f0' : 'white' }}>
+                style={{ borderColor: type === opt.value ? '#1A4B8C' : '#e5e7eb', backgroundColor: type === opt.value ? '#fff7f0' : 'white' }}>
                 <input type="radio" name="type" value={opt.value} className="sr-only"
                   checked={type === opt.value} onChange={() => setType(opt.value)} />
                 <div className="flex-1">
                   <p className="text-xs font-semibold text-gray-800">{opt.label}</p>
                   <p className="text-[10px] text-gray-500 mt-0.5">{opt.desc}</p>
                 </div>
-                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${type === opt.value ? 'border-[#FF6A00]' : 'border-gray-300'}`}>
-                  {type === opt.value && <div className="w-2 h-2 rounded-full bg-[#FF6A00]" />}
+                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${type === opt.value ? 'border-[#1A4B8C]' : 'border-gray-300'}`}>
+                  {type === opt.value && <div className="w-2 h-2 rounded-full bg-[#1A4B8C]" />}
                 </div>
               </label>
             ))}
@@ -89,7 +89,7 @@ export default function NewPostPage() {
         {error && <div className="bg-red-50 text-red-600 text-xs px-3 py-2 rounded-lg">{error}</div>}
 
         <button type="submit" disabled={loading}
-          className="w-full py-3 bg-gradient-to-r from-[#FF6A00] to-[#FF9A3C] text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-60">
+          className="w-full py-3 bg-gradient-to-r from-[#1A4B8C] to-[#4A90D9] text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-60">
           {loading && <Loader2 size={15} className="animate-spin" />}
           发布帖子
         </button>

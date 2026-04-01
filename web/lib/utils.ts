@@ -5,33 +5,45 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-// 颜色映射：院校 → 渐变色
+// 颜色映射：院校关键词 → 渐变色（模糊匹配）
 export const schoolGradients: Record<string, string> = {
-  '牛津大学': 'from-blue-600 to-indigo-700',
-  '剑桥大学': 'from-sky-500 to-blue-600',
-  '帝国理工+RCA': 'from-purple-600 to-violet-700',
-  '帝国理工学院': 'from-purple-600 to-violet-700',
+  '牛津': 'from-blue-600 to-indigo-700',
+  '剑桥': 'from-sky-500 to-blue-600',
+  '帝国理工': 'from-purple-600 to-violet-700',
   'UCL': 'from-emerald-500 to-teal-600',
   '伦敦大学学院': 'from-emerald-500 to-teal-600',
-  '爱丁堡大学': 'from-rose-500 to-pink-600',
-  '中央圣马丁': 'from-orange-500 to-amber-600',
-  '坎伯韦尔艺术学院': 'from-fuchsia-500 to-purple-600',
-  '皇家艺术学院': 'from-red-500 to-rose-600',
+  '爱丁堡': 'from-rose-500 to-pink-600',
+  '中央圣马丁': 'from-blue-500 to-indigo-600',
+  '坎伯韦尔': 'from-fuchsia-500 to-purple-600',
+  '皇家艺术': 'from-red-500 to-rose-600',
   '综合艺术院校': 'from-violet-500 to-purple-600',
+  '格拉斯哥': 'from-teal-500 to-cyan-600',
+  '鲁斯金': 'from-blue-400 to-indigo-500',
+  '切尔西': 'from-cyan-500 to-blue-600',
+  '伦敦时装': 'from-pink-500 to-rose-600',
+  '伦敦传播': 'from-indigo-500 to-blue-600',
+  '伦敦艺术大学': 'from-blue-500 to-cyan-600',
+  '柏林': 'from-slate-600 to-blue-700',
+  '佛罗伦萨': 'from-amber-600 to-yellow-700',
+  '巴黎': 'from-violet-500 to-purple-600',
 }
 
 export function getSchoolGradient(name: string): string {
-  return schoolGradients[name] ?? 'from-gray-500 to-slate-600'
+  const key = Object.keys(schoolGradients).find(k => name.includes(k))
+  return key ? schoolGradients[key] : 'from-blue-500 to-indigo-600'
 }
 
 export function getSchoolInitial(name: string): string {
   const map: Record<string, string> = {
-    '牛津大学': 'Ox', '剑桥大学': 'Cam', '帝国理工+RCA': 'IDE',
-    'UCL': 'UCL', '伦敦大学学院': 'UCL', '爱丁堡大学': 'Edin',
-    '中央圣马丁': 'CSM', '坎伯韦尔艺术学院': 'CAM', '皇家艺术学院': 'RCA',
-    '综合艺术院校': 'Art',
+    '牛津': 'Ox', '剑桥': 'Cam', '帝国理工': 'IC',
+    'UCL': 'UCL', '爱丁堡': 'Edin', '中央圣马丁': 'CSM',
+    '坎伯韦尔': 'CAM', '皇家艺术': 'RCA', '综合艺术院校': 'Art',
+    '格拉斯哥': 'GSA', '鲁斯金': 'Rus', '切尔西': 'CCA',
+    '伦敦时装': 'LCF', '伦敦传播': 'LCC', '伦敦艺术大学': 'UAL',
+    '柏林': 'UdK', '佛罗伦萨': 'AFAM', '巴黎': 'ENSBA',
   }
-  return map[name] ?? name.slice(0, 3)
+  const key = Object.keys(map).find(k => name.includes(k))
+  return key ? map[key] : name.slice(0, 2)
 }
 
 export const resultLabel = {
@@ -55,7 +67,7 @@ export const statusColor = {
   planning: 'bg-gray-100 text-gray-600',
   preparing: 'bg-blue-100 text-blue-700',
   submitted: 'bg-purple-100 text-purple-700',
-  interview: 'bg-amber-100 text-amber-700',
+  interview: 'bg-blue-100 text-blue-700',
   admitted: 'bg-green-100 text-green-700',
   rejected: 'bg-red-100 text-red-600',
   waitlisted: 'bg-yellow-100 text-yellow-700',

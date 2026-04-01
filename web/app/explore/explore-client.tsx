@@ -1,16 +1,22 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { FilterChips } from '@/components/explore/filter-chips'
 import { UniversityCard } from '@/components/explore/university-card'
 import { Search } from 'lucide-react'
 import type { Program } from '@/lib/supabase/types'
 
-export function ExploreClient({ programs }: { programs: Program[] }) {
-  const [search, setSearch] = useState('')
+export function ExploreClient({ programs, initialSchool }: { programs: Program[], initialSchool?: string }) {
+  const [search, setSearch] = useState(initialSchool ?? '')
+  const [debouncedSearch, setDebouncedSearch] = useState(initialSchool ?? '')
   const [degree, setDegree] = useState('全部')
   const [major, setMajor] = useState('全部')
   const [ielts, setIelts] = useState('全部')
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(t)
+  }, [search])
 
   const filtered = useMemo(() => {
     return programs.filter(p => {
@@ -21,8 +27,8 @@ export function ExploreClient({ programs }: { programs: Program[] }) {
         const req = p.program_admissions?.[0]?.ielts_overall
         if (!req || req < min) return false
       }
-      if (search) {
-        const q = search.toLowerCase()
+      if (debouncedSearch) {
+        const q = debouncedSearch.toLowerCase()
         const matchSchool = p.schools?.name_zh?.toLowerCase().includes(q) || p.schools?.name_en?.toLowerCase().includes(q)
         const matchProgram = p.program_name.toLowerCase().includes(q)
         if (!matchSchool && !matchProgram) return false

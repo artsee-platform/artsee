@@ -1,9 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, ThumbsUp, Eye, BadgeCheck, MessageCircle } from 'lucide-react'
+import { ArrowLeft, Eye, BadgeCheck, MessageCircle } from 'lucide-react'
 import { timeAgo } from '@/lib/utils'
 import { ReplySection } from './reply-section'
+import { LikeButton } from './like-button'
 
 const typeStyle: Record<string, { label: string; cls: string; bg: string }> = {
   question:   { label: '问答', cls: 'text-blue-600',   bg: 'from-blue-500 to-indigo-600' },
@@ -23,11 +24,26 @@ export default async function ForumPostPage({ params }: { params: Promise<{ id: 
 
   if (!post) notFound()
 
-  const { data: replies } = await supabase
-    .from('post_replies')
-    .select('*, user_profiles(nickname)')
-    .eq('post_id', id)
-    .order('created_at')
+  const [{ data: replies }, { data: { user } }] = await Promise.all([
+    supabase
+      .from('post_replies')
+      .select('*, user_profiles(nickname)')
+      .eq('post_id', id)
+      .order('created_at'),
+    supabase.auth.getUser(),
+  ])
+
+  let initialLiked = false
+  if (user) {
+    const { data: like } = await supabase
+      .from('likes')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('target_id', id)
+      .eq('target_type', 'post')
+      .single()
+    initialLiked = !!like
+  }
 
   const ts = typeStyle[post.type] ?? typeStyle.discussion
 
@@ -46,7 +62,7 @@ export default async function ForumPostPage({ params }: { params: Promise<{ id: 
 
       {/* 作者卡片 */}
       <div className="mx-4 -mt-4 bg-white rounded-2xl p-3 shadow-md border border-gray-100 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6A00] to-[#FF9A3C] flex items-center justify-center text-white font-bold text-sm">
+        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#1A4B8C] to-[#4A90D9] flex items-center justify-center text-white font-bold text-sm">
           {post.user_profiles?.nickname?.[0] ?? '?'}
         </div>
         <div className="flex-1">
@@ -54,7 +70,7 @@ export default async function ForumPostPage({ params }: { params: Promise<{ id: 
             <span className="text-sm font-semibold text-gray-900">
               {post.user_profiles?.nickname ?? '用户'}
             </span>
-            {post.is_mentor_post && <BadgeCheck size={14} className="text-[#FF6A00]" />}
+            {post.is_mentor_post && <BadgeCheck size={14} className="text-[#1A4B8C]" />}
           </div>
           <p className="text-[10px] text-gray-400">{timeAgo(post.created_at)}</p>
         </div>
@@ -62,9 +78,7 @@ export default async function ForumPostPage({ params }: { params: Promise<{ id: 
           <div className="flex items-center gap-1">
             <Eye size={12} /><span className="text-[10px]">{post.view_count}</span>
           </div>
-          <div className="flex items-center gap-1">
-            <ThumbsUp size={12} /><span className="text-[10px]">{post.like_count}</span>
-          </div>
+          <LikeButton postId={id} initialLikeCount={post.like_count} initialLiked={initialLiked} />
         </div>
       </div>
 
@@ -72,7 +86,7 @@ export default async function ForumPostPage({ params }: { params: Promise<{ id: 
       {post.tags?.length > 0 && (
         <div className="flex gap-2 px-4 mt-3 flex-wrap">
           {post.tags.map((tag: string) => (
-            <span key={tag} className="text-[10px] bg-orange-50 text-[#FF6A00] border border-orange-200 px-2 py-0.5 rounded-full">
+            <span key={tag} className="text-[10px] bg-blue-50 text-[#1A4B8C] border border-blue-200 px-2 py-0.5 rounded-full">
               #{tag}
             </span>
           ))}
@@ -89,7 +103,7 @@ export default async function ForumPostPage({ params }: { params: Promise<{ id: 
       {/* 回复区 */}
       <div className="mx-4 mt-4">
         <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-1">
-          <MessageCircle size={14} className="text-[#FF6A00]" />
+          <MessageCircle size={14} className="text-[#1A4B8C]" />
           {replies?.length ?? 0} 条回复
         </h2>
         {replies?.map(r => (

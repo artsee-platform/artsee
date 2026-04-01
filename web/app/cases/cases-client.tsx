@@ -5,7 +5,7 @@ import { WaterfallGrid } from '@/components/cases/waterfall-grid'
 import Link from 'next/link'
 import type { Case } from '@/lib/supabase/types'
 
-const tabs = ['全部案例', '录取', '等候'] as const
+const tabs = ['全部案例', '录取', '等候', '已拒绝'] as const
 const tagFilters = ['全部', '纯艺', '建筑', '设计', '插画', '摄影', 'IDE']
 
 export function CasesClient({ cases }: { cases: Case[] }) {
@@ -16,6 +16,7 @@ export function CasesClient({ cases }: { cases: Case[] }) {
     let list = cases
     if (activeTab === '录取') list = list.filter(c => c.result === 'admitted')
     else if (activeTab === '等候') list = list.filter(c => c.result === 'waitlisted')
+    else if (activeTab === '已拒绝') list = list.filter(c => c.result === 'rejected')
     if (activeTag !== '全部') list = list.filter(c => c.tags?.includes(activeTag) || c.target_program?.includes(activeTag))
     return list
   }, [cases, activeTab, activeTag])
@@ -26,7 +27,7 @@ export function CasesClient({ cases }: { cases: Case[] }) {
         {tabs.map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
             className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              activeTab === tab ? 'bg-[#FF6A00] text-white' : 'text-gray-500 hover:bg-gray-50'
+              activeTab === tab ? 'bg-[#1A4B8C] text-white' : 'text-gray-500 hover:bg-gray-50'
             }`}>{tab}</button>
         ))}
       </div>
@@ -35,7 +36,7 @@ export function CasesClient({ cases }: { cases: Case[] }) {
         {tagFilters.map(tag => (
           <button key={tag} onClick={() => setActiveTag(tag)}
             className={`flex-shrink-0 text-[10px] px-2.5 py-1 rounded-full font-medium transition-colors ${
-              activeTag === tag ? 'bg-[#FF6A00] text-white' : 'bg-gray-100 text-gray-500'
+              activeTag === tag ? 'bg-[#1A4B8C] text-white' : 'bg-gray-100 text-gray-500'
             }`}>{tag}</button>
         ))}
       </div>
@@ -43,7 +44,7 @@ export function CasesClient({ cases }: { cases: Case[] }) {
       <div className="flex items-center justify-between px-4 mb-3">
         <span className="text-xs text-gray-500">{filtered.length} 条案例</span>
         <Link href="/cases/new"
-          className="flex items-center gap-1 bg-[#FF6A00] text-white text-xs font-medium px-3 py-1.5 rounded-full">
+          className="flex items-center gap-1 bg-[#1A4B8C] text-white text-xs font-medium px-3 py-1.5 rounded-full">
           <span>+</span><span>分享案例</span>
         </Link>
       </div>

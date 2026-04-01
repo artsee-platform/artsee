@@ -16,7 +16,7 @@ export function PostCard({ post }: { post: Post }) {
       <article className="px-4 py-3 border-b border-gray-100 active:bg-gray-50 transition-colors">
         {/* 作者行 */}
         <div className="flex items-center gap-2 mb-2">
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#FF6A00] to-[#FF9A3C] flex items-center justify-center text-white text-xs font-bold">
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#1A4B8C] to-[#4A90D9] flex items-center justify-center text-white text-xs font-bold">
             {post.user_profiles?.nickname?.[0] ?? '?'}
           </div>
           <div className="flex items-center gap-1">
@@ -24,7 +24,7 @@ export function PostCard({ post }: { post: Post }) {
               {post.user_profiles?.nickname ?? '用户'}
             </span>
             {post.is_mentor_post && (
-              <BadgeCheck size={13} className="text-[#FF6A00]" />
+              <BadgeCheck size={13} className="text-[#1A4B8C]" />
             )}
           </div>
           <span className="text-[10px] text-gray-400 ml-auto">{timeAgo(post.created_at)}</span>

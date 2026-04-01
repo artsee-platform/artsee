@@ -41,7 +41,7 @@ export default async function HomePage() {
   return (
     <div className="pb-4">
       {/* 精选推荐 banner */}
-      <div className="mx-4 mt-3 mb-1 rounded-2xl overflow-hidden bg-gradient-to-r from-[#FF6A00] to-[#FF9A3C] p-4 text-white">
+      <div className="mx-4 mt-3 mb-1 rounded-2xl overflow-hidden bg-gradient-to-r from-[#1A4B8C] to-[#4A90D9] p-4 text-white">
         <p className="text-[10px] font-medium opacity-80 mb-0.5">🎉 今日精选</p>
         <h2 className="text-sm font-bold leading-snug">
           2026秋季英国艺术留学
@@ -57,7 +57,7 @@ export default async function HomePage() {
       {/* 分区标题 */}
       <div className="flex items-center justify-between px-4 mb-2">
         <h2 className="text-sm font-semibold text-gray-900">发现 · 精选</h2>
-        <Link href="/cases" className="text-xs text-[#FF6A00] font-medium">查看全部</Link>
+        <Link href="/cases" className="text-xs text-[#1A4B8C] font-medium">查看全部</Link>
       </div>
 
       {/* 混合信息流 */}
@@ -85,7 +85,7 @@ function CaseFeedCard({ c }: { c: Case }) {
     <Link href={`/cases/${c.id}`}>
       <article className="mx-4 mb-4 rounded-2xl overflow-hidden bg-white shadow-sm border border-gray-100">
         <div className={`h-44 bg-gradient-to-br ${gradient} relative`}>
-          <span className="absolute top-3 left-3 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#FF6A00] text-white">
+          <span className="absolute top-3 left-3 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#1A4B8C] text-white">
             案例
           </span>
           {c.target_school && (
@@ -103,7 +103,7 @@ function CaseFeedCard({ c }: { c: Case }) {
           </p>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#FF6A00] to-[#FF9A3C] flex items-center justify-center text-white text-[9px] font-bold">
+              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#1A4B8C] to-[#4A90D9] flex items-center justify-center text-white text-[9px] font-bold">
                 {c.is_anonymous ? '匿' : (c.user_profiles?.nickname?.[0] ?? '?')}
               </div>
               <span className="text-xs text-gray-500">{c.is_anonymous ? '匿名' : (c.user_profiles?.nickname ?? '用户')}</span>

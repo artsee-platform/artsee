@@ -9,7 +9,7 @@ export function FeedCard({ item }: { item: FeedItem }) {
   }[item.type];
 
   const typeBg = {
-    case: "bg-[#FF6A00] text-white",
+    case: "bg-[#1A4B8C] text-white",
     news: "bg-gray-700 text-white",
     topic: "bg-purple-500 text-white",
   }[item.type];

@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Heart, MessageCircle, Bookmark, Calendar } from 'lucide-react'
+import { ArrowLeft, Calendar } from 'lucide-react'
 import { resultLabel, resultColor, timeAgo } from '@/lib/utils'
+import { InteractionButtons } from './interaction-buttons'
 
 export default async function CaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -16,11 +17,20 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
 
   if (!c) notFound()
 
-  const { data: replies } = await supabase
-    .from('post_replies')
-    .select('*, user_profiles(nickname)')
-    .eq('post_id', id)
-    .order('created_at')
+  const { data: { user } } = await supabase.auth.getUser()
+
+  // Check if current user has liked this case
+  let initialLiked = false
+  if (user) {
+    const { data: like } = await supabase
+      .from('likes')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('target_id', id)
+      .eq('target_type', 'case')
+      .single()
+    initialLiked = !!like
+  }
 
   const result = c.result as keyof typeof resultLabel
   const gradient = c.cover_gradient ?? 'from-blue-500 to-purple-600'
@@ -43,7 +53,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
       {/* 申请人信息卡 */}
       <div className="mx-4 -mt-4 bg-white rounded-2xl p-4 shadow-md border border-gray-100">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6A00] to-[#FF9A3C] flex items-center justify-center">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#1A4B8C] to-[#4A90D9] flex items-center justify-center">
             <span className="text-white text-sm">🎨</span>
           </div>
           <div className="flex-1">
@@ -69,7 +79,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
       {c.tags?.length > 0 && (
         <div className="flex gap-2 px-4 mt-3 flex-wrap">
           {c.tags.map((tag: string) => (
-            <span key={tag} className="text-[10px] bg-orange-50 text-[#FF6A00] border border-orange-200 px-2 py-0.5 rounded-full">
+            <span key={tag} className="text-[10px] bg-blue-50 text-[#1A4B8C] border border-blue-200 px-2 py-0.5 rounded-full">
               #{tag}
             </span>
           ))}
@@ -85,17 +95,13 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
       </div>
 
       {/* 互动 */}
-      <div className="mx-4 mt-3 flex gap-3">
-        <button className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-gray-200 bg-white rounded-xl text-xs font-medium text-gray-600">
-          <Heart size={14} /> {c.like_count} 赞
-        </button>
-        <button className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-gray-200 bg-white rounded-xl text-xs font-medium text-gray-600">
-          <Bookmark size={14} /> {c.save_count} 收藏
-        </button>
-        <button className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-gray-200 bg-white rounded-xl text-xs font-medium text-gray-600">
-          <MessageCircle size={14} /> {c.comment_count} 评论
-        </button>
-      </div>
+      <InteractionButtons
+        caseId={id}
+        initialLikeCount={c.like_count}
+        initialSaveCount={c.save_count}
+        initialCommentCount={c.comment_count}
+        initialLiked={initialLiked}
+      />
 
       {/* 发布时间 */}
       <div className="mx-4 mt-2 flex items-center gap-1 text-[10px] text-gray-400">

@@ -1,7 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
 import { ExploreClient } from './explore-client'
 
-export default async function ExplorePage() {
+export default async function ExplorePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ school?: string }>
+}) {
+  const { school } = await searchParams
   const supabase = await createClient()
 
   const { data: programs } = await supabase
@@ -15,5 +20,5 @@ export default async function ExplorePage() {
     .eq('status', 'active')
     .order('id')
 
-  return <ExploreClient programs={programs ?? []} />
+  return <ExploreClient programs={programs ?? []} initialSchool={school} />
 }

@@ -27,7 +27,7 @@ export function FilterChips({ onFilter }: FilterChipsProps) {
         {filters.degree.map((d) => (
           <button key={d} onClick={() => { setActiveDegree(d); update(d, activeMajor, activeIelts); }}
             className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-              activeDegree === d ? "bg-[#FF6A00] text-white" : "bg-gray-100 text-gray-600"
+              activeDegree === d ? "bg-[#1A4B8C] text-white" : "bg-gray-100 text-gray-600"
             }`}>{d}</button>
         ))}
       </div>
@@ -36,7 +36,7 @@ export function FilterChips({ onFilter }: FilterChipsProps) {
           <button key={m} onClick={() => { setActiveMajor(m); update(activeDegree, m, activeIelts); }}
             className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
               activeMajor === m
-                ? "bg-[#FF6A00]/10 text-[#FF6A00] border border-[#FF6A00]/30"
+                ? "bg-[#1A4B8C]/10 text-[#1A4B8C] border border-[#1A4B8C]/30"
                 : "bg-gray-50 text-gray-500 border border-gray-200"
             }`}>{m}</button>
         ))}

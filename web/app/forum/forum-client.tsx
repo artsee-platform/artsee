@@ -48,7 +48,7 @@ export function ForumClient({ posts }: { posts: Post[] }) {
             </button>
           ))}
         </div>
-        <Link href="/forum/new" className="w-8 h-8 bg-[#FF6A00] rounded-xl flex items-center justify-center flex-shrink-0">
+        <Link href="/forum/new" className="w-8 h-8 bg-[#1A4B8C] rounded-xl flex items-center justify-center flex-shrink-0">
           <PenSquare size={15} className="text-white" />
         </Link>
       </div>
@@ -60,7 +60,7 @@ export function ForumClient({ posts }: { posts: Post[] }) {
             key={tag}
             onClick={() => setActiveTag(tag)}
             className={`flex-shrink-0 text-[10px] px-2.5 py-1 rounded-full font-medium whitespace-nowrap transition-colors ${
-              activeTag === tag ? 'bg-[#FF6A00] text-white' : 'bg-gray-100 text-gray-600'
+              activeTag === tag ? 'bg-[#1A4B8C] text-white' : 'bg-gray-100 text-gray-600'
             }`}
           >
             {tag}
