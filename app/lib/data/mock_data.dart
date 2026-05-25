@@ -338,7 +338,8 @@ class MockData {
       country: '美国',
       city: '纽约',
       logo: 'https://via.placeholder.com/100x100/A8C4E0/FFFFFF?text=Parsons',
-      coverImage: 'https://via.placeholder.com/800x400/5A8FC9/FFFFFF?text=Parsons',
+      coverImage:
+          'https://via.placeholder.com/800x400/5A8FC9/FFFFFF?text=Parsons',
       qsRank: 4,
       artRank: 4,
       description: '纽约著名设计学院，时装设计专业全球领先。',
@@ -473,10 +474,30 @@ class MockData {
       status: 'submitted',
       progress: 40,
       tasks: [
-        ApplicationTask(id: 'task_001', title: '准备作品集', deadline: '2024-01-15', status: 'completed', priority: 'high'),
-        ApplicationTask(id: 'task_002', title: '撰写个人陈述', deadline: '2024-01-20', status: 'completed', priority: 'high'),
-        ApplicationTask(id: 'task_003', title: '提交申请', deadline: '2024-02-01', status: 'completed', priority: 'high'),
-        ApplicationTask(id: 'task_004', title: '准备面试', deadline: '2024-03-15', status: 'in_progress', priority: 'high'),
+        ApplicationTask(
+            id: 'task_001',
+            title: '准备作品集',
+            deadline: '2024-01-15',
+            status: 'completed',
+            priority: 'high'),
+        ApplicationTask(
+            id: 'task_002',
+            title: '撰写个人陈述',
+            deadline: '2024-01-20',
+            status: 'completed',
+            priority: 'high'),
+        ApplicationTask(
+            id: 'task_003',
+            title: '提交申请',
+            deadline: '2024-02-01',
+            status: 'completed',
+            priority: 'high'),
+        ApplicationTask(
+            id: 'task_004',
+            title: '准备面试',
+            deadline: '2024-03-15',
+            status: 'in_progress',
+            priority: 'high'),
       ],
     ),
     ApplicationProgress(
@@ -486,10 +507,30 @@ class MockData {
       status: 'offer',
       progress: 100,
       tasks: [
-        ApplicationTask(id: 'task_005', title: '准备作品集', deadline: '2024-01-10', status: 'completed', priority: 'high'),
-        ApplicationTask(id: 'task_006', title: '提交申请', deadline: '2024-01-15', status: 'completed', priority: 'high'),
-        ApplicationTask(id: 'task_007', title: '面试', deadline: '2024-02-20', status: 'completed', priority: 'high'),
-        ApplicationTask(id: 'task_008', title: '收到Offer', deadline: '2024-03-01', status: 'completed', priority: 'high'),
+        ApplicationTask(
+            id: 'task_005',
+            title: '准备作品集',
+            deadline: '2024-01-10',
+            status: 'completed',
+            priority: 'high'),
+        ApplicationTask(
+            id: 'task_006',
+            title: '提交申请',
+            deadline: '2024-01-15',
+            status: 'completed',
+            priority: 'high'),
+        ApplicationTask(
+            id: 'task_007',
+            title: '面试',
+            deadline: '2024-02-20',
+            status: 'completed',
+            priority: 'high'),
+        ApplicationTask(
+            id: 'task_008',
+            title: '收到Offer',
+            deadline: '2024-03-01',
+            status: 'completed',
+            priority: 'high'),
       ],
     ),
   ];
@@ -500,7 +541,8 @@ class MockData {
       id: 'resource_001',
       type: 'tour',
       title: '伦敦艺术深度游',
-      coverImage: 'https://via.placeholder.com/600x400/183b90/FFFFFF?text=London',
+      coverImage:
+          'https://via.placeholder.com/600x400/183b90/FFFFFF?text=London',
       location: '英国伦敦',
       duration: '7天6晚',
       price: 25800,
@@ -511,7 +553,8 @@ class MockData {
       id: 'resource_002',
       type: 'camp',
       title: '托斯卡纳写生营',
-      coverImage: 'https://via.placeholder.com/600x400/425691/FFFFFF?text=Tuscany',
+      coverImage:
+          'https://via.placeholder.com/600x400/425691/FFFFFF?text=Tuscany',
       location: '意大利托斯卡纳',
       duration: '10天9晚',
       price: 19800,
@@ -522,7 +565,8 @@ class MockData {
       id: 'resource_003',
       type: 'course',
       title: '帕森斯暑期课程',
-      coverImage: 'https://via.placeholder.com/600x400/4074b1/FFFFFF?text=Parsons',
+      coverImage:
+          'https://via.placeholder.com/600x400/4074b1/FFFFFF?text=Parsons',
       location: '美国纽约',
       duration: '4周',
       price: 45000,
@@ -547,7 +591,9 @@ class MockData {
         followers: 456,
         following: 34,
       ),
-      images: ['https://via.placeholder.com/600x800/183b90/FFFFFF?text=Artwork1'],
+      images: [
+        'https://via.placeholder.com/600x800/183b90/FFFFFF?text=Artwork1'
+      ],
       category: '油画',
       price: 12000,
       description: '探索城市变迁中的情感记忆，用色彩表达都市生活的节奏。',
@@ -567,7 +613,9 @@ class MockData {
         followers: 678,
         following: 56,
       ),
-      images: ['https://via.placeholder.com/600x800/4074b1/FFFFFF?text=Artwork2'],
+      images: [
+        'https://via.placeholder.com/600x800/4074b1/FFFFFF?text=Artwork2'
+      ],
       category: '水彩',
       price: 5800,
       description: '捕捉自然界的微妙变化，展现生命的律动。',
@@ -581,7 +629,8 @@ class MockData {
       id: 'news_001',
       title: 'RCA 2024申请截止日期延期通知',
       summary: '由于申请人数过多，RCA决定延长部分专业的申请截止日期。',
-      coverImage: 'https://via.placeholder.com/800x400/4074b1/FFFFFF?text=RCA+News',
+      coverImage:
+          'https://via.placeholder.com/800x400/4074b1/FFFFFF?text=RCA+News',
       category: '院校动态',
       views: 5678,
       publishedAt: '2024-03-22T10:00:00Z',
@@ -590,7 +639,8 @@ class MockData {
       id: 'news_002',
       title: '2024年全球艺术院校排名发布',
       summary: 'QS最新发布2024年艺术与设计院校排名，RCA连续第10年蝉联榜首。',
-      coverImage: 'https://via.placeholder.com/800x400/425691/FFFFFF?text=Ranking',
+      coverImage:
+          'https://via.placeholder.com/800x400/425691/FFFFFF?text=Ranking',
       category: '行业资讯',
       views: 8901,
       publishedAt: '2024-03-20T16:00:00Z',
@@ -600,27 +650,32 @@ class MockData {
   // ==================== 数据获取方法 ====================
 
   static User getCurrentUser() => currentUser;
-  
+
   static List<School> getSchools() => schools;
-  
-  static School? getSchoolById(String id) => 
-    schools.firstWhere((s) => s.id == id, orElse: () => null as School);
-  
+
+  static School? getSchoolById(String id) {
+    for (final school in schools) {
+      if (school.id == id) return school;
+    }
+    return null;
+  }
+
   static List<Post> getPosts({String? type}) {
     if (type == null) return posts;
     return posts.where((p) => p.type == type).toList();
   }
-  
+
   static List<Mentor> getMentors() => mentors;
-  
-  static List<ApplicationProgress> getApplicationProgress() => applicationProgress;
-  
+
+  static List<ApplicationProgress> getApplicationProgress() =>
+      applicationProgress;
+
   static List<ArtResource> getArtResources({String? type}) {
     if (type == null) return artResources;
     return artResources.where((r) => r.type == type).toList();
   }
-  
+
   static List<Artwork> getArtworks() => artworks;
-  
+
   static List<News> getNews() => newsList;
 }

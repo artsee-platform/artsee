@@ -28,9 +28,20 @@ import {
   formatHistoryForPrompt,
 } from '@/lib/memory';
 
-const GLM_API_KEY = process.env.GLM_API_KEY;
-const GLM_BASE_URL = process.env.GLM_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4';
-const CHAT_MODEL = 'glm-4-flash';
+const CHAT_API_KEY =
+  process.env.OPENAI_API_KEY ||
+  process.env.MOONSHOT_API_KEY ||
+  process.env.GLM_API_KEY;
+const CHAT_BASE_URL =
+  process.env.OPENAI_BASE_URL ||
+  process.env.AI_BASE_URL ||
+  process.env.GLM_BASE_URL ||
+  'https://api.openai.com/v1';
+const CHAT_MODEL = process.env.AI_MODEL || process.env.CHAT_MODEL || 'deepseek-chat';
+
+function chatCompletionsUrl(): string {
+  return `${CHAT_BASE_URL.replace(/\/$/, '')}/chat/completions`;
+}
 
 // Cache for Evidence Guard prompt
 let evidenceGuardPrompt: string | null = null;
@@ -120,6 +131,7 @@ export interface ConsultInput {
 }
 
 export interface Source {
+  schoolId?: string;
   schoolName?: string;
   heading: string;
   similarity: number;
@@ -288,6 +300,7 @@ export async function runConsultStages(input: ConsultInput): Promise<ConsultStag
     systemPrompt,
     userMessage,
     sources: knowledgeChunks.map((c) => ({
+      schoolId: c.schoolId,
       schoolName: c.schoolName,
       heading: c.headingPath,
       similarity: c.similarity,
@@ -314,11 +327,15 @@ export async function generate(
 ): Promise<{ answer: string }> {
   const { model = CHAT_MODEL, temperature = 0.7, maxTokens = 800 } = options;
 
-  const response = await fetch(`${GLM_BASE_URL}/chat/completions`, {
+  if (!CHAT_API_KEY) {
+    throw new Error('Missing chat API key. Set OPENAI_API_KEY, MOONSHOT_API_KEY, or GLM_API_KEY.');
+  }
+
+  const response = await fetch(chatCompletionsUrl(), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${GLM_API_KEY}`,
+      Authorization: `Bearer ${CHAT_API_KEY}`,
     },
     body: JSON.stringify({
       model,
@@ -333,7 +350,7 @@ export async function generate(
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`GLM API error: ${errorText}`);
+    throw new Error(`Chat API error: ${errorText}`);
   }
 
   const data = await response.json();
@@ -357,11 +374,15 @@ export async function* streamGenerate(
 ): AsyncGenerator<{ text: string; done: boolean }> {
   const { model = CHAT_MODEL, temperature = 0.7, maxTokens = 800 } = options;
 
-  const response = await fetch(`${GLM_BASE_URL}/chat/completions`, {
+  if (!CHAT_API_KEY) {
+    throw new Error('Missing chat API key. Set OPENAI_API_KEY, MOONSHOT_API_KEY, or GLM_API_KEY.');
+  }
+
+  const response = await fetch(chatCompletionsUrl(), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${GLM_API_KEY}`,
+      Authorization: `Bearer ${CHAT_API_KEY}`,
     },
     body: JSON.stringify({
       model,
@@ -377,7 +398,7 @@ export async function* streamGenerate(
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`GLM API error: ${errorText}`);
+    throw new Error(`Chat API error: ${errorText}`);
   }
 
   const reader = response.body?.getReader();

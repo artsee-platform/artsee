@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class DataService {
@@ -21,7 +22,7 @@ class DataService {
       }
       return [];
     } catch (e) {
-      print('获取学校失败: $e');
+      debugPrint('获取学校失败: $e');
       return [];
     }
   }
@@ -39,7 +40,7 @@ class DataService {
       }
       return [];
     } catch (e) {
-      print('获取项目失败: $e');
+      debugPrint('获取项目失败: $e');
       return [];
     }
   }
@@ -57,7 +58,7 @@ class DataService {
       }
       return null;
     } catch (e) {
-      print('获取项目详情失败: $e');
+      debugPrint('获取项目详情失败: $e');
       return null;
     }
   }
@@ -73,7 +74,7 @@ class DataService {
 
       return response.statusCode == 200;
     } catch (e) {
-      print('收藏失败: $e');
+      debugPrint('收藏失败: $e');
       return false;
     }
   }

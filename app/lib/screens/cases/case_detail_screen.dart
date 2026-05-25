@@ -81,7 +81,7 @@ class _CaseDetailScreenState extends State<CaseDetailScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.3),
+                              color: Colors.white.withValues(alpha: 0.3),
                               borderRadius: BorderRadius.circular(99)),
                           child: Text(resultLabel(c.result),
                               style: const TextStyle(
@@ -114,7 +114,8 @@ class _CaseDetailScreenState extends State<CaseDetailScreen> {
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                        color: Colors.black.withOpacity(0.05), blurRadius: 8)
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 8)
                   ]),
               child: Column(
                 children: [
@@ -177,8 +178,8 @@ class _CaseDetailScreenState extends State<CaseDetailScreen> {
                                 horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
                               color: const Color(0xFFFFF7ED),
-                              border:
-                                  Border.all(color: kPrimary.withOpacity(0.3)),
+                              border: Border.all(
+                                  color: kPrimary.withValues(alpha: 0.3)),
                               borderRadius: BorderRadius.circular(99),
                             ),
                             child: Text('#$t',
@@ -256,7 +257,7 @@ class _CaseDetailError extends StatelessWidget {
             Icon(
               Icons.cloud_off_outlined,
               size: 42,
-              color: context.artC.ink.withOpacity(0.25),
+              color: context.artC.ink.withValues(alpha: 0.25),
             ),
             const SizedBox(height: 12),
             Text(
@@ -274,7 +275,7 @@ class _CaseDetailError extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 height: 1.5,
-                color: context.artC.ink.withOpacity(0.58),
+                color: context.artC.ink.withValues(alpha: 0.58),
               ),
             ),
             const SizedBox(height: 16),

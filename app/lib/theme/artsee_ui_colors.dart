@@ -65,5 +65,6 @@ class ArtseeUiColors extends ThemeExtension<ArtseeUiColors> {
 }
 
 extension ArtseeUiX on BuildContext {
-  ArtseeUiColors get artC => Theme.of(this).extension<ArtseeUiColors>() ?? ArtseeUiColors.light;
+  ArtseeUiColors get artC =>
+      Theme.of(this).extension<ArtseeUiColors>() ?? ArtseeUiColors.light;
 }

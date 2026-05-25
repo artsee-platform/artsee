@@ -1,313 +1,423 @@
-# Artsee Backend
+# Artsee Web Backend
 
-Artsee 的 Next.js 后端服务，主要提供艺术留学相关 API、AI 咨询、知识库检索、用户资料、学校和项目数据管理能力。
+> **艺术留学智能申请平台 - Next.js 后端服务**
 
-当前仓库以 `app/api/` 为核心，没有完整前端页面目录。对外接口主要位于 `app/api/v1/`，另有流式聊天接口 `app/api/chat`。
+Artsee 的 Next.js 后端服务（BFF - Backend for Frontend），为 Flutter 移动客户端和未来 Web 前端提供统一的 RESTful API 接口，涵盖 AI 咨询、知识库检索、院校/专业数据、申请清单管理、社区内容等核心业务。
 
-## 技术栈
+---
 
-- Next.js 15.1.8
-- React 19.1.0
-- TypeScript 5
-- Supabase/PostgreSQL
-- OpenAI 兼容大模型接口
-- GLM/本地 Embedding/Xinference/Ollama/OpenAI Embedding
-- Vitest
-- ESLint 9
+## 📋 目录
 
-注意：本项目使用 Next.js 15，开发前请按 `AGENTS.md` 要求查看 `node_modules/next/dist/docs/` 中的相关文档，避免使用旧版本 API 习惯。
+- [技术栈](#技术栈)
+- [项目结构](#项目结构)
+- [快速开始](#快速开始)
+- [API 文档](#api-文档)
+- [开发指南](#开发指南)
+- [测试](#测试)
+- [部署](#部署)
+- [环境变量](#环境变量)
 
-## 快速开始
+---
+
+## 🛠 技术栈
+
+| 技术 | 版本 | 用途 |
+|------|------|------|
+| **Next.js** | 15.5.18 | 服务端框架 + API Routes |
+| **React** | 19.1.0 | UI 组件（管理后台页面） |
+| **TypeScript** | 5.x | 类型安全 |
+| **Supabase** | 2.49.1 | 数据库 + Auth + Storage |
+| **OpenAI SDK** | 6.33.0 | LLM 调用（支持 Moonshot 等兼容接口） |
+| **Vitest** | 3.2.4 | 单元测试 + 集成测试 |
+| **Tailwind CSS** | 4.x | 样式（管理后台） |
+
+---
+
+## 📁 项目结构
+
+```
+web/
+├── app/
+│   ├── api/                    # API Routes
+│   │   ├── v1/                 # 版本化 API（对外）
+│   │   │   ├── ai/             # AI 咨询、分析、搜索
+│   │   │   ├── auth/           # 用户认证、资料管理
+│   │   │   ├── cases/          # 录取案例
+│   │   │   ├── community/      # 社区帖子、评论
+│   │   │   ├── home-contents/  # 首页内容
+│   │   │   ├── knowledge/      # 知识库搜索
+│   │   │   ├── programs/       # 专业数据
+│   │   │   ├── schools/        # 院校数据
+│   │   │   ├── tracker/        # 申请清单 CRUD
+│   │   │   └── upload/         # 文件上传
+│   │   └── chat/               # 流式对话（SSE）
+│   ├── admin/                  # 管理后台页面
+│   └── [locale]/               # 国际化路由
+├── lib/
+│   ├── api/                    # API 工具函数
+│   │   ├── auth-user.ts        # 用户认证
+│   │   ├── supabase-service.ts # Supabase Service Role 客户端
+│   │   └── supabase-client.ts  # Supabase 浏览器客户端
+│   ├── ai/                     # AI 相关逻辑
+│   │   ├── llm-client.ts       # LLM 调用封装
+│   │   ├── knowledge-search.ts # 知识库检索
+│   │   └── prompt-templates.ts # Prompt 模板
+│   └── utils/                  # 通用工具
+├── scripts/                    # 数据导入、测试脚本
+├── tests/                      # 测试文件
+│   └── api/                    # API 契约测试
+├── docs/                       # 文档
+│   └── migrations/             # 数据库 Migration SQL
+├── .env.development.example    # 开发环境变量示例
+├── .env.production.example     # 生产环境变量示例
+└── package.json
+```
+
+---
+
+## 🚀 快速开始
+
+### 1. 环境准备
+
+**前置要求：**
+- Node.js 20+
+- npm 或 pnpm
+- Supabase 项目（或本地 Supabase）
+
+### 2. 安装依赖
 
 ```bash
+cd web
 npm install
+```
+
+### 3. 配置环境变量
+
+复制示例文件并填写：
+
+```bash
 cp .env.development.example .env.local
+```
+
+**必填变量：**
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# LLM（Moonshot 或 OpenAI 兼容）
+MOONSHOT_API_KEY=your-moonshot-key
+MOONSHOT_BASE_URL=https://api.moonshot.cn/v1
+
+# 可选：OpenAI
+OPENAI_API_KEY=your-openai-key
+```
+
+### 4. 运行数据库 Migration
+
+在 Supabase Dashboard → SQL Editor 中执行 `docs/migrations/` 下的 SQL 文件（按序号顺序）。
+
+### 5. 启动开发服务器
+
+```bash
 npm run dev
 ```
 
-开发服务默认由 `next dev` 启动，通常是：
+默认端口：**3000**（可通过 `PORT` 环境变量修改）
 
-```text
-http://localhost:3000
+访问：
+- API 健康检查：`http://localhost:3000/api/v1/health`
+- 管理后台：`http://localhost:3000/admin`
+
+---
+
+## 📡 API 文档
+
+### 基础信息
+
+- **Base URL（开发）**：`http://localhost:3000/api/v1`
+- **Base URL（生产）**：`https://artiqore.com/api/v1`
+- **认证方式**：Bearer Token（通过 Supabase Auth）
+- **响应格式**：JSON
+
+### 通用响应结构
+
+**成功：**
+```json
+{
+  "success": true,
+  "data": { ... }
+}
 ```
 
-生产启动命令使用 9090 端口：
+**失败：**
+```json
+{
+  "success": false,
+  "error": "错误信息"
+}
+```
+
+---
+
+### 🔐 认证 API (`/api/v1/auth`)
+
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| POST | `/auth/signup` | 用户注册 | ❌ |
+| POST | `/auth/login` | 用户登录 | ❌ |
+| POST | `/auth/logout` | 用户登出 | ✅ |
+| GET | `/auth/profile` | 获取用户资料 | ✅ |
+| PATCH | `/auth/update-profile` | 更新用户资料 | ✅ |
+| POST | `/auth/upload-avatar` | 上传头像 | ✅ |
+
+---
+
+### 🤖 AI API (`/api/v1/ai`)
+
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| POST | `/ai/consult` | AI 咨询（含画像注入、知识检索） | ✅ |
+| POST | `/ai/analyze` | 院校匹配度分析（批量） | ✅ |
+| POST | `/ai/school-search` | AI 院校搜索 | ✅ |
+| GET | `/chat` | 流式对话（SSE） | ✅ |
+
+**示例：AI 咨询**
+```bash
+curl -X POST http://localhost:3000/api/v1/ai/consult \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "我想申请交互设计，推荐哪些学校？"
+  }'
+```
+
+---
+
+### 🏫 院校 API (`/api/v1/schools`)
+
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| GET | `/schools` | 获取院校列表（支持过滤） | ❌ |
+| GET | `/schools/:id` | 获取院校详情 | ❌ |
+
+**查询参数：**
+- `keyword` - 关键词搜索
+- `country` - 国家过滤
+- `city` - 城市过滤
+- `limit` / `offset` - 分页
+
+---
+
+### 📚 专业 API (`/api/v1/programs`)
+
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| GET | `/programs` | 获取专业列表 | ❌ |
+| GET | `/programs/:id` | 获取专业详情 | ❌ |
+
+---
+
+### 📋 申请清单 API (`/api/v1/tracker`)
+
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| GET | `/tracker` | 获取我的申请清单 | ✅ |
+| POST | `/tracker` | 添加申请项 | ✅ |
+| PATCH | `/tracker/:id` | 更新申请项（分层/状态） | ✅ |
+| DELETE | `/tracker/:id` | 删除申请项 | ✅ |
+| GET | `/tracker/timeline` | 生成申请时间线 | ✅ |
+
+**示例：添加申请项**
+```bash
+curl -X POST http://localhost:3000/api/v1/tracker \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "school_id": "123",
+    "school_name": "皇家艺术学院",
+    "program_name": "交互设计 MA",
+    "tier": "reach"
+  }'
+```
+
+---
+
+### 📝 案例 API (`/api/v1/cases`)
+
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| GET | `/cases` | 获取录取案例列表 | ❌ |
+| GET | `/cases/:id` | 获取案例详情 | ❌ |
+
+---
+
+### 💬 社区 API (`/api/v1/community`)
+
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| GET | `/community/posts` | 获取帖子列表 | ❌ |
+| POST | `/community/posts` | 发布帖子 | ✅ |
+| GET | `/community/posts/:id` | 获取帖子详情 | ❌ |
+| POST | `/community/posts/:id/like` | 点赞/取消点赞 | ✅ |
+
+---
+
+### 🔍 知识库 API (`/api/v1/knowledge`)
+
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| POST | `/knowledge/search` | 知识库语义搜索 | ✅ |
+
+---
+
+## 🧪 测试
+
+### 运行所有测试
+
+```bash
+npm test
+```
+
+### 运行 API 契约测试
+
+```bash
+npm run test:watch
+```
+
+### 测试覆盖范围
+
+- ✅ API 契约测试（`tests/api/contract.test.ts`）
+- ✅ 后端健康检查（项目根 `npm run test:backend`）
+
+---
+
+## 🚢 部署
+
+### 生产构建
 
 ```bash
 npm run build
-npm start
+npm run start
 ```
 
-```text
-http://localhost:9090
-```
+### 部署到服务器
 
-## 常用命令
+项目根目录提供了自动化部署脚本：
 
 ```bash
-npm run dev                 # 启动开发服务
-npm run build               # 生产构建
-npm start                   # 启动生产服务，端口 9090
-npm run lint                # ESLint 检查
-npm test                    # 运行 Vitest
-npm run test:watch          # 监听模式测试
-
-npm run ingest              # 导入知识库 Markdown
-npm run batch-ingest        # 批量导入知识库
-npm run reingest-all        # 重新导入全部知识库
-npm run test:consult        # 测试知识库问答
-npm run import:programs     # 导入项目数据
+# 在项目根目录执行
+npm run deploy:web
 ```
 
-评测脚本集中在 `eval/` 和 `scripts/eval/`：
+**部署流程：**
+1. 本地构建 Next.js
+2. 通过 SSH 上传到服务器（`artiqore.com`）
+3. 服务器上通过 PM2 重启服务
 
-```bash
-npm run eval:validate
-npm run eval:recall
-npm run eval:faithfulness
-npm run eval:quick-test
+**服务器配置：**
+- 目录：`~/website/artsee/web`
+- PM2 应用名：`artsee-web`
+- 端口：3000（Nginx 反代到 80/443）
+
+---
+
+## 🔧 开发指南
+
+### 添加新 API
+
+1. 在 `app/api/v1/` 下创建新目录
+2. 创建 `route.ts` 文件
+3. 导出 `GET` / `POST` / `PATCH` / `DELETE` 等方法
+4. 使用 `getUserFromBearer()` 进行认证
+5. 使用 `createServiceClient()` 访问数据库
+
+**示例：**
+```typescript
+import { NextRequest, NextResponse } from "next/server";
+import { getUserFromBearer } from "@/lib/api/auth-user";
+import { createServiceClient } from "@/lib/api/supabase-service";
+
+export async function GET(req: NextRequest) {
+  const user = await getUserFromBearer(req);
+  if (!user) {
+    return NextResponse.json({ success: false, error: "未授权" }, { status: 401 });
+  }
+
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("your_table")
+    .select("*")
+    .eq("user_id", user.id);
+
+  if (error) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true, data });
+}
 ```
 
-## 环境变量
+### 数据库 Migration
 
-复制 `.env.development.example` 为 `.env.local` 后配置。
+1. 在 `docs/migrations/` 下创建新 SQL 文件（按序号命名）
+2. 在 Supabase Dashboard → SQL Editor 中执行
+3. 更新相关 TypeScript 类型定义
 
-核心变量：
+### AI Prompt 管理
+
+所有 Prompt 模板位于 `lib/ai/prompt-templates.ts`，统一管理便于优化。
+
+---
+
+## 🌍 环境变量
+
+### 开发环境 (`.env.local`)
 
 ```env
-NODE_ENV=development
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
 
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
+# LLM
+MOONSHOT_API_KEY=sk-...
+MOONSHOT_BASE_URL=https://api.moonshot.cn/v1
 
-OPENAI_API_KEY=
+# 可选
+OPENAI_API_KEY=sk-...
 OPENAI_BASE_URL=https://api.openai.com/v1
-AI_MODEL=gpt-4o-mini
 
-GLM_API_KEY=
-GLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4
+# 开发端口（可选，默认 3000）
+PORT=9090
 ```
 
-Embedding 支持多种方式，通过 `EMBEDDING_PROVIDER` 切换：
+### 生产环境
 
-```env
-EMBEDDING_PROVIDER=xinference
-XINFERENCE_BASE_URL=http://localhost:9997/v1
-XINFERENCE_API_KEY=dummy
-EMBEDDING_MODEL=bge-small-zh-v1.5
-EMBEDDING_DIMENSIONS=512
-EMBEDDING_BATCH_SIZE=32
-```
+生产环境变量通过服务器环境变量或 `.env.production` 配置，**不要提交到 Git**。
 
-也可以使用 `glm`、`ollama` 或 `openai`，具体变量见 `.env.development.example`。
+---
 
-## API 概览
+## 📚 相关文档
 
-后端采用 Next.js Route Handlers。业务接口按版本放在 `app/api/v1/`，聊天流式接口单独放在 `app/api/chat/`。
+- [项目总览](../AGENTS.md)
+- [Flutter 客户端](../app/README.md)
+- [调试指南](../.cursor/skills/jinhui-stack-debug/SKILL.md)
+- [数据库报告](../DATABASE_REPORT.md)
 
-常见约定：
+---
 
-- 返回 JSON，错误通常包含 `success: false` 或 `error` 信息。
-- 需要用户身份的接口通过 Supabase Auth 会话或 `Authorization: Bearer <token>` 获取用户。
-- 管理类写操作依赖服务端 Supabase client 和权限校验。
-- 开发环境在 `next.config.ts` 中对 `/api/:path*` 放开 CORS，方便本地前端联调。
+## 🤝 贡献
 
-### AI 与知识库
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/amazing-feature`)
+3. 提交更改 (`git commit -m 'Add amazing feature'`)
+4. 推送到分支 (`git push origin feature/amazing-feature`)
+5. 创建 Pull Request
 
-| 接口 | 方法 | 说明 |
-| --- | --- | --- |
-| `/api/chat` | POST | 流式聊天接口 |
-| `/api/v1/ai/consult` | POST | 非流式 AI 咨询 |
-| `/api/v1/ai/analyze` | POST | AI 分析 |
-| `/api/v1/ai/record` | POST | AI 咨询记录 |
-| `/api/v1/ai/schools/search` | POST | AI 选校搜索 |
-| `/api/v1/knowledge/search` | POST | 知识库检索 |
+---
 
-核心流程：
+## 📄 License
 
-- `/api/chat`：面向聊天场景，支持流式输出。默认走统一咨询 Pipeline，可结合历史对话、用户资料、知识库检索结果生成回答。
-- `/api/v1/ai/consult`：非流式咨询接口，适合服务端调用、测试或一次性问答。
-- `/api/v1/knowledge/search`：只做知识库检索，适合调试召回、检查 chunk 和相似度。
-- `/api/v1/ai/schools/search`：读取学校/项目数据后调用 OpenAI 兼容模型，输出选校建议。
-- `/api/v1/ai/record`：保存咨询记录，便于后续分析和追踪。
-
-### 用户与认证
-
-| 接口 | 方法 | 说明 |
-| --- | --- | --- |
-| `/api/v1/auth/register` | POST | 注册 |
-| `/api/v1/auth/login` | POST | 登录 |
-| `/api/v1/auth/dev-login` | POST | 开发登录 |
-| `/api/v1/auth/profile` | GET | 获取用户资料 |
-| `/api/v1/auth/profile` | DELETE | 删除用户资料 |
-| `/api/v1/auth/update-profile` | POST | 更新用户资料 |
-| `/api/v1/auth/profile/export` | GET | 导出用户资料 |
-| `/api/v1/auth/profile/field-history` | GET | 用户资料字段历史 |
-| `/api/v1/auth/send-sms` | POST | 发送短信验证码 |
-| `/api/v1/auth/verify-sms` | POST | 验证短信验证码 |
-
-用户资料能力：
-
-- 登录和注册基于 Supabase Auth。
-- `user_profiles` 保存业务资料，如昵称、头像、手机号、简介、所在地、角色、认证状态、会员状态等。
-- `profile/export` 用于导出用户资料，方便合规和调试。
-- `profile/field-history` 用于查看用户资料字段变更历史。
-- `lib/memory/` 会读取用户画像，并在 AI 咨询中用于问题改写、召回增强和回答个性化。
-
-### 内容数据
-
-| 接口 | 方法 | 说明 |
-| --- | --- | --- |
-| `/api/v1/schools` | GET/POST | 学校列表和创建 |
-| `/api/v1/schools/[id]` | GET/PATCH/DELETE | 学校详情、更新、删除 |
-| `/api/v1/programs` | GET/POST | 项目列表和创建 |
-| `/api/v1/programs/[id]` | GET/PATCH/DELETE | 项目详情、更新、删除 |
-| `/api/v1/cases` | GET | 案例列表 |
-| `/api/v1/community/posts` | GET/POST | 社区帖子列表和创建 |
-| `/api/v1/community/posts/[id]` | GET/PATCH/DELETE | 帖子详情、更新、删除 |
-| `/api/v1/home-contents` | GET/POST | 首页内容列表和创建 |
-| `/api/v1/home-contents/[id]` | GET/PATCH/DELETE | 首页内容详情、更新、删除 |
-| `/api/v1/upload` | POST | 文件上传 |
-| `/api/v1/init-db` | GET/POST | 初始化数据库结构 |
-
-学校和项目数据：
-
-- `schools` 是院校主表，包含 slug、中英文名称、国家、城市、官网、介绍等基础字段。
-- `programs` 是项目主表，通常关联学校，保存专业/项目名称、学位、方向、学制、申请要求等信息。
-- 学校和项目接口支持列表查询、详情查询、创建、更新和删除。
-- `scripts/import-program-data.ts` 用于导入项目数据。
-- AI 选校和 RAG 咨询都会复用学校/项目数据，避免只依赖大模型生成。
-
-社区和内容数据：
-
-- `community/posts` 管理社区帖子。
-- `cases` 提供申请案例列表。
-- `home-contents` 管理首页推荐内容。
-- `upload` 负责文件上传，底层使用 Supabase Storage。
-
-## 知识库与 RAG
-
-知识库源文件放在 `knowledge-base/`，以 Markdown 为主。每所学校通常有独立目录，包含整理后的主页内容、来源记录、开放问题和维护日志。
-
-RAG 主要由以下模块组成：
-
-```text
-lib/knowledge/chunker.ts           文档切块
-lib/knowledge/embedder.ts          Embedding 生成
-lib/knowledge/retriever.ts         向量检索
-lib/knowledge/hybrid-retriever.ts  混合检索
-lib/knowledge/sparse-embedder.ts   稀疏向量处理
-lib/knowledge/retrieval-policy.ts  按意图选择召回策略
-lib/knowledge/prompt-builder.ts    构造系统提示词和用户消息
-lib/pipelines/consult-pipeline.ts  咨询主流程
-```
-
-咨询 Pipeline 的大致步骤：
-
-1. 根据对话历史改写当前问题。
-2. 读取用户资料和记忆，补充申请背景。
-3. 识别问题意图，如硬数据、开放咨询、推荐、选校匹配等。
-4. 按意图选择检索策略和召回数量。
-5. 从知识库中检索相关 chunk，必要时使用混合检索或多跳检索。
-6. 根据用户画像重新排序召回结果。
-7. 构造 Prompt，并在低置信度硬数据问题上启用证据约束。
-8. 调用模型生成回答，同时返回来源信息。
-
-支持的 Embedding 后端：
-
-- `xinference`：本地 Xinference，适合开发和私有部署。
-- `ollama`：本地 Ollama。
-- `glm`：智谱 GLM Embedding。
-- `openai`：OpenAI Embedding。
-
-常用命令：
-
-```bash
-npm run batch-ingest        # 批量切块、Embedding、入库
-npm run reingest-all        # 清理后重新导入
-npm run test:consult        # 测试咨询接口
-npm run eval:recall         # 评估召回
-npm run eval:faithfulness   # 评估回答忠实度
-```
-
-评测数据在 `eval/golden.jsonl`。评测脚本会检查问题意图、召回 chunk、参考答案和不应出现的错误信息。
-
-## 主要目录
-
-```text
-app/api/                    Next.js API routes
-lib/api/                    API 侧 Supabase 和权限工具
-lib/ai/                     意图识别等 AI 辅助逻辑
-lib/knowledge/              知识库切块、Embedding、检索、Prompt
-lib/memory/                 用户记忆、历史改写、画像增强
-lib/pipelines/              咨询和选校分析 Pipeline
-lib/supabase/               Supabase 客户端与类型
-knowledge-base/             学校知识库 Markdown 源文件
-docs/migrations/            数据库迁移 SQL
-scripts/                    导入、测试、维护脚本
-scripts/eval/               RAG 评测脚本
-eval/                       Golden 数据集与评测说明
-tests/                      Vitest 测试
-supabase/functions/         Supabase Edge Functions
-```
-
-## 数据库与迁移
-
-项目使用 Supabase/PostgreSQL。迁移 SQL 位于：
-
-```text
-docs/migrations/
-```
-
-可以通过 Supabase Dashboard SQL Editor 执行，也可以使用 Supabase CLI 或 `psql`。详细说明见 `docs/migrations/README.md`。
-
-当前迁移包含聊天日志、用户记忆、记忆抽取、chunk 元数据、稀疏向量等表和 RPC。
-
-## 知识库流程
-
-知识库源文件位于 `knowledge-base/`，每个学校通常包含：
-
-- `index.md`
-- `sources.md`
-- `sources/*.md`
-- `open-questions.md`
-- `log.md`
-
-常用流程：
-
-```bash
-npm run batch-ingest
-npm run test:consult
-npm run eval:recall
-npm run eval:faithfulness
-```
-
-## 部署
-
-项目启用了 Next.js standalone 输出：
-
-```ts
-output: "standalone"
-```
-
-生产构建：
-
-```bash
-npm run build
-npm start
-```
-
-PM2 配置文件：
-
-```text
-ecosystem.config.js
-```
-
-## 开发约定
-
-- API 放在 `app/api/v1/`，聊天流式接口放在 `app/api/chat/`。
-- 服务端访问 Supabase 优先使用 `lib/api/supabase-service.ts` 或 `lib/supabase/server.ts` 中已有封装。
-- 知识库问答相关逻辑优先走 `lib/pipelines/consult-pipeline.ts`。
-- 新增或调整数据库结构时，把 SQL 放入 `docs/migrations/`。
-- 修改 Next.js 行为前先查看本地 Next.js 15 文档。
+Copyright © 2026 Artsee / Artiqore 艺衡. All rights reserved.

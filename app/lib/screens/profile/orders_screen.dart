@@ -78,7 +78,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
         children: [
           SizedBox(
             height: MediaQuery.sizeOf(context).height * 0.55,
-            child: Center(
+            child: const Center(
               child:
                   CircularProgressIndicator(color: kCobalt, strokeWidth: 2.5),
             ),
@@ -93,7 +93,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
         children: [
           const SizedBox(height: 120),
           Icon(Icons.receipt_long_outlined,
-              size: 42, color: context.artC.ink.withOpacity(0.18)),
+              size: 42, color: context.artC.ink.withValues(alpha: 0.18)),
           const SizedBox(height: 14),
           Text(
             '订单加载失败',
@@ -109,7 +109,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
             _error!,
             textAlign: TextAlign.center,
             style: TextStyle(
-                fontSize: 12, color: context.artC.ink.withOpacity(0.42)),
+                fontSize: 12, color: context.artC.ink.withValues(alpha: 0.42)),
           ),
           const SizedBox(height: 20),
           Center(
@@ -129,7 +129,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
         children: [
           const SizedBox(height: 140),
           Icon(Icons.receipt_long_outlined,
-              size: 46, color: context.artC.ink.withOpacity(0.16)),
+              size: 46, color: context.artC.ink.withValues(alpha: 0.16)),
           const SizedBox(height: 14),
           Text(
             '暂无订单',
@@ -145,7 +145,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
             '课程、咨询与服务支付记录会显示在这里。',
             textAlign: TextAlign.center,
             style: TextStyle(
-                fontSize: 12, color: context.artC.ink.withOpacity(0.42)),
+                fontSize: 12, color: context.artC.ink.withValues(alpha: 0.42)),
           ),
         ],
       );
@@ -180,7 +180,7 @@ class _OrderCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(kRadiusLarge),
-        border: Border.all(color: context.artC.silver.withOpacity(0.45)),
+        border: Border.all(color: context.artC.silver.withValues(alpha: 0.45)),
         boxShadow: [kShadowCard],
       ),
       child: Column(
@@ -203,7 +203,7 @@ class _OrderCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                 decoration: BoxDecoration(
-                  color: meta.color.withOpacity(0.1),
+                  color: meta.color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
@@ -222,7 +222,8 @@ class _OrderCard extends StatelessWidget {
             Text(
               '订单号 $orderNo',
               style: TextStyle(
-                  fontSize: 10, color: context.artC.ink.withOpacity(0.34)),
+                  fontSize: 10,
+                  color: context.artC.ink.withValues(alpha: 0.34)),
             ),
           ],
           const SizedBox(height: 16),
@@ -237,7 +238,7 @@ class _OrderCard extends StatelessWidget {
                     '下单时间',
                     style: TextStyle(
                         fontSize: 10,
-                        color: context.artC.ink.withOpacity(0.32)),
+                        color: context.artC.ink.withValues(alpha: 0.32)),
                   ),
                   const SizedBox(height: 3),
                   Text(
@@ -245,7 +246,7 @@ class _OrderCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: context.artC.ink.withOpacity(0.62),
+                      color: context.artC.ink.withValues(alpha: 0.62),
                     ),
                   ),
                 ],
@@ -254,7 +255,7 @@ class _OrderCard extends StatelessWidget {
                 currency == 'CNY'
                     ? '¥${amount.toStringAsFixed(2)}'
                     : '$currency ${amount.toStringAsFixed(2)}',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 19,
                   fontWeight: FontWeight.w800,
                   color: kCobalt,

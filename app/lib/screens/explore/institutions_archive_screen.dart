@@ -55,7 +55,7 @@ class _InstitutionsArchiveScreenState extends State<InstitutionsArchiveScreen> {
                   center: const Alignment(0.9, -0.2),
                   radius: 1.2,
                   colors: [
-                    kCobalt.withOpacity(0.06),
+                    kCobalt.withValues(alpha: 0.06),
                     Colors.transparent,
                   ],
                 ),
@@ -86,7 +86,7 @@ class _InstitutionsArchiveScreenState extends State<InstitutionsArchiveScreen> {
                             fontWeight: FontWeight.w700,
                             fontStyle: FontStyle.italic,
                             letterSpacing: 2.4,
-                            color: kCobalt.withOpacity(0.95),
+                            color: kCobalt.withValues(alpha: 0.95),
                           ),
                         ),
                       ],
@@ -110,7 +110,7 @@ class _InstitutionsArchiveScreenState extends State<InstitutionsArchiveScreen> {
                         fontSize: 16,
                         fontWeight: FontWeight.w300,
                         height: 1.5,
-                        color: context.artC.ink.withOpacity(0.42),
+                        color: context.artC.ink.withValues(alpha: 0.42),
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -120,7 +120,7 @@ class _InstitutionsArchiveScreenState extends State<InstitutionsArchiveScreen> {
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 1.4,
-                        color: context.artC.ink.withOpacity(0.28),
+                        color: context.artC.ink.withValues(alpha: 0.28),
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -130,29 +130,34 @@ class _InstitutionsArchiveScreenState extends State<InstitutionsArchiveScreen> {
                         hintText: '搜索院校名称...',
                         hintStyle: TextStyle(
                           fontSize: 13,
-                          color: context.artC.ink.withOpacity(0.22),
+                          color: context.artC.ink.withValues(alpha: 0.22),
                         ),
                         prefixIcon: Icon(
                           Icons.search,
-                          color: context.artC.ink.withOpacity(0.22),
+                          color: context.artC.ink.withValues(alpha: 0.22),
                         ),
                         filled: true,
-                        fillColor: Colors.white.withOpacity(0.55),
+                        fillColor: Colors.white.withValues(alpha: 0.55),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 20,
                           vertical: 18,
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(kRadiusMedium),
-                          borderSide: BorderSide(color: context.artC.silver.withOpacity(0.5)),
+                          borderSide: BorderSide(
+                              color:
+                                  context.artC.silver.withValues(alpha: 0.5)),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(kRadiusMedium),
-                          borderSide: BorderSide(color: context.artC.silver.withOpacity(0.5)),
+                          borderSide: BorderSide(
+                              color:
+                                  context.artC.silver.withValues(alpha: 0.5)),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(kRadiusMedium),
-                          borderSide: BorderSide(color: kCobalt.withOpacity(0.35)),
+                          borderSide: BorderSide(
+                              color: kCobalt.withValues(alpha: 0.35)),
                         ),
                       ),
                     ),
@@ -173,12 +178,17 @@ class _InstitutionsArchiveScreenState extends State<InstitutionsArchiveScreen> {
                                   vertical: 14,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: sel ? Colors.white : context.artC.silver.withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(kRadiusMedium),
+                                  color: sel
+                                      ? Colors.white
+                                      : context.artC.silver
+                                          .withValues(alpha: 0.12),
+                                  borderRadius:
+                                      BorderRadius.circular(kRadiusMedium),
                                   boxShadow: sel
                                       ? [
                                           BoxShadow(
-                                            color: kCobalt.withOpacity(0.08),
+                                            color:
+                                                kCobalt.withValues(alpha: 0.08),
                                             blurRadius: 18,
                                             offset: const Offset(0, 6),
                                           ),
@@ -191,7 +201,10 @@ class _InstitutionsArchiveScreenState extends State<InstitutionsArchiveScreen> {
                                     fontSize: 10,
                                     fontWeight: FontWeight.w700,
                                     letterSpacing: 1.2,
-                                    color: sel ? kCobalt : context.artC.ink.withOpacity(0.38),
+                                    color: sel
+                                        ? kCobalt
+                                        : context.artC.ink
+                                            .withValues(alpha: 0.38),
                                   ),
                                 ),
                               ),
@@ -215,13 +228,13 @@ class _InstitutionsArchiveScreenState extends State<InstitutionsArchiveScreen> {
                         width: 88,
                         height: 88,
                         decoration: BoxDecoration(
-                          color: context.artC.silver.withOpacity(0.2),
+                          color: context.artC.silver.withValues(alpha: 0.2),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
                           Icons.search,
                           size: 36,
-                          color: context.artC.silver.withOpacity(0.9),
+                          color: context.artC.silver.withValues(alpha: 0.9),
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -231,7 +244,7 @@ class _InstitutionsArchiveScreenState extends State<InstitutionsArchiveScreen> {
                           fontSize: 22,
                           fontWeight: FontWeight.w500,
                           fontStyle: FontStyle.italic,
-                          color: context.artC.ink.withOpacity(0.35),
+                          color: context.artC.ink.withValues(alpha: 0.35),
                           fontFamily: 'Noto Serif SC',
                         ),
                       ),
@@ -297,7 +310,8 @@ class _InstitutionCard extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(48),
-            border: Border.all(color: context.artC.silver.withOpacity(0.35)),
+            border:
+                Border.all(color: context.artC.silver.withValues(alpha: 0.35)),
           ),
           padding: const EdgeInsets.fromLTRB(28, 32, 28, 28),
           child: Column(
@@ -310,8 +324,8 @@ class _InstitutionCard extends StatelessWidget {
                   child: Image.network(
                     inst.image,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        Container(color: context.artC.silver.withOpacity(0.35)),
+                    errorBuilder: (_, __, ___) => Container(
+                        color: context.artC.silver.withValues(alpha: 0.35)),
                   ),
                 ),
               ),
@@ -328,7 +342,7 @@ class _InstitutionCard extends StatelessWidget {
                     ),
                     child: Icon(
                       Icons.school_outlined,
-                      color: context.artC.ink.withOpacity(0.25),
+                      color: context.artC.ink.withValues(alpha: 0.25),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -338,7 +352,7 @@ class _InstitutionCard extends StatelessWidget {
                       fontSize: 9,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 2,
-                      color: context.artC.ink.withOpacity(0.22),
+                      color: context.artC.ink.withValues(alpha: 0.22),
                     ),
                   ),
                   const Spacer(),
@@ -347,7 +361,7 @@ class _InstitutionCard extends StatelessWidget {
                     icon: Icon(
                       Icons.open_in_new,
                       size: 18,
-                      color: context.artC.ink.withOpacity(0.22),
+                      color: context.artC.ink.withValues(alpha: 0.22),
                     ),
                   ),
                 ],
@@ -372,7 +386,7 @@ class _InstitutionCard extends StatelessWidget {
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 1.6,
-                    color: context.artC.ink.withOpacity(0.28),
+                    color: context.artC.ink.withValues(alpha: 0.28),
                   ),
                 ),
               ],
@@ -383,13 +397,15 @@ class _InstitutionCard extends StatelessWidget {
                   fontSize: 16,
                   fontWeight: FontWeight.w300,
                   height: 1.55,
-                  color: context.artC.ink.withOpacity(0.52),
+                  color: context.artC.ink.withValues(alpha: 0.52),
                 ),
               ),
               const SizedBox(height: 22),
               Row(
                 children: [
-                  Icon(Icons.place_outlined, size: 15, color: context.artC.ink.withOpacity(0.32)),
+                  Icon(Icons.place_outlined,
+                      size: 15,
+                      color: context.artC.ink.withValues(alpha: 0.32)),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
@@ -398,7 +414,7 @@ class _InstitutionCard extends StatelessWidget {
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.6,
-                        color: context.artC.ink.withOpacity(0.32),
+                        color: context.artC.ink.withValues(alpha: 0.32),
                       ),
                     ),
                   ),
@@ -413,13 +429,13 @@ class _InstitutionCard extends StatelessWidget {
                             fontSize: 9,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 2,
-                            color: context.artC.ink.withOpacity(0.75),
+                            color: context.artC.ink.withValues(alpha: 0.75),
                           ),
                         ),
                         Icon(
                           Icons.chevron_right,
                           size: 14,
-                          color: context.artC.ink.withOpacity(0.45),
+                          color: context.artC.ink.withValues(alpha: 0.45),
                         ),
                       ],
                     ),
@@ -447,9 +463,10 @@ class _InstitutionArchiveDetailPage extends StatelessWidget {
         slivers: [
           SliverAppBar(
             pinned: true,
-            backgroundColor: context.artC.porcelain.withOpacity(0.94),
+            backgroundColor: context.artC.porcelain.withValues(alpha: 0.94),
             leading: IconButton(
-              icon: Icon(Icons.arrow_back_ios_new, size: 18, color: context.artC.ink),
+              icon: Icon(Icons.arrow_back_ios_new,
+                  size: 18, color: context.artC.ink),
               onPressed: () => Navigator.of(context).pop(),
             ),
             title: Text(
@@ -476,8 +493,8 @@ class _InstitutionArchiveDetailPage extends StatelessWidget {
                       child: Image.network(
                         inst.image,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            Container(color: context.artC.silver.withOpacity(0.35)),
+                        errorBuilder: (_, __, ___) => Container(
+                            color: context.artC.silver.withValues(alpha: 0.35)),
                       ),
                     ),
                   ),
@@ -489,7 +506,7 @@ class _InstitutionArchiveDetailPage extends StatelessWidget {
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 1.8,
-                        color: context.artC.ink.withOpacity(0.35),
+                        color: context.artC.ink.withValues(alpha: 0.35),
                       ),
                     ),
                   const SizedBox(height: 8),
@@ -506,13 +523,14 @@ class _InstitutionArchiveDetailPage extends StatelessWidget {
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      Icon(Icons.place_outlined, size: 16, color: kCobalt),
+                      const Icon(Icons.place_outlined,
+                          size: 16, color: kCobalt),
                       const SizedBox(width: 6),
                       Text(
                         inst.location,
                         style: TextStyle(
                           fontSize: 13,
-                          color: context.artC.ink.withOpacity(0.55),
+                          color: context.artC.ink.withValues(alpha: 0.55),
                         ),
                       ),
                     ],
@@ -523,7 +541,7 @@ class _InstitutionArchiveDetailPage extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 15,
                       height: 1.65,
-                      color: context.artC.ink.withOpacity(0.72),
+                      color: context.artC.ink.withValues(alpha: 0.72),
                     ),
                   ),
                 ],

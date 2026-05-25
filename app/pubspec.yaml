@@ -18,11 +18,19 @@ dependencies:
   image_picker: ^1.0.7
   http: ^1.2.2
   http_parser: ^4.0.0
+  url_launcher: ^6.2.5
+  record: ^5.2.1
+  audioplayers: ^5.2.1
+  path_provider: ^2.1.2
+  permission_handler: ^11.3.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+
+dependency_overrides:
+  record_linux: ^1.0.0
 
 flutter:
   uses-material-design: true

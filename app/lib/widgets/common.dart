@@ -48,21 +48,21 @@ double mainTabBottomInset(BuildContext context) =>
 
 /// 主阴影
 final kShadowMain = BoxShadow(
-  color: kInk.withOpacity(0.06),
+  color: kInk.withValues(alpha: 0.06),
   blurRadius: 20,
   offset: const Offset(0, 4),
 );
 
 /// 卡片阴影
 final kShadowCard = BoxShadow(
-  color: kInk.withOpacity(0.04),
+  color: kInk.withValues(alpha: 0.04),
   blurRadius: 12,
   offset: const Offset(0, 2),
 );
 
 /// 悬浮阴影
 final kShadowElevated = BoxShadow(
-  color: kCobalt.withOpacity(0.15),
+  color: kCobalt.withValues(alpha: 0.15),
   blurRadius: 24,
   offset: const Offset(0, 8),
 );
@@ -106,7 +106,7 @@ const kBodyStyle = TextStyle(
 /// 次要文字
 final kCaptionStyle = TextStyle(
   fontSize: 11,
-  color: kInk.withOpacity(0.5),
+  color: kInk.withValues(alpha: 0.5),
 );
 
 // ═══════════════════════════════════════════════════════════════
@@ -126,16 +126,26 @@ LinearGradient schoolGradient(String? school) {
     '皇家艺术学院': [const Color(0xFFDC2626), const Color(0xFFF87171)],
   };
   final colors = map[school] ?? [kCobalt, kCobaltMuted];
-  return LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight);
+  return LinearGradient(
+      colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight);
 }
 
 LinearGradient resultGradient(String result) {
   if (result == 'admitted') {
-    return const LinearGradient(colors: [Color(0xFF16A34A), Color(0xFF4ADE80)], begin: Alignment.topLeft, end: Alignment.bottomRight);
+    return const LinearGradient(
+        colors: [Color(0xFF16A34A), Color(0xFF4ADE80)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight);
   } else if (result == 'waitlisted') {
-    return const LinearGradient(colors: [Color(0xFFCA8A04), const Color(0xFFFBBF24)], begin: Alignment.topLeft, end: Alignment.bottomRight);
+    return const LinearGradient(
+        colors: [Color(0xFFCA8A04), Color(0xFFFBBF24)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight);
   }
-  return const LinearGradient(colors: [Color(0xFFDC2626), Color(0xFFF87171)], begin: Alignment.topLeft, end: Alignment.bottomRight);
+  return const LinearGradient(
+      colors: [Color(0xFFDC2626), Color(0xFFF87171)],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight);
 }
 
 String resultLabel(String result) {
@@ -170,7 +180,8 @@ class TagChip extends StatelessWidget {
   final bool active;
   final VoidCallback? onTap;
 
-  const TagChip({super.key, required this.label, this.active = false, this.onTap});
+  const TagChip(
+      {super.key, required this.label, this.active = false, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -180,7 +191,7 @@ class TagChip extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: active ? kCobalt : kSilver.withOpacity(0.5),
+          color: active ? kCobalt : kSilver.withValues(alpha: 0.5),
           borderRadius: BorderRadius.circular(kRadiusSmall),
           border: active ? null : Border.all(color: kSilver, width: 1),
         ),
@@ -188,7 +199,7 @@ class TagChip extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 11,
-            color: active ? Colors.white : kInk.withOpacity(0.6),
+            color: active ? Colors.white : kInk.withValues(alpha: 0.6),
             fontWeight: active ? FontWeight.w600 : FontWeight.w500,
           ),
         ),
@@ -202,7 +213,8 @@ class SectionHeader extends StatelessWidget {
   final String? action;
   final VoidCallback? onAction;
 
-  const SectionHeader({super.key, required this.title, this.action, this.onAction});
+  const SectionHeader(
+      {super.key, required this.title, this.action, this.onAction});
 
   @override
   Widget build(BuildContext context) {
@@ -216,24 +228,31 @@ class SectionHeader extends StatelessWidget {
             children: [
               Text(title, style: kSerifTitle.copyWith(fontSize: 18)),
               const SizedBox(height: 2),
-              Container(width: 24, height: 2, color: kCobalt.withOpacity(0.3)),
+              Container(
+                  width: 24, height: 2, color: kCobalt.withValues(alpha: 0.3)),
             ],
           ),
           if (action != null)
             GestureDetector(
               onTap: onAction,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: kCobalt.withOpacity(0.08),
+                  color: kCobalt.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(kRadiusSmall),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(action!, style: const TextStyle(fontSize: 11, color: kCobalt, fontWeight: FontWeight.w600)),
+                    Text(action!,
+                        style: const TextStyle(
+                            fontSize: 11,
+                            color: kCobalt,
+                            fontWeight: FontWeight.w600)),
                     const SizedBox(width: 2),
-                    Icon(Icons.arrow_forward_ios, size: 10, color: kCobalt.withOpacity(0.7)),
+                    Icon(Icons.arrow_forward_ios,
+                        size: 10, color: kCobalt.withValues(alpha: 0.7)),
                   ],
                 ),
               ),
@@ -273,7 +292,7 @@ class EmptyState extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: kSilver.withOpacity(0.5),
+              color: kSilver.withValues(alpha: 0.5),
               shape: BoxShape.circle,
             ),
             child: Text(emoji, style: const TextStyle(fontSize: 40)),
@@ -283,7 +302,7 @@ class EmptyState extends StatelessWidget {
             message,
             style: TextStyle(
               fontSize: 14,
-              color: kInk.withOpacity(0.5),
+              color: kInk.withValues(alpha: 0.5),
               height: 1.5,
             ),
             textAlign: TextAlign.center,
@@ -299,7 +318,11 @@ class GradientBanner extends StatelessWidget {
   final Widget child;
   final double height;
 
-  const GradientBanner({super.key, required this.gradient, required this.child, this.height = 120});
+  const GradientBanner(
+      {super.key,
+      required this.gradient,
+      required this.child,
+      this.height = 120});
 
   @override
   Widget build(BuildContext context) {
@@ -331,7 +354,8 @@ class InfoCard extends StatelessWidget {
           children: [
             Text(
               value,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: kCobalt),
+              style: const TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w700, color: kCobalt),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
@@ -339,7 +363,10 @@ class InfoCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               label,
-              style: TextStyle(fontSize: 10, color: kInk.withOpacity(0.4), letterSpacing: 0.5),
+              style: TextStyle(
+                  fontSize: 10,
+                  color: kInk.withValues(alpha: 0.4),
+                  letterSpacing: 0.5),
             ),
           ],
         ),
@@ -380,7 +407,7 @@ class PorcelainCard extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(kRadiusLarge),
           boxShadow: [kShadowCard],
-          border: Border.all(color: kSilver.withOpacity(0.5), width: 1),
+          border: Border.all(color: kSilver.withValues(alpha: 0.5), width: 1),
         ),
         child: child,
       ),
@@ -461,7 +488,7 @@ class FloatingCobaltButton extends StatelessWidget {
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: kCobalt.withOpacity(0.3),
+              color: kCobalt.withValues(alpha: 0.3),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),

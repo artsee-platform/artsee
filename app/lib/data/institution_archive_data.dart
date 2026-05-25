@@ -22,7 +22,7 @@ const int kInstitutionArchiveTotalCount = 70;
 
 const Map<String, List<InstitutionArchive>> kInstitutionArchiveByRegion = {
   '中国香港': [
-    const InstitutionArchive(
+    InstitutionArchive(
       id: 'hk-1',
       name: '香港理工大学设计学院',
       originalName: 'PolyU Design',
@@ -30,7 +30,7 @@ const Map<String, List<InstitutionArchive>> kInstitutionArchiveByRegion = {
       image: 'https://picsum.photos/seed/polyu-hk/800/600',
       description: '亚洲顶尖设计学院，以创新与实践见长。',
     ),
-    const InstitutionArchive(
+    InstitutionArchive(
       id: 'hk-2',
       name: '香港艺术学院',
       originalName: 'Hong Kong Art School',
@@ -38,7 +38,7 @@ const Map<String, List<InstitutionArchive>> kInstitutionArchiveByRegion = {
       image: 'https://picsum.photos/seed/hkas-art/800/600',
       description: '专注于当代艺术实践，与澳洲皇家墨尔本理工大学合办课程。',
     ),
-    const InstitutionArchive(
+    InstitutionArchive(
       id: 'hk-3',
       name: '香港中文大学艺术系',
       originalName: 'CUHK Fine Arts',
@@ -48,7 +48,7 @@ const Map<String, List<InstitutionArchive>> kInstitutionArchiveByRegion = {
     ),
   ],
   '美国': [
-    const InstitutionArchive(
+    InstitutionArchive(
       id: 'us-1',
       name: '罗德岛设计学院',
       originalName: 'RISD',
@@ -56,7 +56,7 @@ const Map<String, List<InstitutionArchive>> kInstitutionArchiveByRegion = {
       image: 'https://picsum.photos/seed/us-risd/800/600',
       description: '常年位居全美艺术设计类榜首，被誉为「艺术界的哈佛」。',
     ),
-    const InstitutionArchive(
+    InstitutionArchive(
       id: 'us-2',
       name: '耶鲁大学艺术学院',
       originalName: 'Yale School of Art',
@@ -64,7 +64,7 @@ const Map<String, List<InstitutionArchive>> kInstitutionArchiveByRegion = {
       image: 'https://picsum.photos/seed/us-yale/800/600',
       description: '顶级综合性大学中的皇冠，平面设计与绘画闻名遐迩。',
     ),
-    const InstitutionArchive(
+    InstitutionArchive(
       id: 'us-3',
       name: '芝加哥艺术学院',
       originalName: 'SAIC',
@@ -74,7 +74,7 @@ const Map<String, List<InstitutionArchive>> kInstitutionArchiveByRegion = {
     ),
   ],
   '欧洲': [
-    const InstitutionArchive(
+    InstitutionArchive(
       id: 'eu-1',
       name: '皇家艺术学院',
       originalName: 'Royal College of Art (RCA)',
@@ -82,7 +82,7 @@ const Map<String, List<InstitutionArchive>> kInstitutionArchiveByRegion = {
       image: 'https://picsum.photos/seed/eu-rca/800/600',
       description: '全球唯一的全研究制艺术研究生院校，QS 艺术与设计排名长期领先。',
     ),
-    const InstitutionArchive(
+    InstitutionArchive(
       id: 'eu-2',
       name: '中央圣马丁学院',
       originalName: 'Central Saint Martins',
@@ -90,7 +90,7 @@ const Map<String, List<InstitutionArchive>> kInstitutionArchiveByRegion = {
       image: 'https://picsum.photos/seed/eu-csm/800/600',
       description: '跨界创意的代名词，时尚与当代艺术的实验田。',
     ),
-    const InstitutionArchive(
+    InstitutionArchive(
       id: 'eu-3',
       name: '埃因霍温设计学院',
       originalName: 'Design Academy Eindhoven',
@@ -100,7 +100,7 @@ const Map<String, List<InstitutionArchive>> kInstitutionArchiveByRegion = {
     ),
   ],
   '日本': [
-    const InstitutionArchive(
+    InstitutionArchive(
       id: 'jp-1',
       name: '东京艺术大学',
       originalName: 'Tokyo Geidai',
@@ -108,7 +108,7 @@ const Map<String, List<InstitutionArchive>> kInstitutionArchiveByRegion = {
       image: 'https://picsum.photos/seed/jp-geidai/800/600',
       description: '日本唯一的国立艺术大学，艺术界的最高学术殿堂。',
     ),
-    const InstitutionArchive(
+    InstitutionArchive(
       id: 'jp-2',
       name: '多摩美术大学',
       originalName: 'Tama Art University',
@@ -116,7 +116,7 @@ const Map<String, List<InstitutionArchive>> kInstitutionArchiveByRegion = {
       image: 'https://picsum.photos/seed/jp-tama/800/600',
       description: '御三家之一，深泽直人曾任教，平面与工业设计极强。',
     ),
-    const InstitutionArchive(
+    InstitutionArchive(
       id: 'jp-3',
       name: '武藏野美术大学',
       originalName: 'Musabi',
@@ -126,7 +126,7 @@ const Map<String, List<InstitutionArchive>> kInstitutionArchiveByRegion = {
     ),
   ],
   '韩国': [
-    const InstitutionArchive(
+    InstitutionArchive(
       id: 'kr-1',
       name: '首尔大学美术学院',
       originalName: 'SNU College of Fine Arts',
@@ -134,7 +134,7 @@ const Map<String, List<InstitutionArchive>> kInstitutionArchiveByRegion = {
       image: 'https://picsum.photos/seed/kr-snu/800/600',
       description: '韩国学府之首，综合研究实力与艺术造诣兼具。',
     ),
-    const InstitutionArchive(
+    InstitutionArchive(
       id: 'kr-2',
       name: '弘益大学美术学院',
       originalName: 'Hongik Art',
@@ -142,7 +142,7 @@ const Map<String, List<InstitutionArchive>> kInstitutionArchiveByRegion = {
       image: 'https://picsum.photos/seed/kr-hongik/800/600',
       description: '韩国设计界的代名词，拥有庞大的校友网络与产业影响力。',
     ),
-    const InstitutionArchive(
+    InstitutionArchive(
       id: 'kr-3',
       name: '韩国艺术综合大学',
       originalName: 'K-ARTS',
@@ -152,7 +152,7 @@ const Map<String, List<InstitutionArchive>> kInstitutionArchiveByRegion = {
     ),
   ],
   '加拿大': [
-    const InstitutionArchive(
+    InstitutionArchive(
       id: 'ca-1',
       name: '安大略艺术设计大学',
       originalName: 'OCAD University',
@@ -160,7 +160,7 @@ const Map<String, List<InstitutionArchive>> kInstitutionArchiveByRegion = {
       image: 'https://picsum.photos/seed/ca-ocad/800/600',
       description: '加拿大规模最大、历史最悠久的艺术院校，城市艺术地标。',
     ),
-    const InstitutionArchive(
+    InstitutionArchive(
       id: 'ca-2',
       name: '艾米丽卡尔艺术与设计大学',
       originalName: 'Emily Carr (ECUAD)',
@@ -168,7 +168,7 @@ const Map<String, List<InstitutionArchive>> kInstitutionArchiveByRegion = {
       image: 'https://picsum.photos/seed/ca-ecuad/800/600',
       description: '位列全球前列的极客型艺术大学，媒体艺术领先。',
     ),
-    const InstitutionArchive(
+    InstitutionArchive(
       id: 'ca-3',
       name: '谢尔丹学院设计学部',
       originalName: 'Sheridan College',
@@ -178,7 +178,7 @@ const Map<String, List<InstitutionArchive>> kInstitutionArchiveByRegion = {
     ),
   ],
   '亚洲其他国家': [
-    const InstitutionArchive(
+    InstitutionArchive(
       id: 'as-3',
       name: '中国美术学院',
       originalName: 'China Academy of Art',
@@ -186,7 +186,7 @@ const Map<String, List<InstitutionArchive>> kInstitutionArchiveByRegion = {
       image: 'https://picsum.photos/seed/as-caa/800/600',
       description: '中国传统与当代艺术融合的枢纽。',
     ),
-    const InstitutionArchive(
+    InstitutionArchive(
       id: 'as-4',
       name: '中央美术学院',
       originalName: 'CAFA',
@@ -194,7 +194,7 @@ const Map<String, List<InstitutionArchive>> kInstitutionArchiveByRegion = {
       image: 'https://picsum.photos/seed/as-cafa/800/600',
       description: '中国艺术教育的最高学府，大师辈出。',
     ),
-    const InstitutionArchive(
+    InstitutionArchive(
       id: 'as-1',
       name: '新加坡国立大学设计学院',
       originalName: 'NUS Design',

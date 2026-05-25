@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const requestBody = await req.json();
+    const requestBody = (await req.json()) as Record<string, unknown>;
     
     console.log('📥 收到的请求体:', JSON.stringify(requestBody, null, 2));
     
@@ -44,6 +44,8 @@ export async function POST(req: NextRequest) {
     const currentSchool = requestBody.current_school ?? requestBody.currentSchool;
     const currentMajor = requestBody.current_major ?? requestBody.currentMajor;
     const gpaOrGrade = requestBody.gpa_or_grade ?? requestBody.gpaOrGrade;
+    const hasCompletedOnboarding = requestBody.has_completed_onboarding ?? requestBody.hasCompletedOnboarding;
+    const onboardingCompletedAt = requestBody.onboarding_completed_at ?? requestBody.onboardingCompletedAt;
     
     // 旧字段（保持兼容）
     const budgetRange = requestBody.budgetRange;
@@ -54,7 +56,7 @@ export async function POST(req: NextRequest) {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // 构建更新数据
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     };
 
@@ -92,6 +94,10 @@ export async function POST(req: NextRequest) {
     if (currentSchool) updateData.current_school = currentSchool;
     if (currentMajor) updateData.current_major = currentMajor;
     if (gpaOrGrade) updateData.gpa_or_grade = gpaOrGrade;
+    if (hasCompletedOnboarding) {
+      updateData.has_completed_onboarding = true;
+      updateData.onboarding_completed_at = onboardingCompletedAt || new Date().toISOString();
+    }
     
     console.log('📝 构建的 updateData:', JSON.stringify(updateData, null, 2));
     
@@ -100,7 +106,7 @@ export async function POST(req: NextRequest) {
       .from('user_profiles')
       .select('*')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
     
     console.log('💾 数据库中的当前资料 - user_role:', currentProfile?.user_role);
     console.log('💾 数据库中的当前资料 - target_degree:', currentProfile?.target_degree);
@@ -155,13 +161,19 @@ export async function POST(req: NextRequest) {
     // 如果完成度达到 80%，标记 onboarding 完成
     if (updateData.profile_completion_score >= 80 && !updateData.onboarding_completed_at) {
       updateData.onboarding_completed_at = new Date().toISOString();
+      updateData.has_completed_onboarding = true;
     }
 
-    // 更新用户资料
+    // 更新用户资料；如果注册后 user_profiles 尚未建行，则自动创建。
     const { data: profile, error: updateError } = await supabase
       .from("user_profiles")
-      .update(updateData)
-      .eq("id", user.id)
+      .upsert(
+        {
+          id: user.id,
+          ...updateData,
+        },
+        { onConflict: "id" }
+      )
       .select("*")
       .single();
 
@@ -208,10 +220,11 @@ export async function POST(req: NextRequest) {
       priorityFactors: profile?.priority_factors || null,
       onboardingCompletedAt: profile?.onboarding_completed_at || null,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("更新用户资料错误:", error);
+    const message = error instanceof Error ? error.message : "服务器错误";
     return NextResponse.json(
-      { message: error.message || "服务器错误" },
+      { message },
       { status: 500 }
     );
   }

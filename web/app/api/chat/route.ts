@@ -144,6 +144,21 @@ async function handleUnifiedPath(
   const readableStream = new ReadableStream({
     async start(controller) {
       try {
+        const meta = JSON.stringify({
+          type: 'meta',
+          sources: stages.sources.map((s) => ({
+            schoolId: s.schoolId,
+            schoolName: s.schoolName,
+            heading: s.heading,
+            similarity: s.similarity,
+          })),
+          schoolData: stages.schoolData,
+          intent: stages.intent,
+          lowConfidence: stages.lowConfidence,
+          rewrittenQuery: stages.rewrittenQuery,
+        });
+        controller.enqueue(encoder.encode(`data: ${meta}\n\n`));
+
         for await (const chunk of streamGenerate(stages)) {
           if (chunk.done) {
             controller.enqueue(encoder.encode('data: [DONE]\n\n'));

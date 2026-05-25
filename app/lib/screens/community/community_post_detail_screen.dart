@@ -254,15 +254,16 @@ class _ImageGalleryState extends State<_ImageGallery> {
         height: 220,
         margin: const EdgeInsets.fromLTRB(20, 10, 20, 0),
         decoration: BoxDecoration(
-          color: context.artC.silver.withOpacity(0.28),
+          color: context.artC.silver.withValues(alpha: 0.28),
           borderRadius: BorderRadius.circular(kRadiusLarge),
-          border: Border.all(color: context.artC.silver.withOpacity(0.55)),
+          border:
+              Border.all(color: context.artC.silver.withValues(alpha: 0.55)),
         ),
         child: Center(
           child: Icon(
             Icons.article_outlined,
             size: 42,
-            color: context.artC.ink.withOpacity(0.22),
+            color: context.artC.ink.withValues(alpha: 0.22),
           ),
         ),
       );
@@ -284,10 +285,10 @@ class _ImageGalleryState extends State<_ImageGallery> {
                   images[i],
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => Container(
-                    color: context.artC.silver.withOpacity(0.3),
+                    color: context.artC.silver.withValues(alpha: 0.3),
                     child: Icon(
                       Icons.broken_image_outlined,
-                      color: context.artC.ink.withOpacity(0.24),
+                      color: context.artC.ink.withValues(alpha: 0.24),
                     ),
                   ),
                 ),
@@ -300,7 +301,7 @@ class _ImageGalleryState extends State<_ImageGallery> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: context.artC.ink.withOpacity(0.58),
+                      color: context.artC.ink.withValues(alpha: 0.58),
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
@@ -369,7 +370,7 @@ class _PostBody extends StatelessWidget {
                       timeAgo(post.createdAt),
                       style: TextStyle(
                         fontSize: 11,
-                        color: context.artC.ink.withOpacity(0.38),
+                        color: context.artC.ink.withValues(alpha: 0.38),
                       ),
                     ),
                   ],
@@ -395,7 +396,7 @@ class _PostBody extends StatelessWidget {
               style: TextStyle(
                 fontSize: 15,
                 height: 1.75,
-                color: context.artC.ink.withOpacity(0.78),
+                color: context.artC.ink.withValues(alpha: 0.78),
               ),
             ),
           ],
@@ -433,7 +434,7 @@ class _Avatar extends StatelessWidget {
     final avatar = post.authorAvatarUrl;
     return CircleAvatar(
       radius: radius,
-      backgroundColor: kCobalt.withOpacity(0.09),
+      backgroundColor: kCobalt.withValues(alpha: 0.09),
       child: ClipOval(
         child: avatar != null && avatar.isNotEmpty
             ? Image.network(
@@ -488,7 +489,7 @@ class _Metric extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: context.artC.silver.withOpacity(0.55)),
+        border: Border.all(color: context.artC.silver.withValues(alpha: 0.55)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -496,7 +497,7 @@ class _Metric extends StatelessWidget {
           Icon(
             icon,
             size: 15,
-            color: active ? kCobalt : context.artC.ink.withOpacity(0.42),
+            color: active ? kCobalt : context.artC.ink.withValues(alpha: 0.42),
           ),
           const SizedBox(width: 5),
           Text(
@@ -504,7 +505,8 @@ class _Metric extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: active ? kCobalt : context.artC.ink.withOpacity(0.58),
+              color:
+                  active ? kCobalt : context.artC.ink.withValues(alpha: 0.58),
             ),
           ),
         ],
@@ -539,8 +541,8 @@ class _CommentsSection extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           if (loading)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
               child: Center(
                 child: SizedBox(
                   width: 18,
@@ -559,13 +561,14 @@ class _CommentsSection extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(kRadiusMedium),
-                border: Border.all(color: context.artC.silver.withOpacity(0.5)),
+                border: Border.all(
+                    color: context.artC.silver.withValues(alpha: 0.5)),
               ),
               child: Text(
                 '还没有评论，来写下第一句反馈。',
                 style: TextStyle(
                   fontSize: 13,
-                  color: context.artC.ink.withOpacity(0.42),
+                  color: context.artC.ink.withValues(alpha: 0.42),
                 ),
               ),
             )
@@ -591,14 +594,14 @@ class _CommentTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(kRadiusMedium),
-        border: Border.all(color: context.artC.silver.withOpacity(0.5)),
+        border: Border.all(color: context.artC.silver.withValues(alpha: 0.5)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CircleAvatar(
             radius: 16,
-            backgroundColor: kCobalt.withOpacity(0.08),
+            backgroundColor: kCobalt.withValues(alpha: 0.08),
             child: ClipOval(
               child: comment.authorAvatarUrl != null &&
                       comment.authorAvatarUrl!.isNotEmpty
@@ -636,7 +639,7 @@ class _CommentTile extends StatelessWidget {
                       timeAgo(comment.createdAt),
                       style: TextStyle(
                         fontSize: 10,
-                        color: context.artC.ink.withOpacity(0.32),
+                        color: context.artC.ink.withValues(alpha: 0.32),
                       ),
                     ),
                   ],
@@ -647,7 +650,7 @@ class _CommentTile extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13,
                     height: 1.5,
-                    color: context.artC.ink.withOpacity(0.74),
+                    color: context.artC.ink.withValues(alpha: 0.74),
                   ),
                 ),
               ],
@@ -696,7 +699,7 @@ class _CommentComposer extends StatelessWidget {
       decoration: BoxDecoration(
         color: context.artC.porcelain,
         border: Border(
-          top: BorderSide(color: context.artC.silver.withOpacity(0.5)),
+          top: BorderSide(color: context.artC.silver.withValues(alpha: 0.5)),
         ),
       ),
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
@@ -709,8 +712,8 @@ class _CommentComposer extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(999),
-                  border:
-                      Border.all(color: context.artC.silver.withOpacity(0.55)),
+                  border: Border.all(
+                      color: context.artC.silver.withValues(alpha: 0.55)),
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 child: TextField(
@@ -724,7 +727,7 @@ class _CommentComposer extends StatelessWidget {
                     border: InputBorder.none,
                     hintStyle: TextStyle(
                       fontSize: 13,
-                      color: context.artC.ink.withOpacity(0.35),
+                      color: context.artC.ink.withValues(alpha: 0.35),
                     ),
                   ),
                   style: TextStyle(
@@ -780,14 +783,14 @@ class _ErrorView extends StatelessWidget {
             Icon(
               Icons.cloud_off_outlined,
               size: 42,
-              color: context.artC.ink.withOpacity(0.25),
+              color: context.artC.ink.withValues(alpha: 0.25),
             ),
             const SizedBox(height: 12),
             Text(
               message,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: context.artC.ink.withOpacity(0.58),
+                color: context.artC.ink.withValues(alpha: 0.58),
                 height: 1.5,
               ),
             ),

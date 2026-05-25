@@ -1,325 +1,428 @@
-# Artsee
+# Artsee / Artiqore 艺衡
 
-发现、收藏和分享艺术品的最佳平台。
+> **艺术留学智能申请平台 - 让艺术梦想触手可及**
 
-## skills
+Artsee（艺衡）是一个面向艺术留学生的智能申请辅助平台，整合院校信息、AI 咨询、申请管理、案例分享等功能，帮助学生高效完成艺术留学申请全流程。
 
-- 占用和获取开发端口号：[port-manager](.kimi/skills/port-manager/SKILL.md)
-- 开发习惯：[jinhui-stack-debug](.kimi/skills/jinhui-stack-debug/SKILL.md)
+---
 
-## 项目架构
+## 📋 目录
 
-Artsee 采用 **移动优先** 的架构设计，APP 作为核心业务端，Web 作为统一后端服务。
+- [核心功能](#核心功能)
+- [技术架构](#技术架构)
+- [项目结构](#项目结构)
+- [快速开始](#快速开始)
+- [开发指南](#开发指南)
+- [测试](#测试)
+- [部署](#部署)
+- [文档](#文档)
+
+---
+
+## 🎯 核心功能
+
+### 1. AI 智能咨询
+- **个性化画像**：根据用户背景、目标专业、预算等生成申请画像
+- **智能问答**：基于知识库的 RAG 系统，回答院校、专业、申请相关问题
+- **院校推荐**：AI 分析匹配度，推荐冲刺/匹配/保底院校
+- **流式对话**：实时打字机效果，提升用户体验
+
+### 2. 申请清单管理
+- **CRUD 操作**：添加、查看、更新、删除申请项
+- **智能分层**：AI 自动分析院校匹配度，建议分层（reach/match/safety）
+- **时间线生成**：根据 deadline 自动生成倒排任务时间线
+- **状态跟踪**：规划中、准备材料、已提交、已录取、未录取
+
+### 3. 院校与专业数据
+- **院校列表**：支持按国家、城市、排名筛选
+- **专业详情**：学位、学制、学费、申请要求、作品集要求
+- **搜索功能**：关键词搜索院校和专业
+- **媒体资源**：院校 logo、校园图片、专业封面
+
+### 4. 案例分享
+- **录取案例**：查看其他学生的录取经历
+- **案例关联**：申请项下方自动推荐相关案例
+- **筛选功能**：按院校、专业、录取结果筛选
+
+### 5. 社区互动
+- **帖子发布**：分享申请经验、作品集心得
+- **评论互动**：点赞、评论、收藏
+- **内容推荐**：首页智能推荐优质内容
+
+---
+
+## 🏗 技术架构
+
+### 系统架构图
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         系统架构                                     │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│    ┌──────────────────────────────────────────────────────────┐    │
-│    │                         APP (Flutter)                    │    │
-│    │                                                          │    │
-│    │   • 核心业务端 - 用户主要使用场景                          │    │
-│    │   • 作品浏览、收藏、搜索                                   │    │
-│    │   • 用户登录 (手机号/微信)                                 │    │
-│    │                                                          │    │
-│    └────────────────────────┬─────────────────────────────────┘    │
-│                             │                                       │
-│                             │ HTTPS/REST API                        │
-│                             ▼                                       │
-│    ┌──────────────────────────────────────────────────────────┐    │
-│    │                    Web (Next.js)                         │    │
-│    │                                                          │    │
-│    │   • 网站展示 + 后端 API                                    │    │
-│    │   • 管理后台 Dashboard                                     │    │
-│    │   • 统一数据访问层                                         │    │
-│    │   • 身份认证 (Supabase Auth)                               │    │
-│    │                                                          │    │
-│    └────────────────────────┬─────────────────────────────────┘    │
-│                             │                                       │
-│                             │ SQL/Realtime                          │
-│                             ▼                                       │
-│    ┌──────────────────────────────────────────────────────────┐    │
-│    │              Database (Supabase PostgreSQL)              │    │
-│    │                                                          │    │
-│    │   • 学校、专业、艺术分类数据                               │    │
-│    │   • 用户信息 (扩展 auth.users)                             │    │
-│    │   • 收藏、关注关系                                         │    │
-│    │                                                          │    │
-│    └──────────────────────────────────────────────────────────┘    │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                      Artsee 系统架构                             │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌────────────────────────────────────────────────────────┐    │
+│  │              Flutter Mobile App (iOS/Android)          │    │
+│  │                                                        │    │
+│  │  • AI 咨询对话                                          │    │
+│  │  • 申请清单管理                                         │    │
+│  │  • 院校/专业浏览                                        │    │
+│  │  • 案例分享                                            │    │
+│  │  • 社区互动                                            │    │
+│  │                                                        │    │
+│  └──────────────────────┬─────────────────────────────────┘    │
+│                         │                                       │
+│                         │ HTTPS/REST API                        │
+│                         │ (Bearer Token Auth)                   │
+│                         ▼                                       │
+│  ┌────────────────────────────────────────────────────────┐    │
+│  │           Next.js 15 Backend (BFF)                     │    │
+│  │                                                        │    │
+│  │  • RESTful API (/api/v1/*)                             │    │
+│  │  • AI 咨询 Pipeline (RAG + LLM)                        │    │
+│  │  • 知识库检索 (Embedding + Vector Search)              │    │
+│  │  • 用户认证 (Supabase Auth)                            │    │
+│  │  • 管理后台 (/admin)                                   │    │
+│  │                                                        │    │
+│  └──────────────────────┬─────────────────────────────────┘    │
+│                         │                                       │
+│                         │ PostgreSQL + RLS                      │
+│                         ▼                                       │
+│  ┌────────────────────────────────────────────────────────┐    │
+│  │            Supabase (Database + Auth + Storage)        │    │
+│  │                                                        │    │
+│  │  • PostgreSQL (院校、专业、用户、申请清单)              │    │
+│  │  • Auth (用户认证与会话管理)                            │    │
+│  │  • Storage (头像、校园图片、作品集)                     │    │
+│  │  • Realtime (可选，未来扩展)                            │    │
+│  │                                                        │    │
+│  └────────────────────────────────────────────────────────┘    │
+│                                                                 │
+│  ┌────────────────────────────────────────────────────────┐    │
+│  │              External Services                         │    │
+│  │                                                        │    │
+│  │  • Moonshot AI / OpenAI (LLM)                          │    │
+│  │  • Xinference / Ollama (Embedding)                     │    │
+│  │                                                        │    │
+│  └────────────────────────────────────────────────────────┘    │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-## 核心定位
+### 模块职责
 
-| 模块 | 定位 | 职责 |
+| 模块 | 技术栈 | 职责 |
+|------|--------|------|
+| **Flutter APP** | Flutter 3.x + Dart | 移动客户端，所有用户交互界面 |
+| **Next.js Backend** | Next.js 15 + TypeScript | BFF 层，提供统一 API + AI 能力 |
+| **Supabase** | PostgreSQL + Auth + Storage | 数据存储、用户认证、文件管理 |
+| **LLM** | Moonshot / OpenAI | AI 对话生成 |
+| **Embedding** | Xinference / Ollama / OpenAI | 知识库向量化 |
+
+## 🛠 技术栈
+
+### Flutter APP
+
+| 技术 | 版本 | 用途 |
 |------|------|------|
-| **APP** | 🎯 **核心业务端** | 承载所有用户交互，作品浏览、收藏、搜索 |
-| **Web** | 🔧 **网站 + 后端** | 提供管理后台 + 统一 API 服务 + 身份认证 |
-| **Database** | 💾 **数据层** | 存储所有业务数据，仅 Web 后端直接访问 |
+| **Flutter** | 3.x | 跨平台移动开发框架 |
+| **Dart** | 3.x | 编程语言 |
+| **http** | - | HTTP 客户端（调用 Web API） |
+| **Supabase Flutter** | - | Supabase 客户端（Auth + Storage） |
 
-## 技术栈
+### Next.js Backend
 
-### APP 端 (Flutter)
+| 技术 | 版本 | 用途 |
+|------|------|------|
+| **Next.js** | 15.5.18 | 服务端框架 + API Routes |
+| **React** | 19.1.0 | UI 组件（管理后台） |
+| **TypeScript** | 5.x | 类型安全 |
+| **Supabase JS** | 2.49.1 | 数据库 + Auth 客户端 |
+| **OpenAI SDK** | 6.33.0 | LLM 调用 |
+| **Vitest** | 3.2.4 | 单元测试 + 集成测试 |
+| **Tailwind CSS** | 4.x | 样式系统 |
+
+### 数据库与服务
+
 | 技术 | 用途 |
 |------|------|
-| Flutter | 跨平台移动开发 |
-| Dart | 编程语言 |
-| supabase_flutter | Supabase 客户端 |
-| wechat_kit | 微信登录 SDK |
-| Riverpod | 状态管理 |
+| **Supabase PostgreSQL** | 关系型数据库 |
+| **Supabase Auth** | 用户认证与会话管理 |
+| **Supabase Storage** | 文件存储（头像、图片） |
+| **Row Level Security** | 数据权限控制 |
+| **Moonshot AI** | 大语言模型（主要） |
+| **OpenAI** | 大语言模型（备用） |
+| **Xinference** | 本地 Embedding 服务 |
 
-### Web 端 (Next.js)
-| 技术 | 用途 |
-|------|------|
-| Next.js 15 | React 全栈框架 |
-| Tailwind CSS 4 | 样式系统 (青花瓷主题) |
-| shadcn/ui | 组件库 |
-| Supabase | 数据库 + 认证 |
-| TypeScript | 编程语言 |
+---
 
-### 数据库 (Supabase)
-| 技术 | 用途 |
-|------|------|
-| PostgreSQL | 关系型数据库 |
-| Supabase Auth | 用户认证系统 |
-| Row Level Security | 数据权限控制 |
-
-## 数据库结构
-
-### 核心业务表
-
-```
-schools (学校)
-  └── programs (项目)
-       ├── program_admissions (录取信息)
-       ├── program_fees (费用)
-       ├── program_evaluations (评估)
-       └── art_categories (艺术分类) [多对多]
-
-auth.users (Supabase 内置)
-  └── user_profiles (用户资料扩展)
-       ├── user_favorites (收藏)
-       └── user_follows (关注)
-```
-
-### 用户认证系统
-
-支持多种登录方式：
-
-| 方式 | 实现 |
-|------|------|
-| **手机号 + 验证码** | 自定义 SMS + Supabase Auth |
-| **微信登录** | 微信 SDK + OpenID/UnionID 绑定 |
-| **邮箱 + 密码** | Supabase Auth 原生支持 |
-
-### 关键表说明
-
-| 表名 | 说明 | 记录数 |
-|------|------|--------|
-| `schools` | 艺术院校信息 | 待导入 |
-| `art_categories` | 艺术专业分类 | 81 条 |
-| `programs` | 艺术项目/专业 | 待导入 |
-| `program_admissions` | 录取要求 | 一对一 |
-| `program_fees` | 学费信息 | 一对一 |
-| `program_evaluations` | 申请难度评估 | 一对一 |
-| `user_profiles` | 用户资料扩展 | 动态 |
-| `user_favorites` | 用户收藏 | 动态 |
-
-详细设计见 [DATABASE_SCHEMA_V2.md](./DATABASE_SCHEMA_V2.md)
-
-## 项目结构
+## 📁 项目结构
 
 ```
 artsee/
 ├── app/                          # 📱 Flutter 移动应用
 │   ├── lib/
-│   │   ├── main.dart             # 入口，青花瓷主题
+│   │   ├── main.dart             # 应用入口
+│   │   ├── config/               # 配置（API 地址、测试账号）
 │   │   ├── services/             # API 服务层
-│   │   │   └── auth_service.dart # 认证服务
+│   │   │   └── backend_api_service.dart
+│   │   ├── models/               # 数据模型
 │   │   ├── screens/              # 页面
-│   │   │   └── login_screen.dart # 登录页
-│   │   └── models/               # 数据模型
-│   └── pubspec.yaml
+│   │   │   ├── home/             # AI Home
+│   │   │   ├── application/      # 申请清单
+│   │   │   ├── schools/          # 院校列表
+│   │   │   ├── programs/         # 专业列表
+│   │   │   ├── cases/            # 案例分享
+│   │   │   └── community/        # 社区
+│   │   └── widgets/              # 通用组件
+│   ├── test/                     # 单元测试
+│   ├── pubspec.yaml
+│   └── README.md
 │
-├── web/                          # 🌐 Next.js 网站 + 后端
+├── web/                          # 🌐 Next.js 后端服务
 │   ├── app/
-│   │   ├── page.tsx              # 网站首页
-│   │   ├── dashboard/            # 管理后台
-│   │   │   └── page.tsx          # Dashboard 页面
-│   │   └── api/                  # API 路由
-│   │       └── v1/
-│   │           └── auth/         # 认证 API
+│   │   ├── api/v1/               # RESTful API
+│   │   │   ├── ai/               # AI 咨询、分析
+│   │   │   ├── auth/             # 用户认证
+│   │   │   ├── schools/          # 院校数据
+│   │   │   ├── programs/         # 专业数据
+│   │   │   ├── tracker/          # 申请清单
+│   │   │   ├── cases/            # 案例
+│   │   │   └── community/        # 社区
+│   │   ├── admin/                # 管理后台
+│   │   └── chat/                 # 流式对话
 │   ├── lib/
-│   │   └── supabase/             # Supabase 配置
-│   └── app/globals.css           # 青花瓷主题
+│   │   ├── api/                  # API 工具
+│   │   ├── ai/                   # AI 逻辑
+│   │   ├── knowledge/            # 知识库 RAG
+│   │   └── pipelines/            # 咨询 Pipeline
+│   ├── tests/                    # Vitest 测试
+│   ├── docs/migrations/          # 数据库 Migration
+│   └── README.md
 │
-├── init_data/                    # 🗂️ 数据初始化
-│   ├── create_database_v2.sql    # 数据库建表脚本
-│   ├── import_from_feishu.py     # 飞书数据导入
-│   └── lib/FS.py                 # 飞书 API 工具
+├── tests/                        # 🧪 集成测试
+│   └── backend/
+│       └── supabase-health.mjs   # 后端健康检查
 │
-├── README.md                     # 本文件
-├── DATABASE_SCHEMA_V2.md         # 数据库设计文档
-├── AUTH_SYSTEM.md                # 认证系统文档
-└── DESIGN_SYSTEM.md              # 青花瓷设计系统
+├── scripts/                      # 🔧 脚本工具
+│   ├── ensure-dev-test-user.mjs  # 创建测试用户
+│   ├── deploy-web.sh             # 部署脚本
+│   └── browser-admin-e2e.mjs     # E2E 测试
+│
+├── docs/                         # 📚 文档
+│   ├── AGENTS.md                 # AI 助手开发指南
+│   ├── APP_DEVELOPMENT.md        # APP 开发指南
+│   ├── ADMIN_SETUP.md            # 管理员设置
+│   └── ...
+│
+├── .cursor/skills/               # 🤖 AI 技能
+│   ├── port-manager/             # 端口管理
+│   └── jinhui-stack-debug/       # 调试指南
+│
+├── package.json                  # 项目根配置
+├── AGENTS.md                     # 项目总览（AI 必读）
+└── README.md                     # 本文件
 ```
 
-## 快速开始
+---
+
+## � 快速开始
 
 ### 环境要求
-- Node.js 18+
-- Flutter SDK 3.11+
-- Supabase 账号
+- **Node.js** 20+
+- **Flutter SDK** 3.x
+- **Supabase** 账号
 
-### 1. 安装依赖
+### 1. 克隆仓库
 
 ```bash
-# Web 依赖
+git clone https://github.com/artsee-platform/artsee.git
+cd artsee
+```
+
+### 2. 安装依赖
+
+```bash
+# 项目根依赖
 npm install
 
-# APP 依赖
-cd app && flutter pub get
+# Web 依赖
+cd web && npm install && cd ..
+
+# Flutter 依赖
+cd app && flutter pub get && cd ..
 ```
 
-### 2. 配置环境变量
+### 3. 配置环境变量
 
-创建 `web/.env.local`：
+复制示例文件：
 
 ```bash
-# Supabase 配置
-NEXT_PUBLIC_SUPABASE_URL=https://nufrgmlhlfmhxsqbybfd.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-
-# 微信登录配置
-WECHAT_APP_ID=your_wechat_app_id
-WECHAT_APP_SECRET=your_wechat_app_secret
-
-# 短信服务配置
-SMS_PROVIDER=aliyun
-SMS_ACCESS_KEY_ID=your_key
-SMS_ACCESS_KEY_SECRET=your_secret
+cp web/.env.development.example web/.env.local
 ```
 
-### 3. 初始化数据库
+填写必要变量（详见 `web/README.md`）。
 
-1. 打开 [Supabase Dashboard](https://app.supabase.com)
-2. 进入 SQL Editor
-3. 执行 `init_data/create_database_v2.sql`
+### 4. 初始化数据库
 
-### 4. 导入数据（可选）
+在 Supabase Dashboard → SQL Editor 中执行 `web/docs/migrations/` 下的 SQL 文件（按序号顺序）。
+
+### 5. 创建测试用户
 
 ```bash
-cd init_data
-python3 import_from_feishu.py
+npm run ensure:dev-user
 ```
 
-### 5. 运行开发服务器
+### 6. 启动开发服务器
 
 ```bash
-# 运行 Web
+# 启动 Web 后端（默认端口 3000）
 npm run dev:web
 
-# 运行 APP (需要连接设备)
+# 启动 Flutter APP（需连接设备或模拟器）
 npm run dev:app
 ```
 
-## API 设计
+---
 
-### 认证相关
+## 🛠 开发指南
 
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/api/v1/auth/send-sms` | POST | 发送短信验证码 |
-| `/api/v1/auth/verify-sms` | POST | 验证短信登录 |
-| `/api/v1/auth/wechat` | POST | 微信登录 |
-| `/api/v1/auth/logout` | POST | 登出 |
+### 常用命令
 
-### 业务相关
+```bash
+# Web 开发
+npm run dev:web          # 启动 Web 开发服务器
+npm run build:web        # 构建 Web 生产版本
+npm run lint:web         # ESLint 检查
+npm run test:web         # 运行 Web 测试
 
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/api/v1/schools` | GET | 获取学校列表 |
-| `/api/v1/programs` | GET | 获取项目列表 |
-| `/api/v1/programs/:id` | GET | 获取项目详情 |
-| `/api/v1/user/favorites` | GET/POST | 用户收藏 |
-| `/api/v1/user/profile` | GET/PUT | 用户资料 |
+# Flutter 开发
+npm run dev:app          # 启动 Flutter APP
+npm run build:app        # 构建 APP
 
-## 近期完成：院校与专业媒体接入
+# 测试
+npm run test:backend     # 后端健康检查
+npm run ensure:dev-user  # 创建/修复测试用户
+npm run e2e:admin        # 管理后台 E2E 测试
 
-本轮完成了 Supabase Storage 中学校媒体资源到 APP 前端的接入。
-
-### 数据来源
-
-| 类型 | Supabase 位置 | 前端用途 |
-|------|---------------|----------|
-| 学校 logo / 校徽 | `schools.logo_url` | 院校列表、院校详情、专业详情学校头像 |
-| 学校图片组 | `schools.campus_image_urls` | 院校详情大图、专业列表封面、专业详情顶部轮播 |
-| 专业封面兜底 | `programs.cover_image_url` 或学校 `campus_image_urls[0]` | 专业列表卡片、专业详情首屏图片 |
-
-Storage bucket 使用 `school-media`，对象路径约定为：
-
-```text
-school-media/schools/{school_id}/...
+# 部署
+npm run deploy:web       # 部署 Web 到生产服务器
 ```
 
-### API 行为
+### 开发流程
 
-`/api/v1/programs` 和 `/api/v1/programs/:id` 会返回学校媒体字段，并在专业自身 `cover_image_url` 为空时自动使用学校图片作为封面：
+1. **后端优先**：新功能先在 `web/app/api/v1/` 实现 API
+2. **测试验证**：使用 `npm run test:backend` 验证接口
+3. **Flutter 集成**：在 `app/lib/services/backend_api_service.dart` 中调用
+4. **UI 实现**：在 `app/lib/screens/` 中实现界面
 
-```json
-{
-  "cover_image_url": "https://.../school-media/schools/{school_id}/campus-1.jpg",
-  "cover_image_urls": ["https://.../campus-1.jpg", "https://.../campus-2.jpg"]
-}
+### 调试技巧
+
+遇到问题时，按以下顺序排查：
+
+1. **后端 API** → `npm run test:backend`
+2. **数据库** → Supabase Dashboard
+3. **网络** → 检查 API 基址配置
+4. **权限** → 检查 RLS 策略
+
+详见 [`.cursor/skills/jinhui-stack-debug/SKILL.md`](.cursor/skills/jinhui-stack-debug/SKILL.md)
+
+---
+
+## 🧪 测试
+
+### 后端测试
+
+```bash
+# Supabase 健康检查
+npm run test:backend
+
+# Web API 契约测试
+npm run test:web
 ```
 
-### APP 呈现
+### Flutter 测试
 
-- 院校列表和详情继续使用 `logo_url` 展示学校 logo，并增加图片加载失败占位。
-- 专业列表卡片展示专业封面图。
-- 专业详情顶部展示学校图片轮播，优先使用 `cover_image_urls`。
+```bash
+cd app
+flutter test
+```
 
-## 青花瓷主题
+---
 
-项目采用中国传统青花瓷作为设计主题：
+## 🚢 部署
 
-| 颜色 | 色值 | 用途 |
-|------|------|------|
-| **深蓝** | `#16315C` | 主色调、导航栏 |
-| **中蓝** | `#345C8C` | 按钮、链接 |
-| **亮蓝** | `#2279A2` | 高亮、悬停 |
-| **瓷白** | `#F7F4EF` | 背景色 |
-| **墨黑** | `#2B2B2D` | 文字颜色 |
+### Web 后端部署
 
-详见 [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md)
+```bash
+# 自动部署到生产服务器（artiqore.com）
+npm run deploy:web
+```
 
-## 开发路线图
+**部署流程：**
+1. 本地构建 Next.js
+2. 通过 SSH 上传到服务器
+3. PM2 重启服务
 
-- [x] 青花瓷主题设计系统
-- [x] Web Dashboard 管理后台
-- [x] 数据库设计 (v2 - 去掉飞书 key)
-- [x] 用户认证系统设计
-- [ ] 飞书数据导入
-- [ ] Web API 路由实现
-- [ ] APP API 服务层
-- [ ] APP 登录页面
-- [ ] APP 首页和作品列表
-- [ ] 收藏功能
+**服务器信息：**
+- 地址：`artiqore.com`
+- 目录：`~/website/artsee/web`
+- PM2 应用名：`artsee-web`
+- 端口：3000（Nginx 反代）
 
-## 重要文档
+### Flutter APP 发布
+
+```bash
+cd app
+
+# Android
+flutter build apk --release
+
+# iOS
+flutter build ios --release
+```
+
+---
+
+## 📚 文档
+
+### 核心文档
 
 | 文档 | 说明 |
 |------|------|
-| [DESIGN_SYSTEM.md](./docs/DESIGN_SYSTEM.md) | 青花瓷主题设计规范 |
-| [DATABASE_SCHEMA_V2.md](./docs/DATABASE_SCHEMA_V2.md) | 数据库结构设计 |
-| [AUTH_SYSTEM.md](./docs/AUTH_SYSTEM.md) | 用户认证系统详细文档 |
-| [APP_DEVELOPMENT.md](./docs/APP_DEVELOPMENT.md) | APP 开发环境搭建指南（含模拟器安装） |
-| [PRD.md](./docs/PRD.md) | 产品需求文档（基于 PDF 分析） |
-| [AGENTS.md](./docs/AGENTS.md) | AI 助手开发指南 |
+| **[AGENTS.md](AGENTS.md)** | 🤖 AI 助手开发指南（必读） |
+| **[web/README.md](web/README.md)** | 🌐 Web 后端完整文档 |
+| **[app/README.md](app/README.md)** | 📱 Flutter APP 开发指南 |
+| **[DATABASE_REPORT.md](DATABASE_REPORT.md)** | 💾 数据库结构报告 |
 
-## 许可证
+### 技能文档
 
-MIT
+| 文档 | 说明 |
+|------|------|
+| **[port-manager](.cursor/skills/port-manager/SKILL.md)** | 端口管理工具 |
+| **[jinhui-stack-debug](.cursor/skills/jinhui-stack-debug/SKILL.md)** | 调试指南 |
+
+### 业务文档
+
+| 文档 | 说明 |
+|------|------|
+| **[docs/APP_DEVELOPMENT.md](docs/APP_DEVELOPMENT.md)** | APP 开发环境搭建 |
+| **[docs/ADMIN_SETUP.md](docs/ADMIN_SETUP.md)** | 管理员设置指南 |
+| **[docs/api-design/](docs/api-design/)** | API 设计文档 |
+
+---
+
+## 🤝 贡献
+
+欢迎贡献代码、报告问题或提出建议！
+
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/amazing-feature`)
+3. 提交更改 (`git commit -m 'Add amazing feature'`)
+4. 推送到分支 (`git push origin feature/amazing-feature`)
+5. 创建 Pull Request
+
+---
+
+## 📄 许可证
+
+Copyright © 2026 Artsee / Artiqore 艺衡. All rights reserved.

@@ -51,12 +51,12 @@ export async function POST(req: NextRequest) {
 
     await supabase
       .from("user_profiles")
-      .update({
+      .upsert({
+        id: userId,
         nickname: username,
         last_login_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      })
-      .eq("id", userId);
+      }, { onConflict: "id" });
 
     const { data: sessionData, error: sessionError } = await supabase.auth.admin.generateLink({
       type: 'magiclink',
@@ -80,10 +80,11 @@ export async function POST(req: NextRequest) {
         username,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("注册错误:", error);
+    const message = error instanceof Error ? error.message : "服务器错误";
     return NextResponse.json(
-      { message: error.message || "服务器错误" },
+      { message },
       { status: 500 }
     );
   }

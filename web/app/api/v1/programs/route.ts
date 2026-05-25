@@ -72,7 +72,15 @@ export async function GET(req: NextRequest) {
     const supabase = createServiceClient();
     let query = supabase
       .from("programs")
-      .select("*", { count: "exact" })
+      .select(`
+        *,
+        schools!school_id (
+          id,
+          name_zh,
+          name_en,
+          logo_url
+        )
+      `, { count: "exact" })
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 

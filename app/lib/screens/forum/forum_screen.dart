@@ -50,20 +50,20 @@ class ForumScreenState extends State<ForumScreen>
               indicatorColor: kCobalt,
               indicatorWeight: 2,
               labelColor: kCobalt,
-              unselectedLabelColor: context.artC.ink.withOpacity(0.35),
-              labelStyle: TextStyle(
+              unselectedLabelColor: context.artC.ink.withValues(alpha: 0.35),
+              labelStyle: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.2,
               ),
-              unselectedLabelStyle: TextStyle(
+              unselectedLabelStyle: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 1.2,
               ),
               indicatorSize: TabBarIndicatorSize.label,
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              dividerColor: context.artC.silver.withOpacity(0.5),
+              dividerColor: context.artC.silver.withValues(alpha: 0.5),
               tabs: const [
                 Tab(text: '工具集'),
                 Tab(text: '课程中心'),
@@ -93,9 +93,24 @@ class _CoursesTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = [
-      ('作品集辅导：RCA/UAL 申请全攻略', '留学辅导', 'Premium', 'https://picsum.photos/seed/course0/800/450'),
-      ('当代油画技法：从构图到色彩表达', '技法课', '¥1,200', 'https://picsum.photos/seed/course1/800/450'),
-      ('艺术家职业商业课：定价、版权与合同', '职业发展', '¥800', 'https://picsum.photos/seed/course2/800/450'),
+      (
+        '作品集辅导：RCA/UAL 申请全攻略',
+        '留学辅导',
+        'Premium',
+        'https://picsum.photos/seed/course0/800/450'
+      ),
+      (
+        '当代油画技法：从构图到色彩表达',
+        '技法课',
+        '¥1,200',
+        'https://picsum.photos/seed/course1/800/450'
+      ),
+      (
+        '艺术家职业商业课：定价、版权与合同',
+        '职业发展',
+        '¥800',
+        'https://picsum.photos/seed/course2/800/450'
+      ),
     ];
 
     return SingleChildScrollView(
@@ -105,9 +120,10 @@ class _CoursesTab extends StatelessWidget {
           return Container(
             margin: const EdgeInsets.only(bottom: 16),
             decoration: BoxDecoration(
-              color: context.artC.silver.withOpacity(0.12),
+              color: context.artC.silver.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(kRadiusLarge),
-              border: Border.all(color: context.artC.silver.withOpacity(0.4)),
+              border:
+                  Border.all(color: context.artC.silver.withValues(alpha: 0.4)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -127,9 +143,9 @@ class _CoursesTab extends StatelessWidget {
                           fit: BoxFit.cover,
                         ),
                         Container(
-                          color: context.artC.ink.withOpacity(0.15),
+                          color: context.artC.ink.withValues(alpha: 0.15),
                         ),
-                        Center(
+                        const Center(
                           child: Icon(
                             Icons.play_circle_outline,
                             size: 52,
@@ -146,9 +162,10 @@ class _CoursesTab extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: kCobalt.withOpacity(0.05),
+                          color: kCobalt.withValues(alpha: 0.05),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
@@ -156,7 +173,7 @@ class _CoursesTab extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.w700,
-                            color: kCobalt.withOpacity(0.7),
+                            color: kCobalt.withValues(alpha: 0.7),
                             letterSpacing: 1,
                           ),
                         ),
@@ -178,13 +195,15 @@ class _CoursesTab extends StatelessWidget {
                         children: [
                           Text(
                             item.$3,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                               color: kCobalt,
                             ),
                           ),
-                          Icon(Icons.arrow_forward, size: 18, color: context.artC.ink.withOpacity(0.2)),
+                          Icon(Icons.arrow_forward,
+                              size: 18,
+                              color: context.artC.ink.withValues(alpha: 0.2)),
                         ],
                       ),
                     ],
@@ -209,22 +228,22 @@ class _ToolsTab extends StatelessWidget {
         'AI咨询',
         Icons.auto_awesome_outlined,
         () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const AiConsultScreen()),
-        ),
+              MaterialPageRoute(builder: (_) => const AiConsultScreen()),
+            ),
       ),
       (
         '院校查询',
         Icons.school_outlined,
         () => ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('院校查询功能开发中')),
-        ),
+              const SnackBar(content: Text('院校查询功能开发中')),
+            ),
       ),
       (
         '专业查询',
         Icons.menu_book_outlined,
         () => ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('专业查询功能开发中')),
-        ),
+              const SnackBar(content: Text('专业查询功能开发中')),
+            ),
       ),
     ];
 
@@ -251,7 +270,7 @@ class _ToolsTab extends StatelessWidget {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: context.artC.ink.withOpacity(0.06),
+                        color: context.artC.ink.withValues(alpha: 0.06),
                         blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
@@ -265,7 +284,7 @@ class _ToolsTab extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: context.artC.ink.withOpacity(0.8),
+                    color: context.artC.ink.withValues(alpha: 0.8),
                   ),
                 ),
               ],
@@ -283,8 +302,18 @@ class _SchoolsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final schools = [
-      ('Royal College of Art', 'London, UK', '#1 Art & Design', 'https://picsum.photos/seed/rca/800/400'),
-      ('University of the Arts London', 'London, UK', '#2 Art & Design', 'https://picsum.photos/seed/ual/800/400'),
+      (
+        'Royal College of Art',
+        'London, UK',
+        '#1 Art & Design',
+        'https://picsum.photos/seed/rca/800/400'
+      ),
+      (
+        'University of the Arts London',
+        'London, UK',
+        '#2 Art & Design',
+        'https://picsum.photos/seed/ual/800/400'
+      ),
     ];
 
     final news = [
@@ -316,9 +345,9 @@ class _SchoolsTab extends StatelessWidget {
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              context.artC.ink.withOpacity(0.0),
-                              context.artC.ink.withOpacity(0.6),
-                              context.artC.ink.withOpacity(0.85),
+                              context.artC.ink.withValues(alpha: 0.0),
+                              context.artC.ink.withValues(alpha: 0.6),
+                              context.artC.ink.withValues(alpha: 0.85),
                             ],
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
@@ -334,7 +363,7 @@ class _SchoolsTab extends StatelessWidget {
                           children: [
                             Text(
                               s.$3,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
                                 color: kCobaltMuted,
@@ -344,7 +373,7 @@ class _SchoolsTab extends StatelessWidget {
                             const SizedBox(height: 4),
                             Text(
                               s.$1,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.w700,
                                 color: Colors.white,
@@ -357,7 +386,7 @@ class _SchoolsTab extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
-                                color: Colors.white.withOpacity(0.6),
+                                color: Colors.white.withValues(alpha: 0.6),
                               ),
                             ),
                           ],
@@ -373,9 +402,10 @@ class _SchoolsTab extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(22),
             decoration: BoxDecoration(
-              color: context.artC.silver.withOpacity(0.12),
+              color: context.artC.silver.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(kRadiusLarge),
-              border: Border.all(color: context.artC.silver.withOpacity(0.4)),
+              border:
+                  Border.all(color: context.artC.silver.withValues(alpha: 0.4)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -385,7 +415,7 @@ class _SchoolsTab extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: context.artC.ink.withOpacity(0.4),
+                    color: context.artC.ink.withValues(alpha: 0.4),
                     letterSpacing: 1.5,
                   ),
                 ),
@@ -402,13 +432,15 @@ class _SchoolsTab extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
-                              color: context.artC.ink.withOpacity(0.75),
+                              color: context.artC.ink.withValues(alpha: 0.75),
                               fontFamily: 'Noto Serif SC',
                             ),
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Icon(Icons.north_east, size: 18, color: context.artC.ink.withOpacity(0.2)),
+                        Icon(Icons.north_east,
+                            size: 18,
+                            color: context.artC.ink.withValues(alpha: 0.2)),
                       ],
                     ),
                   );

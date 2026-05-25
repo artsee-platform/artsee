@@ -3,7 +3,7 @@ import '../../models/models.dart';
 import '../../services/backend_api_service.dart';
 import '../../widgets/common.dart';
 import '../community/community_post_detail_screen.dart';
-import '../programs/program_list_screen.dart';
+import '../programs/program_list_enhanced_screen.dart';
 import '../schools/school_list_screen.dart';
 import 'package:artsee_app/theme/artsee_ui_colors.dart';
 
@@ -61,20 +61,20 @@ class ExploreScreenState extends State<ExploreScreen>
               indicatorColor: kCobalt,
               indicatorWeight: 2,
               labelColor: kCobalt,
-              unselectedLabelColor: context.artC.ink.withOpacity(0.35),
-              labelStyle: TextStyle(
+              unselectedLabelColor: context.artC.ink.withValues(alpha: 0.35),
+              labelStyle: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.2,
               ),
-              unselectedLabelStyle: TextStyle(
+              unselectedLabelStyle: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 1.2,
               ),
               indicatorSize: TabBarIndicatorSize.label,
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              dividerColor: context.artC.silver.withOpacity(0.5),
+              dividerColor: context.artC.silver.withValues(alpha: 0.5),
               tabs: const [
                 Tab(text: '院校'),
                 Tab(text: '专业'),
@@ -87,7 +87,7 @@ class ExploreScreenState extends State<ExploreScreen>
                 controller: _tabController,
                 children: [
                   const SchoolListScreen(),
-                  const ProgramListScreen(),
+                  const ProgramListEnhancedScreen(),
                   CommunityFeedTab(key: _communityKey),
                   const _QaTab(),
                 ],
@@ -163,7 +163,7 @@ class CommunityFeedTabState extends State<CommunityFeedTab> {
             Icon(
               Icons.auto_awesome_mosaic_outlined,
               size: 44,
-              color: context.artC.ink.withOpacity(0.22),
+              color: context.artC.ink.withValues(alpha: 0.22),
             ),
             const SizedBox(height: 14),
             Text(
@@ -182,7 +182,7 @@ class CommunityFeedTabState extends State<CommunityFeedTab> {
               style: TextStyle(
                 fontSize: 12,
                 height: 1.5,
-                color: context.artC.ink.withOpacity(0.45),
+                color: context.artC.ink.withValues(alpha: 0.45),
               ),
             ),
           ],
@@ -260,7 +260,7 @@ class _CommunityPostCard extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: context.artC.porcelain.withOpacity(0.92),
+                        color: context.artC.porcelain.withValues(alpha: 0.92),
                         borderRadius: BorderRadius.circular(kRadiusSmall),
                       ),
                       child: Row(
@@ -275,7 +275,7 @@ class _CommunityPostCard extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
-                                color: context.artC.ink.withOpacity(0.72),
+                                color: context.artC.ink.withValues(alpha: 0.72),
                               ),
                             ),
                           ),
@@ -306,7 +306,7 @@ class _CommunityPostCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 10,
                 height: 1.35,
-                color: context.artC.ink.withOpacity(0.4),
+                color: context.artC.ink.withValues(alpha: 0.4),
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -316,26 +316,26 @@ class _CommunityPostCard extends StatelessWidget {
           Row(
             children: [
               Icon(Icons.favorite_border,
-                  size: 13, color: context.artC.ink.withOpacity(0.35)),
+                  size: 13, color: context.artC.ink.withValues(alpha: 0.35)),
               const SizedBox(width: 3),
               Text(
                 _shortCount(post.likeCount),
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
-                  color: context.artC.ink.withOpacity(0.42),
+                  color: context.artC.ink.withValues(alpha: 0.42),
                 ),
               ),
               const SizedBox(width: 10),
               Icon(Icons.chat_bubble_outline,
-                  size: 13, color: context.artC.ink.withOpacity(0.35)),
+                  size: 13, color: context.artC.ink.withValues(alpha: 0.35)),
               const SizedBox(width: 3),
               Text(
                 _shortCount(post.commentCount),
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
-                  color: context.artC.ink.withOpacity(0.42),
+                  color: context.artC.ink.withValues(alpha: 0.42),
                 ),
               ),
               const Spacer(),
@@ -344,7 +344,7 @@ class _CommunityPostCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w500,
-                  color: context.artC.ink.withOpacity(0.32),
+                  color: context.artC.ink.withValues(alpha: 0.32),
                 ),
               ),
             ],
@@ -363,7 +363,7 @@ class _CommunityImageFallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: context.artC.silver.withOpacity(0.25),
+      color: context.artC.silver.withValues(alpha: 0.25),
       padding: const EdgeInsets.all(18),
       alignment: Alignment.center,
       child: Text(
@@ -375,7 +375,7 @@ class _CommunityImageFallback extends StatelessWidget {
           fontSize: 18,
           height: 1.25,
           fontWeight: FontWeight.w800,
-          color: kCobalt.withOpacity(0.82),
+          color: kCobalt.withValues(alpha: 0.82),
           fontFamily: 'Noto Serif SC',
         ),
       ),
@@ -397,7 +397,7 @@ class _CommunityAvatar extends StatelessWidget {
       child: Container(
         width: size,
         height: size,
-        color: kCobalt.withOpacity(0.09),
+        color: kCobalt.withValues(alpha: 0.09),
         child: avatar != null && avatar.isNotEmpty
             ? Image.network(
                 avatar,
@@ -447,7 +447,7 @@ class _CommunityError extends StatelessWidget {
             Icon(
               Icons.cloud_off_outlined,
               size: 42,
-              color: context.artC.ink.withOpacity(0.25),
+              color: context.artC.ink.withValues(alpha: 0.25),
             ),
             const SizedBox(height: 12),
             Text(
@@ -456,7 +456,7 @@ class _CommunityError extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 height: 1.5,
-                color: context.artC.ink.withOpacity(0.58),
+                color: context.artC.ink.withValues(alpha: 0.58),
               ),
             ),
             const SizedBox(height: 16),
@@ -506,7 +506,7 @@ class _QaTab extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 14),
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: context.artC.silver.withOpacity(0.15),
+                color: context.artC.silver.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(kRadiusMedium),
                 border: Border.all(color: Colors.transparent),
               ),
@@ -517,7 +517,7 @@ class _QaTab extends StatelessWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: kCobalt.withOpacity(0.05),
+                      color: kCobalt.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -525,7 +525,7 @@ class _QaTab extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 9,
                         fontWeight: FontWeight.w700,
-                        color: kCobalt.withOpacity(0.7),
+                        color: kCobalt.withValues(alpha: 0.7),
                         letterSpacing: 1,
                       ),
                     ),
@@ -547,7 +547,7 @@ class _QaTab extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
-                      color: context.artC.ink.withOpacity(0.35),
+                      color: context.artC.ink.withValues(alpha: 0.35),
                     ),
                   ),
                 ],
@@ -570,7 +570,7 @@ class _QaTab extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: Colors.white.withOpacity(0.55),
+                    color: Colors.white.withValues(alpha: 0.55),
                     letterSpacing: 1.5,
                   ),
                 ),
@@ -583,14 +583,15 @@ class _QaTab extends StatelessWidget {
                       children: [
                         Text(
                           c,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
                             color: Colors.white,
                           ),
                         ),
                         Icon(Icons.chevron_right,
-                            size: 16, color: Colors.white.withOpacity(0.4)),
+                            size: 16,
+                            color: Colors.white.withValues(alpha: 0.4)),
                       ],
                     ),
                   );
@@ -608,13 +609,13 @@ class _QaTab extends StatelessWidget {
               borderRadius: BorderRadius.circular(999),
               boxShadow: [
                 BoxShadow(
-                  color: kCobalt.withOpacity(0.25),
+                  color: kCobalt.withValues(alpha: 0.25),
                   blurRadius: 16,
                   offset: const Offset(0, 6),
                 ),
               ],
             ),
-            child: Center(
+            child: const Center(
               child: Text(
                 '我要提问',
                 style: TextStyle(

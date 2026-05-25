@@ -48,7 +48,8 @@ class StorageService {
           'file',
           bytes,
           filename: fileName,
-          contentType: _parseMediaType(contentType ?? 'application/octet-stream'),
+          contentType:
+              _parseMediaType(contentType ?? 'application/octet-stream'),
         ),
       );
 
@@ -69,7 +70,8 @@ class StorageService {
 
     final name = file.name;
     final ext = name.contains('.') ? name.split('.').last.toLowerCase() : 'jpg';
-    final safeExt = ['jpg', 'jpeg', 'png', 'webp', 'gif'].contains(ext) ? ext : 'jpg';
+    final safeExt =
+        ['jpg', 'jpeg', 'png', 'webp', 'gif'].contains(ext) ? ext : 'jpg';
     // 头像固定路径格式：{uid}/avatar.{ext}
     final mime = _mimeForExt(safeExt);
     final bytes = await file.readAsBytes();

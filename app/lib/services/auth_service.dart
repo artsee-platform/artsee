@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class AuthService {
   static const String apiBaseUrl = 'http://10.0.2.2:3000/api/v1'; // Android模拟器
   // static const String apiBaseUrl = 'http://localhost:3000/api/v1'; // iOS模拟器
-  
+
   static final AuthService _instance = AuthService._internal();
   factory AuthService() => _instance;
   AuthService._internal();
@@ -48,13 +48,13 @@ class AuthService {
       );
 
       final data = jsonDecode(response.body);
-      
+
       if (data['success'] == true && data['user'] != null) {
         // 添加 role 到用户数据
         final userData = Map<String, dynamic>.from(data['user']);
         userData['role'] = userData['role'] ?? 'user';
         await _saveUserData(userData);
-        
+
         // 更新返回数据
         data['user'] = userData;
       }
@@ -117,7 +117,7 @@ class AuthService {
       );
 
       final data = jsonDecode(response.body);
-      
+
       if (data['success'] == true && data['user'] != null) {
         final userData = Map<String, dynamic>.from(data['user']);
         userData['role'] = userData['role'] ?? 'admin';
@@ -153,7 +153,7 @@ class AuthService {
       );
 
       final data = jsonDecode(response.body);
-      
+
       if (data['success'] == true && data['profile'] != null) {
         // 更新本地存储的用户数据
         final updatedUser = Map<String, dynamic>.from(user);
@@ -171,10 +171,10 @@ class AuthService {
   Future<bool> isNewUser() async {
     final user = await getCurrentUser();
     if (user == null) return false;
-    
+
     final profile = user['profile'] as Map<String, dynamic>?;
     if (profile == null) return true;
-    
+
     return profile['has_completed_onboarding'] != true;
   }
 }

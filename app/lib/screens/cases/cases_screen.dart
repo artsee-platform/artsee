@@ -15,8 +15,8 @@ class CasesScreen extends StatefulWidget {
 
 class _CasesScreenState extends State<CasesScreen> {
   static const _filters = <({String label, String? value})>[
-    (label: '全部案例', value: null),
-    (label: '已录取', value: 'admitted'),
+    (label: '全部', value: null),
+    (label: '录取', value: 'admitted'),
     (label: '候补', value: 'waitlisted'),
     (label: '未录取', value: 'rejected'),
   ];
@@ -74,13 +74,13 @@ class _CasesScreenState extends State<CasesScreen> {
     return Scaffold(
       backgroundColor: context.artC.porcelain,
       body: SafeArea(
+        top: false,
         child: RefreshIndicator(
           color: kCobalt,
           onRefresh: () => _load(showLoading: false),
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
-              const SliverToBoxAdapter(child: _CasesHeader()),
               SliverToBoxAdapter(
                 child: _ResultFilters(
                   filters: _filters,
@@ -120,41 +120,6 @@ class _CasesScreenState extends State<CasesScreen> {
   }
 }
 
-class _CasesHeader extends StatelessWidget {
-  const _CasesHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '录取案例库',
-            style: TextStyle(
-              fontSize: 28,
-              height: 1.15,
-              fontWeight: FontWeight.w800,
-              color: context.artC.ink,
-              fontFamily: 'Noto Serif SC',
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '从真实申请结果里查看院校、专业、背景和作品集准备路径。',
-            style: TextStyle(
-              fontSize: 13,
-              height: 1.45,
-              color: context.artC.ink.withOpacity(0.42),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _ResultFilters extends StatelessWidget {
   final List<({String label, String? value})> filters;
   final String? selected;
@@ -172,18 +137,73 @@ class _ResultFilters extends StatelessWidget {
       height: 44,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 2),
         itemCount: filters.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
           final f = filters[index];
           final active = selected == f.value;
-          return TagChip(
+          return _CaseFilterChip(
             label: f.label,
             active: active,
             onTap: () => onSelected(f.value),
           );
         },
+      ),
+    );
+  }
+}
+
+class _CaseFilterChip extends StatelessWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _CaseFilterChip({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        height: 34,
+        constraints: const BoxConstraints(minWidth: 72),
+        padding: const EdgeInsets.symmetric(horizontal: 15),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: active ? kCobalt : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color:
+                active ? kCobalt : context.artC.silver.withValues(alpha: 0.56),
+          ),
+          boxShadow: active
+              ? [
+                  BoxShadow(
+                    color: kCobalt.withValues(alpha: 0.10),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            color: active
+                ? Colors.white
+                : context.artC.ink.withValues(alpha: 0.46),
+            fontWeight: active ? FontWeight.w800 : FontWeight.w700,
+          ),
+        ),
       ),
     );
   }
@@ -197,6 +217,8 @@ class _CaseCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final excerpt = (item.excerpt ?? item.content ?? '').trim();
+    final targetText =
+        '${item.targetSchool ?? '目标院校待补'} · ${item.targetProgram ?? '专业待补'}';
     return GestureDetector(
       onTap: () {
         Navigator.of(context).push(
@@ -206,171 +228,186 @@ class _CaseCard extends StatelessWidget {
         );
       },
       child: Container(
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: context.artC.cardIconBg,
-          borderRadius: BorderRadius.circular(kRadiusLarge),
-          border: Border.all(color: context.artC.silver.withOpacity(0.55)),
-          boxShadow: [kShadowCard],
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          border:
+              Border.all(color: context.artC.silver.withValues(alpha: 0.34)),
+          boxShadow: [
+            BoxShadow(
+              color: context.artC.ink.withValues(alpha: 0.035),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                gradient: resultGradient(item.result),
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(kRadiusLarge),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 9,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.22),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          resultLabel(item.result),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        item.year ?? timeAgo(item.createdAt),
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.78),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    gradient: resultGradient(item.result),
+                    borderRadius: BorderRadius.circular(15),
                   ),
-                  const SizedBox(height: 14),
-                  Text(
-                    item.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                  alignment: Alignment.center,
+                  child: Text(
+                    resultLabel(item.result).substring(0, 1),
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 18,
-                      height: 1.25,
-                      fontWeight: FontWeight.w800,
-                      fontFamily: 'Noto Serif SC',
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    '${item.targetSchool ?? '目标院校待补'} · ${item.targetProgram ?? '专业待补'}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.78),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: _MiniFact(
-                          label: '本科背景',
-                          value: item.undergrad ?? '未填写',
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _MiniFact(
-                          label: 'GPA',
-                          value: item.gpa ?? '未填写',
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (excerpt.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      excerpt,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        height: 1.55,
-                        color: context.artC.ink.withOpacity(0.52),
-                      ),
-                    ),
-                  ],
-                  if (item.tags.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: item.tags.take(5).map((tag) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: kCobalt.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              resultLabel(item.result),
+                              style: const TextStyle(
+                                color: kCobalt,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
                           ),
-                          decoration: BoxDecoration(
-                            color: kCobalt.withOpacity(0.06),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            tag,
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: kCobalt,
+                          const Spacer(),
+                          Text(
+                            item.year ?? timeAgo(item.createdAt),
+                            style: TextStyle(
+                              color: context.artC.ink.withValues(alpha: 0.34),
+                              fontSize: 10.5,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                        );
-                      }).toList(),
-                    ),
-                  ],
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      _Meta(icon: Icons.favorite_border, value: item.likeCount),
-                      const SizedBox(width: 14),
-                      _Meta(
-                        icon: Icons.chat_bubble_outline,
-                        value: item.commentCount,
+                        ],
                       ),
-                      const SizedBox(width: 14),
-                      _Meta(
-                        icon: Icons.bookmark_border,
-                        value: item.saveCount,
+                      const SizedBox(height: 7),
+                      Text(
+                        item.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: context.artC.ink,
+                          fontSize: 15,
+                          height: 1.2,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                      const Spacer(),
-                      Icon(
-                        Icons.arrow_forward_ios,
-                        size: 13,
-                        color: context.artC.ink.withOpacity(0.28),
+                      const SizedBox(height: 3),
+                      Text(
+                        targetText,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: context.artC.ink.withValues(alpha: 0.34),
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ],
                   ),
-                ],
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.chevron_right,
+                  size: 20,
+                  color: context.artC.ink.withValues(alpha: 0.16),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: _MiniFact(
+                    label: '本科背景',
+                    value: item.undergrad ?? '未填写',
+                  ),
+                ),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: _MiniFact(
+                    label: 'GPA',
+                    value: item.gpa ?? '未填写',
+                  ),
+                ),
+              ],
+            ),
+            if (excerpt.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                excerpt,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.55,
+                  color: context.artC.ink.withValues(alpha: 0.5),
+                ),
               ),
+            ],
+            if (item.tags.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: item.tags.take(5).map((tag) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF4F5F3),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      tag,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: context.artC.ink.withValues(alpha: 0.48),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                _Meta(icon: Icons.favorite_border, value: item.likeCount),
+                const SizedBox(width: 14),
+                _Meta(
+                  icon: Icons.chat_bubble_outline,
+                  value: item.commentCount,
+                ),
+                const SizedBox(width: 14),
+                _Meta(
+                  icon: Icons.bookmark_border,
+                  value: item.saveCount,
+                ),
+              ],
             ),
           ],
         ),
@@ -388,10 +425,11 @@ class _MiniFact extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
       decoration: BoxDecoration(
-        color: context.artC.silver.withOpacity(0.18),
-        borderRadius: BorderRadius.circular(kRadiusSmall),
+        color: context.artC.porcelain.withValues(alpha: 0.64),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.artC.silver.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -401,7 +439,7 @@ class _MiniFact extends StatelessWidget {
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w700,
-              color: context.artC.ink.withOpacity(0.32),
+              color: context.artC.ink.withValues(alpha: 0.32),
             ),
           ),
           const SizedBox(height: 4),
@@ -412,7 +450,7 @@ class _MiniFact extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w800,
-              color: context.artC.ink.withOpacity(0.76),
+              color: context.artC.ink.withValues(alpha: 0.76),
             ),
           ),
         ],
@@ -432,14 +470,14 @@ class _Meta extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: context.artC.ink.withOpacity(0.32)),
+        Icon(icon, size: 14, color: context.artC.ink.withValues(alpha: 0.32)),
         const SizedBox(width: 4),
         Text(
           _shortCount(value),
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w700,
-            color: context.artC.ink.withOpacity(0.45),
+            color: context.artC.ink.withValues(alpha: 0.45),
           ),
         ),
       ],
@@ -460,7 +498,7 @@ class _CasesEmpty extends StatelessWidget {
           Icon(
             Icons.folder_open_outlined,
             size: 46,
-            color: context.artC.ink.withOpacity(0.22),
+            color: context.artC.ink.withValues(alpha: 0.22),
           ),
           const SizedBox(height: 14),
           Text(
@@ -478,7 +516,7 @@ class _CasesEmpty extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               height: 1.5,
-              color: context.artC.ink.withOpacity(0.45),
+              color: context.artC.ink.withValues(alpha: 0.45),
             ),
           ),
         ],
@@ -503,7 +541,7 @@ class _CasesError extends StatelessWidget {
           Icon(
             Icons.cloud_off_outlined,
             size: 46,
-            color: context.artC.ink.withOpacity(0.22),
+            color: context.artC.ink.withValues(alpha: 0.22),
           ),
           const SizedBox(height: 14),
           Text(
@@ -521,7 +559,7 @@ class _CasesError extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               height: 1.5,
-              color: context.artC.ink.withOpacity(0.48),
+              color: context.artC.ink.withValues(alpha: 0.48),
             ),
           ),
           const SizedBox(height: 16),

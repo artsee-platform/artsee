@@ -5,7 +5,7 @@ import '../../services/supabase_service.dart';
 import '../../widgets/common.dart';
 import '../auth/login_screen.dart';
 import '../programs/program_detail_screen.dart';
-import '../schools/school_detail_screen.dart';
+import '../schools/school_detail_enhanced_screen.dart';
 import 'orders_screen.dart';
 import 'profile_edit_screen.dart';
 import 'package:artsee_app/theme/artsee_theme_controller.dart';
@@ -65,13 +65,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('退出登录'),
-        content: Text('确定要退出当前账号吗？'),
+        title: const Text('退出登录'),
+        content: const Text('确定要退出当前账号吗？'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false), child: Text('取消')),
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消')),
           TextButton(
-              onPressed: () => Navigator.pop(ctx, true), child: Text('确定')),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('确定')),
         ],
       ),
     );
@@ -106,7 +108,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (_loading) {
       return Scaffold(
         backgroundColor: context.artC.porcelain,
-        body: Center(
+        body: const Center(
             child: CircularProgressIndicator(color: kCobalt, strokeWidth: 2.5)),
       );
     }
@@ -130,7 +132,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onPressed: () => ArtseeThemeController.instance.toggle(),
                     icon: Icon(
                       dark ? Icons.wb_sunny_outlined : Icons.nightlight_round,
-                      color: context.artC.ink.withOpacity(0.55),
+                      color: context.artC.ink.withValues(alpha: 0.55),
                     ),
                   );
                 },
@@ -146,10 +148,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       width: 88,
                       height: 88,
                       decoration: BoxDecoration(
-                        color: context.artC.silver.withOpacity(0.35),
+                        color: context.artC.silver.withValues(alpha: 0.35),
                         shape: BoxShape.circle,
                       ),
-                      child: Center(
+                      child: const Center(
                         child: Text(
                           '艺',
                           style: TextStyle(
@@ -172,7 +174,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       '申请追踪 · 案例分享 · 论坛互动',
                       style: TextStyle(
                           fontSize: 13,
-                          color: context.artC.ink.withOpacity(0.45)),
+                          color: context.artC.ink.withValues(alpha: 0.45)),
                     ),
                     const SizedBox(height: 24),
                     GestureDetector(
@@ -184,7 +186,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           color: kCobalt,
                           borderRadius: BorderRadius.circular(999),
                         ),
-                        child: Center(
+                        child: const Center(
                           child: Text(
                             '登录 / 注册',
                             style: TextStyle(
@@ -214,6 +216,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (Navigator.of(context).canPop()) ...[
+                _buildProfileBackButton(
+                  onTap: () => Navigator.of(context).pop(),
+                ),
+                const SizedBox(height: 18),
+              ],
               _buildProfileHeader(),
               const SizedBox(height: 28),
               _buildStatsCards(),
@@ -222,6 +230,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 120),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileBackButton({required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: context.artC.silver.withValues(alpha: 0.55),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: context.artC.ink.withValues(alpha: 0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Icon(
+          Icons.arrow_back_ios_new_rounded,
+          size: 18,
+          color: context.artC.ink,
         ),
       ),
     );
@@ -236,12 +274,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               width: 110,
               height: 110,
               decoration: BoxDecoration(
-                color: context.artC.silver.withOpacity(0.3),
+                color: context.artC.silver.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(32),
                 border: Border.all(color: context.artC.porcelain, width: 4),
                 boxShadow: [
                   BoxShadow(
-                    color: context.artC.ink.withOpacity(0.1),
+                    color: context.artC.ink.withValues(alpha: 0.1),
                     blurRadius: 20,
                     offset: const Offset(0, 8),
                   ),
@@ -271,12 +309,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     border: Border.all(color: context.artC.porcelain, width: 3),
                     boxShadow: [
                       BoxShadow(
-                        color: context.artC.ink.withOpacity(0.15),
+                        color: context.artC.ink.withValues(alpha: 0.15),
                         blurRadius: 10,
                       ),
                     ],
                   ),
-                  child: Icon(Icons.verified, size: 20, color: Colors.white),
+                  child:
+                      const Icon(Icons.verified, size: 20, color: Colors.white),
                 ),
               ),
           ],
@@ -301,7 +340,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
-                  color: context.artC.ink.withOpacity(0.4),
+                  color: context.artC.ink.withValues(alpha: 0.4),
                 ),
               ),
               const SizedBox(height: 14),
@@ -326,13 +365,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         borderRadius: BorderRadius.circular(999),
                         boxShadow: [
                           BoxShadow(
-                            color: kCobalt.withOpacity(0.25),
+                            color: kCobalt.withValues(alpha: 0.25),
                             blurRadius: 14,
                             offset: const Offset(0, 6),
                           ),
                         ],
                       ),
-                      child: Text(
+                      child: const Text(
                         '编辑资料',
                         style: TextStyle(
                           fontSize: 12,
@@ -356,7 +395,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             width: 42,
                             height: 42,
                             decoration: BoxDecoration(
-                              color: context.artC.silver.withOpacity(0.35),
+                              color:
+                                  context.artC.silver.withValues(alpha: 0.35),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
@@ -364,7 +404,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ? Icons.wb_sunny_outlined
                                   : Icons.nightlight_round,
                               size: 20,
-                              color: context.artC.ink.withOpacity(0.55),
+                              color: context.artC.ink.withValues(alpha: 0.55),
                             ),
                           ),
                         ),
@@ -376,11 +416,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     width: 42,
                     height: 42,
                     decoration: BoxDecoration(
-                      color: context.artC.silver.withOpacity(0.35),
+                      color: context.artC.silver.withValues(alpha: 0.35),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(Icons.share_outlined,
-                        size: 20, color: context.artC.ink.withOpacity(0.5)),
+                        size: 20,
+                        color: context.artC.ink.withValues(alpha: 0.5)),
                   ),
                 ],
               ),
@@ -396,7 +437,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Center(
       child: Text(
         ch,
-        style: TextStyle(
+        style: const TextStyle(
             fontSize: 40, fontWeight: FontWeight.w700, color: kCobalt),
       ),
     );
@@ -428,7 +469,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 borderRadius: BorderRadius.circular(32),
                 boxShadow: [
                   BoxShadow(
-                    color: kInk.withOpacity(0.15),
+                    color: kInk.withValues(alpha: 0.15),
                     blurRadius: 20,
                     offset: const Offset(0, 10),
                   ),
@@ -442,7 +483,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
-                      color: Colors.white.withOpacity(0.5),
+                      color: Colors.white.withValues(alpha: 0.5),
                       letterSpacing: 1.5,
                     ),
                   ),
@@ -455,7 +496,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           children: [
                             Text(
                               exposure,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.w700,
                                 color: kCobaltMuted,
@@ -469,7 +510,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w500,
-                                color: Colors.white.withOpacity(0.35),
+                                color: Colors.white.withValues(alpha: 0.35),
                                 letterSpacing: 0.5,
                               ),
                             ),
@@ -483,7 +524,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           children: [
                             Text(
                               activeInvitations,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.w700,
                                 color: kCobaltMuted,
@@ -497,7 +538,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w500,
-                                color: Colors.white.withOpacity(0.35),
+                                color: Colors.white.withValues(alpha: 0.35),
                                 letterSpacing: 0.5,
                               ),
                             ),
@@ -516,9 +557,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Container(
             padding: const EdgeInsets.all(22),
             decoration: BoxDecoration(
-              color: context.artC.silver.withOpacity(0.12),
+              color: context.artC.silver.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(32),
-              border: Border.all(color: context.artC.silver.withOpacity(0.4)),
+              border:
+                  Border.all(color: context.artC.silver.withValues(alpha: 0.4)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -528,7 +570,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
-                    color: context.artC.ink.withOpacity(0.4),
+                    color: context.artC.ink.withValues(alpha: 0.4),
                     letterSpacing: 1.5,
                   ),
                 ),
@@ -554,7 +596,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w500,
-                            color: context.artC.ink.withOpacity(0.3),
+                            color: context.artC.ink.withValues(alpha: 0.3),
                             letterSpacing: 0.5,
                           ),
                         ),
@@ -565,9 +607,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: kCobalt.withOpacity(0.9),
+                        color: kCobalt.withValues(alpha: 0.9),
                         decoration: TextDecoration.underline,
-                        decorationColor: kCobalt.withOpacity(0.5),
+                        decorationColor: kCobalt.withValues(alpha: 0.5),
                       ),
                     ),
                   ],
@@ -599,7 +641,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
               decoration: BoxDecoration(
-                color: context.artC.silver.withOpacity(0.1),
+                color: context.artC.silver.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(color: Colors.transparent),
               ),
@@ -616,14 +658,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
-                              color: context.artC.ink.withOpacity(0.04),
+                              color: context.artC.ink.withValues(alpha: 0.04),
                               blurRadius: 8,
                             ),
                           ],
                         ),
                         child: Icon(item.icon,
                             size: 20,
-                            color: context.artC.ink.withOpacity(0.35)),
+                            color: context.artC.ink.withValues(alpha: 0.35)),
                       ),
                       const SizedBox(width: 14),
                       Text(
@@ -631,13 +673,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
-                          color: context.artC.ink.withOpacity(0.8),
+                          color: context.artC.ink.withValues(alpha: 0.8),
                         ),
                       ),
                     ],
                   ),
                   Icon(Icons.chevron_right,
-                      size: 22, color: context.artC.ink.withOpacity(0.2)),
+                      size: 22, color: context.artC.ink.withValues(alpha: 0.2)),
                 ],
               ),
             ),
@@ -649,7 +691,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
             decoration: BoxDecoration(
-              color: context.artC.silver.withOpacity(0.1),
+              color: context.artC.silver.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(24),
               border: Border.all(color: Colors.transparent),
             ),
@@ -666,16 +708,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
-                            color: context.artC.ink.withOpacity(0.04),
+                            color: context.artC.ink.withValues(alpha: 0.04),
                             blurRadius: 8,
                           ),
                         ],
                       ),
                       child: Icon(Icons.logout,
-                          size: 20, color: Colors.red.withOpacity(0.5)),
+                          size: 20, color: Colors.red.withValues(alpha: 0.5)),
                     ),
                     const SizedBox(width: 14),
-                    Text(
+                    const Text(
                       '退出登录',
                       style: TextStyle(
                         fontSize: 15,
@@ -686,7 +728,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
                 Icon(Icons.chevron_right,
-                    size: 22, color: context.artC.ink.withOpacity(0.2)),
+                    size: 22, color: context.artC.ink.withValues(alpha: 0.2)),
               ],
             ),
           ),
@@ -696,9 +738,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: kCobalt.withOpacity(0.04),
+              color: kCobalt.withValues(alpha: 0.04),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: kCobalt.withOpacity(0.12)),
+              border: Border.all(color: kCobalt.withValues(alpha: 0.12)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -708,7 +750,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: kCobalt.withOpacity(0.8),
+                    color: kCobalt.withValues(alpha: 0.8),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -719,7 +761,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         '学校详情页',
                         () => Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) => const SchoolDetailScreen(
+                            builder: (_) => const SchoolDetailEnhancedScreen(
                                 id: '3485e258-d84b-4067-b093-62a3d468ac62'),
                           ),
                         ),
@@ -755,7 +797,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         decoration: BoxDecoration(
           color: context.artC.cardIconBg,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: kCobalt.withOpacity(0.2)),
+          border: Border.all(color: kCobalt.withValues(alpha: 0.2)),
         ),
         child: Text(
           label,
@@ -763,7 +805,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: kCobalt.withOpacity(0.9),
+            color: kCobalt.withValues(alpha: 0.9),
           ),
         ),
       ),

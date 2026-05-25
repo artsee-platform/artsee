@@ -4,7 +4,7 @@ import { createServiceClient } from "@/lib/api/supabase-service";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-export async function GET(_req: NextRequest, ctx: Ctx) {
+export async function GET(req: NextRequest, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
     const supabase = createServiceClient();
@@ -21,9 +21,23 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
       .select("nickname, avatar_url")
       .eq("id", row.author_id)
       .maybeSingle();
+
+    // 查询当前用户是否点赞
+    const user = await getUserFromBearer(req);
+    let likedByMe = false;
+    if (user) {
+      const { data: like } = await supabase
+        .from("community_post_likes")
+        .select("id")
+        .eq("post_id", id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      likedByMe = !!like;
+    }
+
     return NextResponse.json({
       success: true,
-      data: { ...row, user_profiles: prof ?? null },
+      data: { ...row, user_profiles: prof ?? null, liked_by_me: likedByMe },
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);

@@ -14,10 +14,13 @@ import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 class AppConfig {
   AppConfig._();
 
-  static const bool _devMode = bool.fromEnvironment('DEV_MODE', defaultValue: false);
-  static const bool _devLogin = bool.fromEnvironment('DEV_LOGIN', defaultValue: false);
+  static const bool _devMode =
+      bool.fromEnvironment('DEV_MODE', defaultValue: false);
+  static const bool _devLogin =
+      bool.fromEnvironment('DEV_LOGIN', defaultValue: false);
   static const String _apiBaseUrl = String.fromEnvironment('API_BASE_URL');
-  static const String _webDevPort = String.fromEnvironment('WEB_DEV_PORT', defaultValue: '3003');
+  static const String _webDevPort =
+      String.fromEnvironment('WEB_DEV_PORT', defaultValue: '3003');
 
   /// 是否处于开发模式
   /// - Debug 构建自动为 true

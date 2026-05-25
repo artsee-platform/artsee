@@ -230,6 +230,55 @@ class SupabaseService {
     return data;
   }
 
+  static Future<List<Map<String, dynamic>>> fetchAiConversations() async {
+    if (!isLoggedIn) return [];
+    try {
+      final data = await _client
+          .from('ai_conversations')
+          .select('*, ai_messages(*)')
+          .eq('user_id', currentUser!.id)
+          .order('updated_at', ascending: false)
+          .limit(20);
+      return (data as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('fetchAiConversations skipped: $e');
+      return [];
+    }
+  }
+
+  static Future<void> saveAiConversation({
+    required String id,
+    required String title,
+    required List<Map<String, dynamic>> messages,
+  }) async {
+    if (!isLoggedIn) return;
+    try {
+      await _client.from('ai_conversations').upsert({
+        'id': id,
+        'user_id': currentUser!.id,
+        'title': title,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+      await _client.from('ai_messages').delete().eq('conversation_id', id);
+      if (messages.isEmpty) return;
+      await _client.from('ai_messages').insert(
+            messages.asMap().entries.map((entry) {
+              final value = Map<String, dynamic>.from(entry.value);
+              return {
+                'conversation_id': id,
+                'user_id': currentUser!.id,
+                'role': value['role'],
+                'content': value['content'],
+                'metadata': value['metadata'] ?? <String, dynamic>{},
+                'position': entry.key,
+              };
+            }).toList(),
+          );
+    } catch (e) {
+      debugPrint('saveAiConversation skipped: $e');
+    }
+  }
+
   static Future<List<AppCase>> fetchMyCases() async {
     if (!isLoggedIn) return [];
     final data = await _client

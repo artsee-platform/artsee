@@ -72,6 +72,7 @@ export async function POST(request: NextRequest) {
       query,
       answer,
       sources: stages.sources.map((s) => ({
+        schoolId: s.schoolId,
         schoolName: s.schoolName,
         heading: s.heading,
         similarity: s.similarity,

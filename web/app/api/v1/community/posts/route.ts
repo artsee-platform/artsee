@@ -37,9 +37,23 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // 查询当前用户的点赞状态
+    const user = await getUserFromBearer(req);
+    let likedPostIds = new Set<string>();
+    if (user && posts.length > 0) {
+      const postIds = posts.map((p: { id: string }) => p.id);
+      const { data: likes } = await supabase
+        .from("community_post_likes")
+        .select("post_id")
+        .eq("user_id", user.id)
+        .in("post_id", postIds);
+      likedPostIds = new Set((likes ?? []).map((l: { post_id: string }) => l.post_id));
+    }
+
     const data = posts.map((p: Record<string, unknown>) => ({
       ...p,
       user_profiles: profileMap[String(p.author_id)] ?? null,
+      liked_by_me: likedPostIds.has(String(p.id)),
     }));
 
     return NextResponse.json({ success: true, data, pagination: { limit, offset } });
