@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+import '../config/api_config.dart';
+
 class DataService {
-  static const String apiBaseUrl = 'http://10.0.2.2:3000/api/v1'; // Android模拟器
+  static String get apiBaseUrl =>
+      '${ApiConfig.baseUrl.replaceAll(RegExp(r'/$'), '')}/api/v1';
 
   static final DataService _instance = DataService._internal();
   factory DataService() => _instance;
