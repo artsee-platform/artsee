@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
-import '../../config/dev_test_account.dart';
+import '../../models/models.dart';
 import '../../services/backend_api_service.dart';
 import '../../services/supabase_service.dart';
-import '../../widgets/artsee_ui.dart';
 import '../../widgets/common.dart';
 import '../auth/login_screen.dart';
+import '../community/community_post_detail_screen.dart';
 import '../consultation/organization_list_screen.dart';
+import '../create/create_post_screen.dart';
 import '../mentors/mentor_application_screen.dart';
 import '../mentors/mentor_list_screen.dart';
 import '../onboarding/art_interest_onboarding_screen.dart';
-import '../programs/program_detail_screen.dart';
 import '../publish/publish_artist_screen.dart';
-import '../schools/school_detail_screen.dart';
 import 'application_workspace_screen.dart';
 import 'contract_archive_screen.dart';
 import 'content_submissions_screen.dart';
@@ -32,8 +31,9 @@ import 'package:artsee_app/theme/artsee_ui_colors.dart';
 
 class ProfileScreen extends StatefulWidget {
   final ValueChanged<int>? onOpenMainTab;
+  final ValueChanged<bool>? onDrawerChanged;
 
-  const ProfileScreen({super.key, this.onOpenMainTab});
+  const ProfileScreen({super.key, this.onOpenMainTab, this.onDrawerChanged});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -43,8 +43,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, dynamic>? _profile;
   int _savedSchoolCount = 0;
   int _unreadNotificationCount = 0;
-  int _consultationUnreadCount = 0;
-  String _planStatus = '待创建';
+  int _walletPaidAmountCents = 0;
+  int _walletPendingOrderCount = 0;
+  int _walletPaidOrderCount = 0;
+  List<AppCommunityPost> _profileShowcasePosts = const [];
+  List<AppCommunityPost> _profileSavedPosts = const [];
   bool _loading = true;
   int _profileShowcaseTab = 0;
 
@@ -62,8 +65,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final p = await SupabaseService.fetchProfile();
     var savedSchoolCount = 0;
     var unreadNotificationCount = 0;
-    var consultationUnreadCount = 0;
-    var planStatus = '待创建';
+    var walletPaidAmountCents = 0;
+    var walletPendingOrderCount = 0;
+    var walletPaidOrderCount = 0;
+    var profileShowcasePosts = <AppCommunityPost>[];
+    var profileSavedPosts = <AppCommunityPost>[];
     try {
       final saved = await BackendApiService.fetchSavedSchools(limit: 1);
       savedSchoolCount = saved.count ?? saved.data.length;
@@ -71,37 +77,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
       savedSchoolCount = 0;
     }
     try {
-      final plan = await BackendApiService.fetchApplicationPlan();
-      final tasks = (plan['tasks'] as List<dynamic>? ?? []);
-      final todo = tasks.where((task) {
-        return task is Map && task['status'] != 'done';
-      }).length;
-      planStatus = plan['state'] == 'generated' ? '$todo 项待办' : '待创建';
-    } catch (_) {}
-    try {
       unreadNotificationCount =
           await BackendApiService.fetchUnreadNotificationCount();
     } catch (_) {
       unreadNotificationCount = 0;
     }
     try {
-      final consultations = await BackendApiService.fetchConsultations(
-        limit: 100,
-      );
-      consultationUnreadCount = consultations.data.fold<int>(
-        0,
-        (sum, item) => sum + _asInt(item['unread_count']),
-      );
+      final orders = await BackendApiService.fetchMyOrders(limit: 50);
+      for (final order in orders) {
+        final status = order['status']?.toString() ?? 'pending';
+        final amount = _asInt(order['amount_total']);
+        if (status == 'paid') {
+          walletPaidOrderCount += 1;
+          walletPaidAmountCents += amount;
+        }
+        if (_profileWalletOrderNeedsPayment(status)) {
+          walletPendingOrderCount += 1;
+        }
+      }
     } catch (_) {
-      consultationUnreadCount = 0;
+      walletPaidAmountCents = 0;
+      walletPendingOrderCount = 0;
+      walletPaidOrderCount = 0;
+    }
+    try {
+      final posts = await BackendApiService.fetchCommunityPosts(limit: 50);
+      final nonQaPosts = posts
+          .where((post) => post.metadata['kind']?.toString() != 'qa')
+          .toList();
+      final currentUserId = SupabaseService.currentUser?.id;
+      final ownPosts = currentUserId == null
+          ? const <AppCommunityPost>[]
+          : nonQaPosts.where((post) => post.authorId == currentUserId).toList();
+      profileShowcasePosts = (ownPosts.isNotEmpty ? ownPosts : nonQaPosts)
+          .take(9)
+          .toList(growable: false);
+    } catch (_) {
+      profileShowcasePosts = const [];
+    }
+    try {
+      profileSavedPosts =
+          await BackendApiService.fetchSavedCommunityPosts(limit: 20);
+    } catch (_) {
+      profileSavedPosts = const [];
     }
     if (mounted) {
       setState(() {
         _profile = p;
         _savedSchoolCount = savedSchoolCount;
         _unreadNotificationCount = unreadNotificationCount;
-        _consultationUnreadCount = consultationUnreadCount;
-        _planStatus = planStatus;
+        _walletPaidAmountCents = walletPaidAmountCents;
+        _walletPendingOrderCount = walletPendingOrderCount;
+        _walletPaidOrderCount = walletPaidOrderCount;
+        _profileShowcasePosts = profileShowcasePosts;
+        _profileSavedPosts = profileSavedPosts;
         _loading = false;
       });
     }
@@ -213,13 +242,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return shortLabels[label] ?? label;
   }
 
-  String get _statusLabel {
-    if (!_isBusinessUser) return _isVerified ? '已认证' : '待认证';
-    if (_isVerified) return '审核通过';
-    if (_stageLabel == '入驻待审核') return '待审核';
-    return '待认证';
-  }
-
   String get _cityLabel {
     final city = _profile?['city_preference']?.toString();
     final location = _profile?['location']?.toString();
@@ -277,27 +299,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     : 96,
       );
 
-  int get _profileViews => _profileInt(
-        ['view_count', 'views_count', 'profile_views'],
-        _isBusinessUser ? 18600 : 3200 + _savedSchoolCount * 120,
-      );
-
   int get _followingCount => _profileInt(
         ['following_count', 'followings_count'],
         28 + _savedSchoolCount,
-      );
-
-  int get _worksCount => _profileInt(
-        ['works_count', 'artwork_count', 'portfolio_count'],
-        _isBusinessUser
-            ? 18
-            : _roleKey == 'artist'
-                ? 24
-                : _roleKey == 'student'
-                    ? 12
-                    : _roleKey == 'mentor'
-                        ? 8
-                        : 5,
       );
 
   String get _businessName {
@@ -451,167 +455,188 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       backgroundColor: context.artC.porcelain,
+      drawerScrimColor: Colors.black.withValues(alpha: 0.36),
+      drawer: _buildProfileDrawer(),
+      onDrawerChanged: widget.onDrawerChanged,
       body: SafeArea(
         top: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildProfileHeader(),
-              const SizedBox(height: 18),
-              if (_isBusinessUser)
-                _buildMenuList()
-              else
-                _buildProfileShowcaseSection(),
-              SizedBox(height: bottomSpacer),
-            ],
+        child: Builder(
+          builder: (scaffoldContext) => SingleChildScrollView(
+            padding: EdgeInsets.only(bottom: bottomSpacer),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildProfileHeader(
+                  onMenuTap: () {
+                    widget.onDrawerChanged?.call(true);
+                    Scaffold.of(scaffoldContext).openDrawer();
+                  },
+                ),
+                Transform.translate(
+                  offset: const Offset(0, -82),
+                  child: _buildProfileContentPanel(),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildProfileHeader() {
+  Widget _buildProfileHeader({required VoidCallback onMenuTap}) {
     final title = _isBusinessUser ? _businessName : _nickname;
+    final topInset = MediaQuery.of(context).padding.top;
+    final coverUrl = _coverUrl;
+    final heroHeight = topInset + 318.0;
+    const avatarSize = 86.0;
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(17, 16, 17, 14),
-      decoration: BoxDecoration(
-        color: context.artC.cardIconBg,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: context.artC.silver.withValues(alpha: 0.22)),
-        boxShadow: [
-          BoxShadow(
-            color: context.artC.ink.withValues(alpha: 0.032),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
+    return SizedBox(
+      height: heroHeight,
       child: Stack(
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _InstagramAvatar(
-                    imageUrl: _avatarUrl,
-                    fallback: _nickname,
-                    verified: _isVerified,
-                    business: _isBusinessUser,
-                  ),
-                  const SizedBox(width: 11),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: context.artC.ink,
-                            fontFamily: 'Noto Serif SC',
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _profileHandle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                            color: context.artC.ink.withValues(alpha: 0.42),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: [
-                            _ProfileChip(label: _roleLabel, strong: true),
-                            _ProfileChip(label: _statusLabel),
-                          ],
-                        ),
-                      ],
+          Positioned.fill(
+            child: coverUrl.isNotEmpty
+                ? Image.network(
+                    coverUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _ProfileCoverFallback(
+                      seed: _profileHandle,
                     ),
-                  ),
-                ],
+                  )
+                : _ProfileCoverFallback(seed: _profileHandle),
+          ),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.38),
               ),
-              const SizedBox(height: 12),
-              _ProfilePublicStats(
-                followers: _followersCount,
-                views: _profileViews,
-                following: _followingCount,
-                works: _worksCount,
+            ),
+          ),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.08),
+                    Colors.black.withValues(alpha: 0.1),
+                    Colors.black.withValues(alpha: 0.54),
+                  ],
+                ),
               ),
-              if (_isBusinessUser && !_isVerified) ...[
-                const SizedBox(height: 10),
-                const _NoticeStrip(
-                  text: '完成身份认证后，可发布活动、服务和合作机会',
-                  icon: Icons.verified_outlined,
-                ),
-              ] else if (!_isBusinessUser && !_isVerified) ...[
-                const SizedBox(height: 10),
-                const _NoticeStrip(
-                  text: '认证后可解锁完整申请工具、院校数据和咨询服务',
-                  icon: Icons.verified_outlined,
-                ),
-              ] else if (!_isBusinessUser && !_hasCompletedOnboarding) ...[
-                const SizedBox(height: 10),
-                const _NoticeStrip(
-                  text: '完善画像，获得更准确推荐',
-                  icon: Icons.auto_awesome_outlined,
-                ),
-              ],
-            ],
+            ),
           ),
           Positioned(
-            top: 0,
-            right: 0,
+            top: topInset + 4,
+            left: 22,
+            right: 22,
             child: Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                GestureDetector(
+                _HeroIconButton(
+                  icon: Icons.menu_rounded,
+                  onTap: onMenuTap,
+                ),
+                const Spacer(),
+                _HeroEditButton(
                   onTap: !_isBusinessUser && !_hasCompletedOnboarding
                       ? _openOnboardingEditor
                       : _openEditProfile,
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: context.artC.silver.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      Icons.edit_outlined,
-                      size: 18,
-                      color: context.artC.ink.withValues(alpha: 0.68),
-                    ),
-                  ),
                 ),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: _openSettings,
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: context.artC.silver.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      Icons.settings_outlined,
-                      size: 18,
-                      color: context.artC.ink.withValues(alpha: 0.68),
-                    ),
+                const SizedBox(width: 12),
+                _HeroIconButton(
+                  icon: Icons.qr_code_scanner_rounded,
+                  onTap: () => _openPlaceholder('我的名片'),
+                ),
+                const SizedBox(width: 12),
+                _HeroIconButton(
+                  icon: Icons.ios_share_rounded,
+                  onTap: _isBusinessUser
+                      ? _openBusinessPublicProfile
+                      : _openPublicProfile,
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            left: 28,
+            right: 24,
+            top: topInset + 70,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _HeroProfileAvatar(
+                  size: avatarSize,
+                  imageUrl: _avatarUrl,
+                  fallback: title,
+                  verified: _isVerified,
+                  business: _isBusinessUser,
+                ),
+                const SizedBox(width: 18),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 25,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          height: 1.12,
+                        ),
+                      ),
+                      const SizedBox(height: 9),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              'Artsee ID：${_profileHandle.replaceFirst('@', '')}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 14,
+                                height: 1.15,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white.withValues(alpha: 0.68),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Icon(
+                            Icons.qr_code_2_rounded,
+                            size: 15,
+                            color: Colors.white.withValues(alpha: 0.58),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 7),
+                      Text(
+                        'IP：$_cityLabel · $_stageShortLabel',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white.withValues(alpha: 0.62),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
+            ),
+          ),
+          Positioned(
+            left: 28,
+            right: 24,
+            top: topInset + 194,
+            child: _HeroStatsRow(
+              followers: _followersCount,
+              following: _followingCount,
             ),
           ),
         ],
@@ -619,36 +644,232 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  ({String label, VoidCallback onTap}) _primaryAction() {
-    if (_isBusinessUser) {
-      return (label: '查看主页', onTap: _openBusinessPublicProfile);
-    }
-    if (_savedSchoolCount == 0) {
-      return (
-        label: '添加目标院校',
-        onTap: () =>
-            _openApplicationWorkspace(ApplicationWorkspaceKind.savedSchools),
-      );
-    }
-    if (_savedSchoolCount >= 2 && _planStatus == '待创建') {
-      return (
-        label: '生成院校对比',
-        onTap: () =>
-            _openApplicationWorkspace(ApplicationWorkspaceKind.programCompare),
-      );
-    }
-    if (_planStatus == '待创建') {
-      return (
-        label: '创建申请计划',
-        onTap: () =>
-            _openApplicationWorkspace(ApplicationWorkspaceKind.applicationPlan),
-      );
-    }
-    return (
-      label: '查看今日待办',
-      onTap: () =>
-          _openApplicationWorkspace(ApplicationWorkspaceKind.applicationPlan),
+  Widget _buildProfileContentPanel() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      decoration: BoxDecoration(
+        color: context.artC.cardIconBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: _buildProfileShowcaseSection(),
     );
+  }
+
+  Widget _buildProfileDrawer() {
+    final drawerWidth = (MediaQuery.of(context).size.width * 0.82)
+        .clamp(300.0, 348.0)
+        .toDouble();
+    final title = _isBusinessUser ? _businessName : _nickname;
+    final drawerBottomPadding = MediaQuery.of(context).padding.bottom + 132;
+
+    return Drawer(
+      width: drawerWidth,
+      elevation: 0,
+      backgroundColor: context.artC.porcelain,
+      shape: const RoundedRectangleBorder(),
+      child: SafeArea(
+        child: Builder(
+          builder: (drawerContext) {
+            void run(VoidCallback action) {
+              Navigator.of(drawerContext).pop();
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) action();
+              });
+            }
+
+            return ListView(
+              padding: EdgeInsets.fromLTRB(18, 18, 18, drawerBottomPadding),
+              children: [
+                Row(
+                  children: [
+                    _InstagramAvatar(
+                      imageUrl: _avatarUrl,
+                      fallback: title,
+                      verified: _isVerified,
+                      business: _isBusinessUser,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: context.artC.ink,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            _roleLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: context.artC.ink.withValues(alpha: 0.45),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 22),
+                _buildDrawerSection([
+                  _MenuAction(
+                      '编辑主页',
+                      Icons.edit_outlined,
+                      !_isBusinessUser && !_hasCompletedOnboarding
+                          ? _openOnboardingEditor
+                          : _openEditProfile),
+                  _MenuAction(
+                      '创作者中心', Icons.auto_awesome_outlined, _openCreatorCenter),
+                  _MenuAction(
+                      '艺术家入驻', Icons.palette_outlined, _openArtistOnboarding),
+                  _MenuAction(
+                    _isBusinessUser ? '查看机构主页' : '查看公开主页',
+                    Icons.open_in_new_rounded,
+                    _isBusinessUser
+                        ? _openBusinessPublicProfile
+                        : _openPublicProfile,
+                  ),
+                ], run),
+                _buildDrawerSection([
+                  _MenuAction(
+                    '申请计划',
+                    Icons.assignment_turned_in_outlined,
+                    () => _openApplicationWorkspace(
+                      ApplicationWorkspaceKind.applicationPlan,
+                    ),
+                  ),
+                  _MenuAction(
+                    '作品集任务',
+                    Icons.auto_awesome_mosaic_outlined,
+                    () => _openApplicationWorkspace(
+                      ApplicationWorkspaceKind.portfolioTasks,
+                    ),
+                  ),
+                  _MenuAction(
+                    '我的活动',
+                    Icons.event_available_outlined,
+                    () => widget.onOpenMainTab?.call(2),
+                  ),
+                  _MenuAction(
+                    '我的合作',
+                    Icons.handshake_outlined,
+                    () => widget.onOpenMainTab?.call(2),
+                  ),
+                ], run),
+                _buildDrawerSection([
+                  _MenuAction('我的草稿', Icons.inventory_2_outlined,
+                      () => _openPlaceholder('我的草稿')),
+                  _MenuAction(
+                      '发布记录', Icons.layers_outlined, _openContentSubmissions),
+                  _MenuAction('我的收藏', Icons.bookmark_border_rounded,
+                      () => _openPlaceholder('我的收藏')),
+                  _MenuAction('浏览记录', Icons.history_rounded,
+                      () => _openPlaceholder('浏览记录')),
+                ], run),
+                _buildDrawerSection([
+                  _MenuAction(
+                      '消息通知', Icons.notifications_outlined, _openNotifications,
+                      badgeText: _unreadNotificationCount > 0
+                          ? '$_unreadNotificationCount'
+                          : null),
+                  _MenuAction(
+                      '团队邀请', Icons.group_add_outlined, _openTeamInvitations),
+                  if (!_isBusinessUser) ...[
+                    _MenuAction(
+                        '导师中心', Icons.school_outlined, _openMentorCenter),
+                    _MenuAction(
+                        '导师预约', Icons.event_note_outlined, _openMentorBookings),
+                    _MenuAction('导师咨询', Icons.forum_outlined, _openMentors),
+                  ],
+                ], run),
+                _buildDrawerSection([
+                  _MenuAction(
+                      '咨询与订单', Icons.receipt_long_outlined, _openOrders),
+                  _MenuAction('会员中心', Icons.workspace_premium_outlined,
+                      _openMembershipCenter),
+                  _MenuAction('身份认证', Icons.verified_outlined,
+                      _openIdentityVerification),
+                  _MenuAction(
+                      '合同存档', Icons.description_outlined, _openContractArchive),
+                ], run),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _DrawerBottomAction(
+                        icon: Icons.qr_code_scanner_rounded,
+                        label: '扫一扫',
+                        onTap: () => run(() => _openPlaceholder('扫一扫')),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _DrawerBottomAction(
+                        icon: Icons.headset_mic_outlined,
+                        label: '帮助与客服',
+                        onTap: () => run(() => _openPlaceholder('帮助与客服')),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _DrawerBottomAction(
+                        icon: Icons.settings_outlined,
+                        label: '设置',
+                        onTap: () => run(_openSettings),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawerSection(
+    List<_MenuAction> items,
+    void Function(VoidCallback action) run,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: context.artC.cardIconBg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: context.artC.silver.withValues(alpha: 0.16)),
+      ),
+      child: Column(
+        children: List.generate(items.length, (index) {
+          final item = items[index];
+          return _DrawerMenuTile(
+            item: item,
+            showDivider: index < items.length - 1,
+            onTap: () => run(item.onTap),
+          );
+        }),
+      ),
+    );
+  }
+
+  String get _coverUrl {
+    final raw = _profile?['cover_url']?.toString() ??
+        _profile?['banner_url']?.toString() ??
+        _profile?['background_url']?.toString() ??
+        '';
+    if (raw.trim().isNotEmpty) return raw.trim();
+    return 'https://picsum.photos/seed/artsee_profile_cover_${Uri.encodeComponent(_profileHandle)}/900/700';
   }
 
   String _directionSummary({String fallback = '待补全'}) {
@@ -846,414 +1067,82 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildProfileShowcaseSection() {
-    const tabs = ['作品', '动态', '回答', '收藏 / 经历'];
+    const tabs = ['动态', '收藏', '钱包'];
+    final selectedTab = _profileShowcaseTab.clamp(0, tabs.length - 1).toInt();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _ProfileShowcaseTabStrip(
           tabs: tabs,
-          selectedIndex: _profileShowcaseTab,
+          selectedIndex: selectedTab,
           onChanged: (index) => setState(() => _profileShowcaseTab = index),
         ),
+        const SizedBox(height: 14),
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 180),
-          child: _buildProfileShowcaseBody(),
+          child: _buildProfileShowcaseBody(selectedTab),
         ),
       ],
     );
   }
 
-  Widget _buildProfileShowcaseBody() {
-    return switch (_profileShowcaseTab) {
+  Widget _buildProfileShowcaseBody(int selectedTab) {
+    return switch (selectedTab) {
       0 => _ProfileWorksPreview(
-          key: const ValueKey('works'),
-          seed: _profileHandle,
-        ),
-      1 => _ProfileTextPreview(
           key: const ValueKey('activity'),
-          icon: Icons.auto_awesome_mosaic_outlined,
-          title: _isBusinessUser ? '机构动态' : '最新动态',
-          text: _isBusinessUser
-              ? '服务更新、团队活动和案例进展会在这里展示。'
-              : '作品集进度、创作过程和社区帖子会在这里展示。',
+          posts: _profileShowcasePosts,
+          emptyTitle: '还没有动态',
+          emptySubtitle: '发布作品、现场或灵感记录后，会出现在这里。',
+          onPostTap: _openCommunityPost,
+          onEmptyTap: _openCreatePost,
         ),
-      2 => _ProfileTextPreview(
-          key: const ValueKey('answers'),
-          icon: Icons.question_answer_outlined,
-          title: _publicProfileKind == PublicUserProfileKind.mentor
-              ? '回答 / 案例'
-              : '讨论回答',
-          text: _publicProfileKind == PublicUserProfileKind.mentor
-              ? '回答、案例拆解和经历判断会沉淀在主页，作为信任依据。'
-              : '在热议、问答和评论区发布过的回答会沉淀在这里。',
-        ),
-      _ => _ProfileTextPreview(
+      1 => _ProfileWorksPreview(
           key: const ValueKey('saved'),
-          icon: Icons.bookmark_border_rounded,
-          title: _publicProfileKind == PublicUserProfileKind.artist
-              ? '收藏 / 展览经历'
-              : '收藏 / 经历',
-          text: _publicProfileKind == PublicUserProfileKind.artist
-              ? '展览记录、代表项目和收藏内容会集中展示。'
-              : '收藏的案例、院校内容和公开经历会集中展示。',
+          posts: _profileSavedPosts,
+          emptyTitle: '还没有收藏',
+          emptySubtitle: '去发现页收藏喜欢的作品、经验和灵感记录。',
+          onPostTap: _openCommunityPost,
+          onEmptyTap: _openExploreTab,
+        ),
+      _ => _ProfileWalletPreview(
+          key: const ValueKey('wallet'),
+          paidAmountCents: _walletPaidAmountCents,
+          pendingOrderCount: _walletPendingOrderCount,
+          paidOrderCount: _walletPaidOrderCount,
+          onOrdersTap: _openOrders,
+          onMembershipTap: _openMembershipCenter,
+          onCouponsTap: () => _openPlaceholder('优惠券'),
+          onTransactionsTap: () => _openPlaceholder('交易记录'),
         ),
     };
   }
 
-  Widget _buildMenuList() {
-    return Column(
-      children: [
-        if (_isBusinessUser) ...[
-          _buildMenuSection('入驻与认证', [
-            _MenuAction(
-                '入驻审核', Icons.fact_check_outlined, _openIdentityVerification),
-            _MenuAction(
-                '身份认证', Icons.verified_outlined, _openIdentityVerification),
-            _MenuAction('机构资料', Icons.storefront_outlined, _openEditProfile),
-            _MenuAction('查看机构主页', Icons.open_in_new_rounded,
-                _openBusinessPublicProfile),
-          ]),
-          _buildMenuSection('业务管理', [
-            _MenuAction(
-                '发布记录', Icons.history_outlined, _openContentSubmissions),
-            _MenuAction('咨询与订单', Icons.receipt_long_outlined, _openOrders),
-            _MenuAction(
-                '合同 / 报价', Icons.description_outlined, _openContractArchive),
-          ]),
-        ] else ...[
-          _buildContentGridSection(),
-        ],
-        _buildMenuSection('账号与设置', [
-          _MenuAction('消息通知', Icons.notifications_outlined, _openNotifications,
-              badgeText: _unreadNotificationCount > 0
-                  ? '$_unreadNotificationCount'
-                  : null),
-          _MenuAction('团队邀请', Icons.group_add_outlined, _openTeamInvitations),
-          if (!_isBusinessUser) ...[
-            _MenuAction('导师中心', Icons.school_outlined, _openMentorCenter),
-            _MenuAction('导师预约', Icons.event_note_outlined, _openMentorBookings),
-          ],
-          _MenuAction(
-            '深色模式',
-            ArtseeThemeController.instance.isDark
-                ? Icons.wb_sunny_outlined
-                : Icons.nightlight_round,
-            () => ArtseeThemeController.instance.toggle(),
-            switchValue: ArtseeThemeController.instance.isDark,
-          ),
-          _MenuAction(
-              '账号设置', Icons.settings_outlined, () => _openPlaceholder('账号设置')),
-          _MenuAction('帮助中心', Icons.help_outline_rounded,
-              () => _openPlaceholder('帮助中心')),
-          _MenuAction('联系客服', Icons.headset_mic_outlined,
-              () => _openPlaceholder('联系客服')),
-          _MenuAction('退出登录', Icons.logout, _signOut, destructive: true),
-        ]),
-        if (devLoginShortcutsEnabled) ...[
-          const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: kCobalt.withValues(alpha: 0.04),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: kCobalt.withValues(alpha: 0.12)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '开发调试',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: kCobalt.withValues(alpha: 0.8),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildDevButton(
-                        '学校详情页',
-                        () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const SchoolDetailScreen(
-                                id: '3485e258-d84b-4067-b093-62a3d468ac62'),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _buildDevButton(
-                        '专业详情页',
-                        () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const ProgramDetailScreen(
-                                id: '001f9862-a2c5-4d37-9b7a-720ceeef163e'),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildMenuSection(String title, List<_MenuAction> items) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 9),
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w900,
-                color: context.artC.ink.withValues(alpha: 0.86),
-              ),
-            ),
-          ),
-          Container(
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              color: context.artC.cardIconBg,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: context.artC.silver.withValues(alpha: 0.22),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: context.artC.ink.withValues(alpha: 0.026),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              children: List.generate(
-                items.length,
-                (index) => _buildMenuTile(
-                  items[index],
-                  showDivider: index < items.length - 1,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildContentGridSection() {
-    final items = [
-      _MenuAction(
-          '会员中心', Icons.workspace_premium_outlined, _openMembershipCenter),
-      _MenuAction('创作中心', Icons.auto_awesome_outlined, _openCreatorCenter),
-      _MenuAction('艺术家入驻', Icons.palette_outlined, _openArtistOnboarding),
-      _MenuAction('发布记录', Icons.layers_outlined, _openContentSubmissions),
-      _MenuAction(
-        '咨询记录',
-        Icons.forum_outlined,
-        () => _openApplicationWorkspace(ApplicationWorkspaceKind.consultations),
-        badgeText:
-            _consultationUnreadCount > 0 ? '$_consultationUnreadCount' : null,
-      ),
-      _MenuAction('我的收藏', Icons.favorite_border_rounded,
-          () => _openPlaceholder('我的收藏')),
-      _MenuAction('导师咨询', Icons.school_outlined, _openMentors),
-      _MenuAction('导师预约', Icons.event_note_outlined, _openMentorBookings),
-      _MenuAction('身份认证', Icons.verified_outlined, _openIdentityVerification),
-      _MenuAction('合同存档', Icons.description_outlined, _openContractArchive),
-      _MenuAction(
-          '看展记录', Icons.museum_outlined, () => _openPlaceholder('看展记录')),
-    ];
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 9),
-            child: Text(
-              '我的内容',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w900,
-                color: context.artC.ink.withValues(alpha: 0.86),
-              ),
-            ),
-          ),
-          GridView.count(
-            crossAxisCount: 2,
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-            childAspectRatio: 3.25,
-            padding: EdgeInsets.zero,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            children: items
-                .map(
-                  (item) => ArtseeSurface(
-                    onTap: item.onTap,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    radius: 16,
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 29,
-                          height: 29,
-                          decoration: BoxDecoration(
-                            color: kCobalt.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(item.icon, size: 16, color: kCobalt),
-                        ),
-                        const SizedBox(width: 9),
-                        Expanded(
-                          child: Text(
-                            item.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: context.artC.ink.withValues(alpha: 0.82),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                        if (item.badgeText != null) ...[
-                          const SizedBox(width: 6),
-                          _MenuBadge(text: item.badgeText!),
-                        ],
-                      ],
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMenuTile(_MenuAction item, {required bool showDivider}) {
-    final color = item.destructive
-        ? Colors.red
-        : context.artC.ink.withValues(alpha: 0.82);
-    final iconColor = item.destructive
-        ? Colors.red.withValues(alpha: 0.64)
-        : context.artC.ink.withValues(alpha: 0.42);
-
-    return GestureDetector(
-      onTap: item.onTap,
-      child: Column(
-        children: [
-          Container(
-            height: 56,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: item.destructive
-                            ? Colors.red.withValues(alpha: 0.08)
-                            : context.artC.silver.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(item.icon, size: 18, color: iconColor),
-                    ),
-                    const SizedBox(width: 13),
-                    Text(
-                      item.label,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: color,
-                      ),
-                    ),
-                    if (item.badgeText != null) ...[
-                      const SizedBox(width: 8),
-                      _MenuBadge(text: item.badgeText!),
-                    ],
-                  ],
-                ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (item.switchValue != null)
-                      ListenableBuilder(
-                        listenable: ArtseeThemeController.instance,
-                        builder: (context, _) => Switch(
-                          value: ArtseeThemeController.instance.isDark,
-                          onChanged: (_) => item.onTap(),
-                          activeThumbColor: kCobalt,
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                        ),
-                      )
-                    else ...[
-                      Icon(
-                        Icons.chevron_right,
-                        size: 21,
-                        color: item.destructive
-                            ? Colors.red.withValues(alpha: 0.28)
-                            : context.artC.ink.withValues(alpha: 0.22),
-                      ),
-                    ],
-                  ],
-                ),
-              ],
-            ),
-          ),
-          if (showDivider)
-            Padding(
-              padding: const EdgeInsets.only(left: 63),
-              child: Divider(
-                height: 1,
-                thickness: 1,
-                color: context.artC.silver.withValues(alpha: 0.22),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDevButton(String label, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: context.artC.cardIconBg,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: kCobalt.withValues(alpha: 0.2)),
-        ),
-        child: Text(
-          label,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: kCobalt.withValues(alpha: 0.9),
-          ),
+  Future<void> _openCommunityPost(AppCommunityPost post) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => CommunityPostDetailScreen(
+          postId: post.id,
+          initialPost: post,
         ),
       ),
     );
+    _load();
+  }
+
+  Future<void> _openCreatePost() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(builder: (_) => const CreatePostScreen()),
+    );
+    _load();
+  }
+
+  void _openExploreTab() {
+    final openMainTab = widget.onOpenMainTab;
+    if (openMainTab != null) {
+      openMainTab(2);
+      return;
+    }
+    _openPlaceholder('发现');
   }
 
   void _openOrders() {
@@ -1300,16 +1189,12 @@ class _MenuAction {
   final String label;
   final IconData icon;
   final VoidCallback onTap;
-  final bool destructive;
-  final bool? switchValue;
   final String? badgeText;
 
   const _MenuAction(
     this.label,
     this.icon,
     this.onTap, {
-    this.destructive = false,
-    this.switchValue,
     this.badgeText,
   });
 }
@@ -1341,6 +1226,374 @@ class _MenuBadge extends StatelessWidget {
   }
 }
 
+class _ProfileCoverFallback extends StatelessWidget {
+  final String seed;
+
+  const _ProfileCoverFallback({required this.seed});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = [
+      const Color(0xFF2F3F66),
+      const Color(0xFF6E5D47),
+      const Color(0xFF465C4E),
+      const Color(0xFF5D5869),
+    ];
+    final color = colors[seed.hashCode.abs() % colors.length];
+    return DecoratedBox(
+      decoration: BoxDecoration(color: color),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -42,
+            top: -18,
+            child: Container(
+              width: 180,
+              height: 180,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          Positioned(
+            left: -56,
+            bottom: -80,
+            child: Container(
+              width: 240,
+              height: 240,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.06),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeroIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _HeroIconButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: SizedBox(
+        width: 36,
+        height: 36,
+        child: Center(
+          child: Icon(
+            icon,
+            size: 28,
+            color: Colors.white.withValues(alpha: 0.92),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroEditButton extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _HeroEditButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 34,
+        padding: const EdgeInsets.symmetric(horizontal: 13),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.edit_outlined,
+              size: 16,
+              color: Colors.white.withValues(alpha: 0.92),
+            ),
+            const SizedBox(width: 5),
+            Text(
+              '编辑主页',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.92),
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroProfileAvatar extends StatelessWidget {
+  final double size;
+  final String imageUrl;
+  final String fallback;
+  final bool verified;
+  final bool business;
+
+  const _HeroProfileAvatar({
+    required this.size,
+    required this.imageUrl,
+    required this.fallback,
+    required this.verified,
+    required this.business,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ch = fallback.isNotEmpty ? fallback.substring(0, 1) : '艺';
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          width: size,
+          height: size,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.18),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: ClipOval(
+            child: imageUrl.isNotEmpty
+                ? Image.network(
+                    imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _heroAvatarFallback(ch),
+                  )
+                : _heroAvatarFallback(ch),
+          ),
+        ),
+        Positioned(
+          right: -1,
+          bottom: 5,
+          child: Container(
+            width: 22,
+            height: 22,
+            decoration: BoxDecoration(
+              color: verified ? kCobalt : const Color(0xFF9AA3B2),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2.5),
+            ),
+            child: Icon(
+              business ? Icons.storefront_outlined : Icons.check_rounded,
+              size: 13,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _heroAvatarFallback(String ch) {
+    return Container(
+      color: const Color(0xFFEAF1FF),
+      alignment: Alignment.center,
+      child: Text(
+        ch,
+        style: const TextStyle(
+          color: kCobalt,
+          fontSize: 30,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroStatsRow extends StatelessWidget {
+  final int followers;
+  final int following;
+
+  const _HeroStatsRow({
+    required this.followers,
+    required this.following,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      ('关注', following),
+      ('粉丝', followers),
+    ];
+    return Row(
+      children: items
+          .map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(right: 22),
+              child: RichText(
+                text: TextSpan(
+                  children: [
+                    TextSpan(
+                      text: _compactProfileNumber(item.$2),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        height: 1.1,
+                      ),
+                    ),
+                    TextSpan(
+                      text: ' ${item.$1}',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.76),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
+class _DrawerMenuTile extends StatelessWidget {
+  final _MenuAction item;
+  final bool showDivider;
+  final VoidCallback onTap;
+
+  const _DrawerMenuTile({
+    required this.item,
+    required this.showDivider,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = context.artC.ink.withValues(alpha: 0.84);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Column(
+        children: [
+          SizedBox(
+            height: 60,
+            child: Row(
+              children: [
+                const SizedBox(width: 18),
+                Icon(
+                  item.icon,
+                  size: 26,
+                  color: context.artC.ink.withValues(alpha: 0.72),
+                ),
+                const SizedBox(width: 18),
+                Expanded(
+                  child: Text(
+                    item.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                if (item.badgeText != null) ...[
+                  _MenuBadge(text: item.badgeText!),
+                  const SizedBox(width: 10),
+                ],
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 22,
+                  color: context.artC.ink.withValues(alpha: 0.18),
+                ),
+                const SizedBox(width: 14),
+              ],
+            ),
+          ),
+          if (showDivider)
+            Padding(
+              padding: const EdgeInsets.only(left: 62),
+              child: Divider(
+                height: 1,
+                color: context.artC.silver.withValues(alpha: 0.22),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DrawerBottomAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _DrawerBottomAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              color: context.artC.cardIconBg,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: context.artC.silver.withValues(alpha: 0.16),
+              ),
+            ),
+            child: Icon(
+              icon,
+              size: 25,
+              color: context.artC.ink.withValues(alpha: 0.58),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: context.artC.ink.withValues(alpha: 0.48),
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 int _asInt(dynamic value) {
   if (value is num) return value.toInt();
   return int.tryParse(value?.toString() ?? '') ?? 0;
@@ -1358,57 +1611,16 @@ String _compactProfileNumber(int value) {
   return '$value';
 }
 
-class _ProfilePublicStats extends StatelessWidget {
-  final int followers;
-  final int views;
-  final int following;
-  final int works;
+bool _profileWalletOrderNeedsPayment(String status) {
+  return status == 'pending' ||
+      status == 'checkout_created' ||
+      status == 'failed' ||
+      status == 'expired';
+}
 
-  const _ProfilePublicStats({
-    required this.followers,
-    required this.views,
-    required this.following,
-    required this.works,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final items = [
-      ('粉丝', followers),
-      ('浏览', views),
-      ('关注', following),
-      ('作品', works),
-    ];
-    return Row(
-      children: items
-          .map(
-            (item) => Expanded(
-              child: Column(
-                children: [
-                  Text(
-                    _compactProfileNumber(item.$2),
-                    style: TextStyle(
-                      color: context.artC.ink,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    item.$1,
-                    style: TextStyle(
-                      color: context.artC.ink.withValues(alpha: 0.42),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          )
-          .toList(),
-    );
-  }
+String _profileMoneyFromCents(int cents) {
+  final amount = cents / 100;
+  return '¥${amount.toStringAsFixed(cents % 100 == 0 ? 0 : 2)}';
 }
 
 class _ProfileShowcaseTabStrip extends StatelessWidget {
@@ -1424,148 +1636,61 @@ class _ProfileShowcaseTabStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: context.artC.silver.withValues(alpha: 0.22),
-        borderRadius: BorderRadius.circular(12),
-      ),
+    return SizedBox(
+      height: 44,
       child: Row(
-        children: List.generate(tabs.length, (index) {
-          final active = selectedIndex == index;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => onChanged(index),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                height: 36,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: active ? context.artC.cardIconBg : Colors.transparent,
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: Text(
-                  tabs[index],
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: active
-                        ? context.artC.ink
-                        : context.artC.ink.withValues(alpha: 0.46),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-}
-
-class _ProfileWorksPreview extends StatelessWidget {
-  final String seed;
-
-  const _ProfileWorksPreview({super.key, required this.seed});
-
-  @override
-  Widget build(BuildContext context) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: EdgeInsets.zero,
-      itemCount: 9,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        mainAxisSpacing: 4,
-        crossAxisSpacing: 4,
-      ),
-      itemBuilder: (_, index) {
-        final encoded = Uri.encodeComponent('$seed-$index');
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: Image.network(
-            'https://picsum.photos/seed/artsee_profile_$encoded/360/360',
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
-              color: [
-                const Color(0xFFE7EEF8),
-                const Color(0xFFF0ECE4),
-                const Color(0xFFE8F3EE),
-                const Color(0xFFF4E8EA),
-              ][index % 4],
-              child: Icon(
-                Icons.image_outlined,
-                color: kCobalt.withValues(alpha: 0.34),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _ProfileTextPreview extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String text;
-
-  const _ProfileTextPreview({
-    super.key,
-    required this.icon,
-    required this.title,
-    required this.text,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: context.artC.cardIconBg,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: context.artC.silver.withValues(alpha: 0.32)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: kCobalt.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, size: 18, color: kCobalt),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: context.artC.ink,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                  ),
+          ...List.generate(tabs.length, (index) {
+            final active = selectedIndex == index;
+            return Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onChanged(index),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      tabs[index],
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: active
+                            ? context.artC.ink
+                            : context.artC.ink.withValues(alpha: 0.42),
+                        fontSize: 17,
+                        fontWeight: active ? FontWeight.w900 : FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 160),
+                      width: active ? 28 : 0,
+                      height: 3,
+                      decoration: BoxDecoration(
+                        color: kCobalt,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  text,
-                  style: TextStyle(
-                    color: context.artC.ink.withValues(alpha: 0.64),
-                    fontSize: 12,
-                    height: 1.48,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
+              ),
+            );
+          }),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('主页内容搜索 - 节点二待实现')),
+              );
+            },
+            child: SizedBox(
+              width: 42,
+              height: 44,
+              child: Icon(
+                Icons.search_rounded,
+                size: 28,
+                color: context.artC.ink.withValues(alpha: 0.56),
+              ),
             ),
           ),
         ],
@@ -1574,30 +1699,635 @@ class _ProfileTextPreview extends StatelessWidget {
   }
 }
 
-class _ProfileChip extends StatelessWidget {
-  final String label;
-  final bool strong;
+class _ProfileWorksPreview extends StatelessWidget {
+  final List<AppCommunityPost> posts;
+  final String emptyTitle;
+  final String emptySubtitle;
+  final ValueChanged<AppCommunityPost> onPostTap;
+  final VoidCallback onEmptyTap;
 
-  const _ProfileChip({required this.label, this.strong = false});
+  const _ProfileWorksPreview({
+    super.key,
+    required this.posts,
+    required this.emptyTitle,
+    required this.emptySubtitle,
+    required this.onPostTap,
+    required this.onEmptyTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (posts.isEmpty) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onEmptyTap,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: context.artC.cardIconBg,
+            borderRadius: BorderRadius.circular(8),
+            border:
+                Border.all(color: context.artC.silver.withValues(alpha: 0.34)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: kCobalt.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.add_photo_alternate_outlined,
+                  color: kCobalt,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      emptyTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: context.artC.ink,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      emptySubtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: context.artC.ink.withValues(alpha: 0.56),
+                        fontSize: 12,
+                        height: 1.35,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: context.artC.ink.withValues(alpha: 0.28),
+                size: 22,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
+      itemCount: posts.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 10,
+        mainAxisExtent: 238,
+      ),
+      itemBuilder: (_, index) {
+        final post = posts[index];
+        return _ProfileWorkTile(
+          post: post,
+          index: index,
+          onTap: () => onPostTap(post),
+        );
+      },
+    );
+  }
+}
+
+class _ProfileWorkTile extends StatelessWidget {
+  final AppCommunityPost post;
+  final int index;
+  final VoidCallback onTap;
+
+  const _ProfileWorkTile({
+    required this.post,
+    required this.index,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = post.imageUrls.isNotEmpty ? post.imageUrls.first : '';
+    final coverUrl = imageUrl.isNotEmpty
+        ? imageUrl
+        : 'https://picsum.photos/seed/artsee_profile_${Uri.encodeComponent(post.id)}/640/760';
+    final title = post.title.trim().isNotEmpty
+        ? post.title.trim()
+        : (post.body?.trim().isNotEmpty == true ? post.body!.trim() : '作品动态');
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: context.artC.cardIconBg,
+          borderRadius: BorderRadius.circular(8),
+          border:
+              Border.all(color: context.artC.silver.withValues(alpha: 0.28)),
+          boxShadow: [
+            BoxShadow(
+              color: context.artC.ink.withValues(alpha: 0.026),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    coverUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        _ProfileWorkFallback(index: index),
+                  ),
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0),
+                            Colors.black.withValues(alpha: 0.18),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (post.imageUrls.length > 1)
+                    Positioned(
+                      right: 7,
+                      top: 7,
+                      child: Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.44),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: const Icon(
+                          Icons.collections_outlined,
+                          color: Colors.white,
+                          size: 14,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(9, 8, 9, 0),
+              child: Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: context.artC.ink,
+                  fontSize: 13,
+                  height: 1.24,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            const Spacer(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(9, 7, 9, 9),
+              child: Row(
+                children: [
+                  Icon(
+                    post.likedByMe
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                    size: 14,
+                    color: post.likedByMe
+                        ? const Color(0xFFE64565)
+                        : context.artC.ink.withValues(alpha: 0.34),
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    _compactProfileNumber(post.likeCount),
+                    style: TextStyle(
+                      color: context.artC.ink.withValues(alpha: 0.42),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Icon(
+                    Icons.chat_bubble_outline_rounded,
+                    size: 13,
+                    color: context.artC.ink.withValues(alpha: 0.32),
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    _compactProfileNumber(post.commentCount),
+                    style: TextStyle(
+                      color: context.artC.ink.withValues(alpha: 0.42),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileWorkFallback extends StatelessWidget {
+  final int index;
+
+  const _ProfileWorkFallback({required this.index});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = [
+      const [Color(0xFFE7EEF8), Color(0xFFB9C7D7)],
+      const [Color(0xFFF0ECE4), Color(0xFFBEB8AA)],
+      const [Color(0xFFE8F3EE), Color(0xFFB2CBC0)],
+      const [Color(0xFFF4E8EA), Color(0xFFD2B5BD)],
+    ][index % 4];
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: colors,
+        ),
+      ),
+      child: Center(
+        child: Icon(
+          Icons.image_outlined,
+          color: Colors.white.withValues(alpha: 0.72),
+          size: 30,
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileWalletPreview extends StatelessWidget {
+  final int paidAmountCents;
+  final int pendingOrderCount;
+  final int paidOrderCount;
+  final VoidCallback onOrdersTap;
+  final VoidCallback onMembershipTap;
+  final VoidCallback onCouponsTap;
+  final VoidCallback onTransactionsTap;
+
+  const _ProfileWalletPreview({
+    super.key,
+    required this.paidAmountCents,
+    required this.pendingOrderCount,
+    required this.paidOrderCount,
+    required this.onOrdersTap,
+    required this.onMembershipTap,
+    required this.onCouponsTap,
+    required this.onTransactionsTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final paidAmount = _profileMoneyFromCents(paidAmountCents);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: context.artC.deepPanel,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.account_balance_wallet_outlined,
+                      size: 19,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'Artsee 钱包',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: kCobalt,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: const Text(
+                      '安全托管',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Text(
+                '可用余额',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.62),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                '¥0',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 30,
+                  height: 1,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.08),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '累计已支付',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.58),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      paidAmount,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            const Expanded(child: _WalletMetric(label: '优惠券', value: '0张')),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _WalletMetric(label: '待支付', value: '$pendingOrderCount笔'),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _WalletMetric(label: '已支付', value: '$paidOrderCount笔'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          childAspectRatio: 2.18,
+          children: [
+            _WalletActionTile(
+              icon: Icons.receipt_long_outlined,
+              title: '我的订单',
+              subtitle:
+                  pendingOrderCount > 0 ? '$pendingOrderCount 笔待处理' : '查看购买记录',
+              badgeText: pendingOrderCount > 0 ? '$pendingOrderCount' : null,
+              onTap: onOrdersTap,
+            ),
+            _WalletActionTile(
+              icon: Icons.workspace_premium_outlined,
+              title: '会员权益',
+              subtitle: '权益与服务',
+              onTap: onMembershipTap,
+            ),
+            _WalletActionTile(
+              icon: Icons.local_offer_outlined,
+              title: '优惠券',
+              subtitle: '抵扣券与活动券',
+              onTap: onCouponsTap,
+            ),
+            _WalletActionTile(
+              icon: Icons.sync_alt_rounded,
+              title: '交易记录',
+              subtitle: '支付与退款',
+              onTap: onTransactionsTap,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _WalletMetric extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _WalletMetric({
+    required this.label,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      height: 58,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: strong
-            ? kCobalt.withValues(alpha: 0.08)
-            : context.artC.silver.withValues(alpha: 0.22),
-        borderRadius: BorderRadius.circular(999),
-        border:
-            strong ? Border.all(color: kCobalt.withValues(alpha: 0.22)) : null,
+        color: context.artC.cardIconBg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: context.artC.silver.withValues(alpha: 0.38)),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-          color: strong ? kCobalt : context.artC.ink.withValues(alpha: 0.62),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: context.artC.ink,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: context.artC.ink.withValues(alpha: 0.46),
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WalletActionTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String? badgeText;
+  final VoidCallback onTap;
+
+  const _WalletActionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.badgeText,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: context.artC.cardIconBg,
+          borderRadius: BorderRadius.circular(8),
+          border:
+              Border.all(color: context.artC.silver.withValues(alpha: 0.34)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: kCobalt.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: kCobalt, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: context.artC.ink,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      if (badgeText != null)
+                        Container(
+                          constraints: const BoxConstraints(minWidth: 18),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 5, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: kCobalt,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            badgeText!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: context.artC.ink.withValues(alpha: 0.48),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1691,128 +2421,6 @@ class _InstagramAvatar extends StatelessWidget {
   }
 }
 
-class _ProfileStatusItem extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _ProfileStatusItem({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 38),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: context.artC.silver.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: context.artC.silver.withValues(alpha: 0.28)),
-      ),
-      child: Row(
-        children: [
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              color: context.artC.ink.withValues(alpha: 0.38),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
-                color: context.artC.ink.withValues(alpha: 0.86),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NoticeStrip extends StatelessWidget {
-  final String text;
-  final IconData icon;
-
-  const _NoticeStrip({required this.text, required this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: kCobalt.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kCobalt.withValues(alpha: 0.12)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 17, color: kCobalt),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                fontSize: 12,
-                height: 1.35,
-                fontWeight: FontWeight.w800,
-                color: kCobalt,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeaderActionButton extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-  final bool secondary;
-
-  const _HeaderActionButton({
-    required this.label,
-    required this.onTap,
-    this.secondary = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color:
-              secondary ? context.artC.silver.withValues(alpha: 0.32) : kCobalt,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w900,
-            color: secondary
-                ? context.artC.ink.withValues(alpha: 0.68)
-                : Colors.white,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _SettingsScreen extends StatelessWidget {
   final bool isBusinessUser;
   final VoidCallback onSignOut;
@@ -1878,7 +2486,7 @@ class _SettingsScreen extends StatelessWidget {
                 trailing: Switch(
                   value: ArtseeThemeController.instance.isDark,
                   onChanged: (_) => ArtseeThemeController.instance.toggle(),
-                  activeColor: kCobalt,
+                  activeThumbColor: kCobalt,
                 ),
                 onTap: () => ArtseeThemeController.instance.toggle(),
               ),

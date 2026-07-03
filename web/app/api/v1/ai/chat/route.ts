@@ -16,7 +16,7 @@ import {
   resolveAiConversation,
 } from '@/lib/ai/general-context';
 import { logChatInteraction } from '@/lib/logging/chat-logger';
-import { runConsultStages, streamGenerate } from '@/lib/pipelines/consult-pipeline';
+import { buildRoleSystemPrompt, runConsultStages, streamGenerate } from '@/lib/pipelines/consult-pipeline';
 import { loadPersona } from '@/lib/knowledge/persona-loader';
 
 // Grayscale flag
@@ -108,14 +108,24 @@ async function handleUnifiedPath(
 ) {
   console.log('[chat] Using unified pipeline');
 
-  // Run unified consult pipeline
-  const stages = await runConsultStages({
-    query: lastUserMessage,
-    userId: user?.id,
-    mode: 'chat',
-    history,
-    userProfile,
-  });
+  let stages;
+  try {
+    // Run unified consult pipeline
+    stages = await runConsultStages({
+      query: lastUserMessage,
+      userId: user?.id,
+      mode: 'chat',
+      history,
+      userProfile,
+    });
+  } catch (error) {
+    console.warn('[chat] Unified pipeline failed, falling back to no-retrieval chat:', error);
+    stages = buildNoRetrievalStages({
+      lastUserMessage,
+      history,
+      userProfile,
+    });
+  }
 
   // Load persona and inject into system prompt
   const basePersona = loadPersona('artsee', 'v1');
@@ -195,6 +205,43 @@ async function handleUnifiedPath(
       Connection: 'keep-alive',
     },
   });
+}
+
+function buildNoRetrievalStages({
+  lastUserMessage,
+  history,
+  userProfile,
+}: {
+  lastUserMessage: string;
+  history: Array<{ role?: string; content?: string }>;
+  userProfile: any;
+}) {
+  const recentHistory = (history || [])
+    .slice(-8)
+    .map((message) => {
+      const role = message.role === 'assistant' ? '助手' : '用户';
+      const content = String(message.content || '').trim();
+      return content ? `${role}: ${content}` : '';
+    })
+    .filter(Boolean)
+    .join('\n');
+
+  return {
+    systemPrompt: [
+      buildRoleSystemPrompt(userProfile),
+      '【临时降级说明】知识库检索或 embedding 服务暂时不可用。本轮请按通用艺术留学顾问能力回答：可以做思路拆解、信息补充清单、判断框架和下一步建议；不要编造具体排名、学费、截止日期、录取率、作品集页数等需要知识库或官方来源核验的硬数据。遇到硬数据问题时，请说明需要核对官方或平台知识库。',
+    ].join('\n\n'),
+    userMessage: [
+      recentHistory ? `【最近对话】\n${recentHistory}` : '',
+      `【用户当前问题】\n${lastUserMessage}`,
+    ]
+      .filter(Boolean)
+      .join('\n\n'),
+    sources: [],
+    intent: 'general_chat' as any,
+    lowConfidence: true,
+    retrievedChunkIds: [],
+  };
 }
 
 /**

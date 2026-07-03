@@ -228,7 +228,9 @@ class _AiHomeProfileConfig {
 }
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final VoidCallback? onReturnToMain;
+
+  const HomeScreen({super.key, this.onReturnToMain});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -438,6 +440,16 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     }
     MainScaffold.globalKey.currentState?.setHomeNavHidden(false);
+  }
+
+  void _returnToMainInterface() {
+    FocusScope.of(context).unfocus();
+    final customReturn = widget.onReturnToMain;
+    if (customReturn != null) {
+      customReturn();
+      return;
+    }
+    MainScaffold.globalKey.currentState?.switchToTab(1);
   }
 
   void _handleChatDragEnd(DragEndDetails details) {
@@ -1105,6 +1117,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: _ChatHeader(
                     onMenuTap: () => _scaffoldKey.currentState?.openDrawer(),
                     onActionTap: inputMode ? _showMainNav : _showChatInput,
+                    onReturnTap: _returnToMainInterface,
                     showAppsIcon: inputMode,
                     title: _aiConfig.chatTitle,
                     subtitle: _aiConfig.chatSubtitle,
@@ -1151,6 +1164,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: _HeaderIconButton(
                     icon: Icons.menu_rounded,
                     onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                  ),
+                ),
+                Positioned(
+                  right: 8,
+                  top: (MediaQuery.paddingOf(context).top > 0
+                          ? MediaQuery.paddingOf(context).top
+                          : 44) +
+                      4,
+                  child: _HeaderIconButton(
+                    icon: Icons.school_outlined,
+                    onTap: _returnToMainInterface,
                   ),
                 ),
               ],
@@ -2402,6 +2426,7 @@ class _OrbitLogoPainter extends CustomPainter {
 class _ChatHeader extends StatelessWidget {
   final VoidCallback onMenuTap;
   final VoidCallback onActionTap;
+  final VoidCallback onReturnTap;
   final bool showAppsIcon;
   final String title;
   final String subtitle;
@@ -2409,6 +2434,7 @@ class _ChatHeader extends StatelessWidget {
   const _ChatHeader({
     required this.onMenuTap,
     required this.onActionTap,
+    required this.onReturnTap,
     required this.showAppsIcon,
     required this.title,
     required this.subtitle,
@@ -2428,36 +2454,62 @@ class _ChatHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _HeaderIconButton(icon: Icons.menu_rounded, onTap: onMenuTap),
-          const Spacer(),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  color: context.artC.ink,
-                ),
+          SizedBox(
+            width: 90,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: _HeaderIconButton(
+                icon: Icons.menu_rounded,
+                onTap: onMenuTap,
               ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: context.artC.ink.withValues(alpha: 0.45),
-                ),
-              ),
-            ],
+            ),
           ),
-          const Spacer(),
-          _HeaderIconButton(
-            icon: showAppsIcon
-                ? Icons.apps_rounded
-                : Icons.chat_bubble_outline_rounded,
-            onTap: onActionTap,
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: context.artC.ink,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: context.artC.ink.withValues(alpha: 0.45),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            width: 90,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                _HeaderIconButton(
+                  icon: showAppsIcon
+                      ? Icons.apps_rounded
+                      : Icons.chat_bubble_outline_rounded,
+                  onTap: onActionTap,
+                ),
+                const SizedBox(width: 6),
+                _HeaderIconButton(
+                  icon: Icons.school_outlined,
+                  onTap: onReturnTap,
+                ),
+              ],
+            ),
           ),
         ],
       ),

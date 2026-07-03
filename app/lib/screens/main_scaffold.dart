@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import '../widgets/common.dart';
 import 'auth/login_screen.dart';
@@ -9,6 +7,7 @@ import 'news/news_scaffold.dart';
 import 'explore/explore_screen.dart';
 import 'forum/forum_screen.dart';
 import 'profile/profile_screen.dart';
+import 'tools/dot_chat_screen.dart';
 import 'publish/publish_exhibition_screen.dart';
 import 'publish/publish_opportunity_screen.dart';
 import 'publish/publish_artist_screen.dart';
@@ -23,7 +22,7 @@ import 'package:artsee_app/theme/artsee_ui_colors.dart';
 
 /// ═══════════════════════════════════════════════════════════════
 /// artiqore 艺见心 — App 总入口
-/// 当前主导航：首页 / 院校 / 发现 / 社区 / 我的。
+/// 当前主界面由院校频道 header 与各页面内入口承载导航。
 /// ═══════════════════════════════════════════════════════════════
 
 class MainScaffold extends StatefulWidget {
@@ -40,8 +39,9 @@ class MainScaffold extends StatefulWidget {
 
 class _MainScaffoldState extends State<MainScaffold> {
   static const double _headerHeight = 64;
-  int _currentIndex = 0;
+  int _currentIndex = 1;
   bool _homeNavHidden = false;
+  bool _profileDrawerOpen = false;
   bool _hasOrganizationMembership = false;
   Map<String, dynamic>? _profile;
   final GlobalKey<NewsScaffoldState> _newsKey = GlobalKey<NewsScaffoldState>();
@@ -99,6 +99,7 @@ class _MainScaffoldState extends State<MainScaffold> {
       setState(() {
         _currentIndex = index;
         if (index != 0) _homeNavHidden = false;
+        if (index != 4) _profileDrawerOpen = false;
       });
     }
   }
@@ -119,34 +120,39 @@ class _MainScaffoldState extends State<MainScaffold> {
     setState(() => _homeNavHidden = hidden);
   }
 
+  void _setProfileDrawerOpen(bool open) {
+    if (!mounted || _profileDrawerOpen == open) return;
+    setState(() => _profileDrawerOpen = open);
+  }
+
   List<_NavItem> get _navItems => [
-        const _NavItem(
-          icon: Icons.home_outlined,
-          activeIcon: Icons.home_rounded,
-          label: '首页',
-        ),
         _usesWorkspaceTab
             ? const _NavItem(
+                tabIndex: 1,
                 icon: Icons.dashboard_customize_outlined,
                 activeIcon: Icons.dashboard_customize_rounded,
                 label: '工作台',
               )
             : const _NavItem(
+                tabIndex: 1,
                 icon: Icons.school_outlined,
                 activeIcon: Icons.school_rounded,
                 label: '院校',
               ),
         const _NavItem(
+          tabIndex: 2,
           icon: Icons.explore_outlined,
           activeIcon: Icons.explore_rounded,
           label: '发现',
         ),
         const _NavItem(
-          icon: Icons.forum_outlined,
-          activeIcon: Icons.forum_rounded,
-          label: '社区',
+          tabIndex: 3,
+          icon: Icons.chat_bubble_outline,
+          activeIcon: Icons.chat_bubble_rounded,
+          label: '消息',
         ),
         const _NavItem(
+          tabIndex: 4,
           icon: Icons.person_outline,
           activeIcon: Icons.person_rounded,
           label: '我的',
@@ -177,6 +183,8 @@ class _MainScaffoldState extends State<MainScaffold> {
         systemRole == 'institution_user' ||
         systemRole == 'advisor';
   }
+
+  bool get _shouldShowTopHeader => false;
 
   String get _workspaceRole {
     final userRole = _profile?['user_role']?.toString();
@@ -227,6 +235,12 @@ class _MainScaffoldState extends State<MainScaffold> {
       MaterialPageRoute(builder: (_) => const CreatePostScreen()),
     );
     if (!mounted || created != true) return;
+    if (_currentIndex == 2) {
+      _exploreKey.currentState?.refreshActiveTab();
+    }
+    if (_currentIndex == 3) {
+      _forumKey.currentState?.refreshActiveTab();
+    }
   }
 
   Future<void> _openCommunityDialog(_CommunityCreateKind kind) async {
@@ -472,7 +486,7 @@ class _MainScaffoldState extends State<MainScaffold> {
                 'hot_topic': '发布第一条讨论，开启圈子交流',
                 'member_count': created['member_count'] ?? 1,
               };
-              _forumKey.currentState?.addCreatedCircle(localCircle);
+              _exploreKey.currentState?.addCreatedCircle(localCircle);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('圈子已创建，你可以发布第一条动态或邀请同方向用户加入'),
@@ -767,24 +781,10 @@ class _MainScaffoldState extends State<MainScaffold> {
               final navigator = Navigator.of(context);
               final messenger = ScaffoldMessenger.of(context);
               Navigator.of(sheetContext).pop();
-              final localSalon = {
-                ...created,
-                'metadata': {
-                  ...(created['metadata'] is Map
-                      ? Map<String, dynamic>.from(created['metadata'] as Map)
-                      : <String, dynamic>{}),
-                  'salon_type': salonType,
-                  'mode': mode,
-                  'guest': guest,
-                  'fee_mode': feeMode,
-                  'seats_left': seats,
-                  'benefit': _salonCreateBenefit(salonType, feeMode),
-                },
-              };
               if (created['status']?.toString() == 'published') {
-                _forumKey.currentState?.addCreatedSalon(localSalon);
+                _exploreKey.currentState?.refreshActiveTab();
                 messenger.showSnackBar(
-                  const SnackBar(content: Text('沙龙已创建，可以在“我的预约/活动”中管理')),
+                  const SnackBar(content: Text('沙龙已创建，可以在发现页“活动”中查看')),
                 );
               } else {
                 showSubmissionReviewSnackBar(
@@ -1049,134 +1049,250 @@ class _MainScaffoldState extends State<MainScaffold> {
   }
 
   Future<void> _showCreateSheet() async {
+    if (_currentIndex == 2 &&
+        (_exploreKey.currentState?.isDynamicTabActive ?? false)) {
+      await _openCreatePost();
+      return;
+    }
     if (!await ensureLoggedIn(context, message: '请先登录后发布资源')) return;
     if (!mounted) return;
-    final primaryKind = switch (_exploreKey.currentState?.activeTabIndex ?? 0) {
-      0 => _ResourceKind.opportunity,
-      1 => _ResourceKind.event,
-      _ => _ResourceKind.artist,
+    final primarySection = _primaryCreateSection;
+    final sections = _orderedCreateSections(primarySection);
+
+    await showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '关闭发布菜单',
+      barrierColor: Colors.black.withValues(alpha: 0.58),
+      transitionDuration: const Duration(milliseconds: 180),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        final bottomInset = MediaQuery.paddingOf(dialogContext).bottom;
+        return Material(
+          color: Colors.transparent,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => Navigator.of(dialogContext).pop(),
+                ),
+              ),
+              Positioned(
+                left: 20,
+                right: 20,
+                bottom: bottomInset + 22,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildCreateFloatingOptions(
+                      dialogContext,
+                      sections: sections,
+                      primarySection: primarySection,
+                    ),
+                    const SizedBox(height: 18),
+                    _buildCreateCloseButton(dialogContext),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return FadeTransition(
+          opacity: curved,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.05),
+              end: Offset.zero,
+            ).animate(curved),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
+  _CreateSectionKind get _primaryCreateSection {
+    if (_currentIndex != 2) return _CreateSectionKind.cooperation;
+    return switch (_exploreKey.currentState?.activeTabIndex ?? 0) {
+      1 => _CreateSectionKind.activity,
+      2 || 3 => _CreateSectionKind.circle,
+      _ => _CreateSectionKind.cooperation,
     };
-    final resourceOptions = <({
-      _ResourceKind kind,
-      IconData icon,
-      String label,
-      String subtitle,
-    })>[
-      (
-        kind: _ResourceKind.opportunity,
-        icon: Icons.business_center_outlined,
-        label: '发布合作机会',
-        subtitle: '品牌 / 空间 / 项目方招募艺术家',
+  }
+
+  List<_CreateSheetSection> _orderedCreateSections(
+    _CreateSectionKind primarySection,
+  ) {
+    const sections = [
+      _CreateSheetSection(
+        kind: _CreateSectionKind.cooperation,
+        actions: [
+          _CreateSheetAction(
+            kind: _CreateActionKind.opportunity,
+            icon: Icons.business_center_outlined,
+            label: '发布合作机会',
+            subtitle: '项目招募 / 展览征集 / 驻留委托',
+          ),
+          _CreateSheetAction(
+            kind: _CreateActionKind.artist,
+            icon: Icons.palette_outlined,
+            label: '艺术家入驻',
+            subtitle: '创建档案，被合作方发现',
+          ),
+        ],
       ),
-      (
-        kind: _ResourceKind.event,
-        icon: Icons.grid_view_rounded,
-        label: '发布展览活动',
-        subtitle: '展览 / 沙龙 / 工作坊 / 导览预约',
+      _CreateSheetSection(
+        kind: _CreateSectionKind.activity,
+        actions: [
+          _CreateSheetAction(
+            kind: _CreateActionKind.exhibition,
+            icon: Icons.grid_view_rounded,
+            label: '发布展览活动',
+            subtitle: '展览 / 工作坊 / 开放日 / 说明会',
+          ),
+          _CreateSheetAction(
+            kind: _CreateActionKind.salon,
+            icon: Icons.groups_2_outlined,
+            label: '创建沙龙',
+            subtitle: '小型分享 / 导览 / 线上交流',
+          ),
+        ],
       ),
-      (
-        kind: _ResourceKind.artist,
-        icon: Icons.palette_outlined,
-        label: '艺术家入驻',
-        subtitle: '创建艺术家档案，被合作方发现',
+      _CreateSheetSection(
+        kind: _CreateSectionKind.circle,
+        actions: [
+          _CreateSheetAction(
+            kind: _CreateActionKind.post,
+            icon: Icons.add_photo_alternate_outlined,
+            label: '发布动态',
+            subtitle: '作品 / 现场 / 灵感记录',
+          ),
+          _CreateSheetAction(
+            kind: _CreateActionKind.circle,
+            icon: Icons.bubble_chart_outlined,
+            label: '创建圈子',
+            subtitle: '院校 / 专业 / 城市 / 作品集社群',
+          ),
+          _CreateSheetAction(
+            kind: _CreateActionKind.question,
+            icon: Icons.help_outline_rounded,
+            label: '发布问答',
+            subtitle: '把问题发到相关圈子讨论',
+          ),
+        ],
       ),
-    ];
-    final orderedResources = [
-      ...resourceOptions.where((option) => option.kind == primaryKind),
-      ...resourceOptions.where((option) => option.kind != primaryKind),
     ];
 
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) => ClipRRect(
-        borderRadius:
-            const BorderRadius.vertical(top: Radius.circular(kRadiusLarge)),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-          child: Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFFE8EEF5).withOpacity(0.92),
-              borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(kRadiusLarge)),
-              border:
-                  Border.all(color: Colors.white.withOpacity(0.6), width: 1),
-            ),
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-            child: SafeArea(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: context.artC.ink.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
+    return [
+      ...sections.where((section) => section.kind == primarySection),
+      ...sections.where((section) => section.kind != primarySection),
+    ];
+  }
+
+  Widget _buildCreateFloatingOptions(
+    BuildContext dialogContext, {
+    required List<_CreateSheetSection> sections,
+    required _CreateSectionKind primarySection,
+  }) {
+    final availableWidth =
+        (MediaQuery.sizeOf(dialogContext).width - 40).clamp(280.0, 620.0);
+    final tileWidth = (availableWidth - 12) / 2;
+
+    return Center(
+      child: SizedBox(
+        width: availableWidth,
+        child: Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            for (final section in sections)
+              for (final action in section.actions)
+                SizedBox(
+                  width: tileWidth,
+                  height: 82,
+                  child: _buildSheetOption(
+                    icon: action.icon,
+                    label: action.label,
+                    subtitle: action.subtitle,
+                    emphasized: section.kind == primarySection,
+                    onTap: () => _handleCreateAction(
+                      dialogContext,
+                      action.kind,
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  _SheetGroupTitle(
-                    title: '资源发布',
-                    subtitle: primaryKind == _ResourceKind.opportunity
-                        ? '当前优先发布合作机会'
-                        : primaryKind == _ResourceKind.event
-                            ? '当前优先发布展览活动'
-                            : '当前优先创建艺术家档案',
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: orderedResources
-                        .map(
-                          (option) => Expanded(
-                            child: _buildSheetOption(
-                              icon: option.icon,
-                              label: option.label,
-                              subtitle: option.subtitle,
-                              emphasized: option.kind == primaryKind,
-                              onTap: () {
-                                Navigator.of(ctx).pop();
-                                _openResourceDialog(option.kind);
-                              },
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                  const SizedBox(height: 10),
-                  const _SheetGroupTitle(
-                    title: '个人创作',
-                    subtitle: '分享作品、灵感和展览现场',
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildSheetOption(
-                          icon: Icons.add_photo_alternate_outlined,
-                          label: '发布图文动态',
-                          subtitle: '作品 / 现场 / 灵感记录',
-                          onTap: () {
-                            Navigator.of(ctx).pop();
-                            _openCreatePost();
-                          },
-                        ),
-                      ),
-                      const Expanded(child: SizedBox()),
-                      const Expanded(child: SizedBox()),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                ],
-              ),
-            ),
+                ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCreateCloseButton(BuildContext dialogContext) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.96),
+      shape: const CircleBorder(),
+      elevation: 18,
+      shadowColor: Colors.black.withValues(alpha: 0.24),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: () => Navigator.of(dialogContext).pop(),
+        child: SizedBox(
+          width: 54,
+          height: 54,
+          child: Icon(
+            Icons.close_rounded,
+            size: 29,
+            color: context.artC.ink.withValues(alpha: 0.82),
           ),
         ),
       ),
     );
+  }
+
+  void _handleCreateAction(
+    BuildContext sheetContext,
+    _CreateActionKind action,
+  ) {
+    Navigator.of(sheetContext).pop();
+    switch (action) {
+      case _CreateActionKind.opportunity:
+        _openResourceDialog(_ResourceKind.opportunity);
+        break;
+      case _CreateActionKind.artist:
+        _openResourceDialog(_ResourceKind.artist);
+        break;
+      case _CreateActionKind.exhibition:
+        _openResourceDialog(_ResourceKind.event);
+        break;
+      case _CreateActionKind.salon:
+        _openCommunityDialog(_CommunityCreateKind.salon);
+        break;
+      case _CreateActionKind.circle:
+        _openCommunityDialog(_CommunityCreateKind.circle);
+        break;
+      case _CreateActionKind.question:
+        _openQuestionFromCreateSheet();
+        break;
+      case _CreateActionKind.post:
+        _openCreatePost();
+        break;
+    }
+  }
+
+  Future<void> _openQuestionFromCreateSheet() async {
+    final exploreState = _exploreKey.currentState;
+    if (exploreState != null) {
+      await exploreState.openQuestionComposer();
+      return;
+    }
+    await _openCommunityDialog(_CommunityCreateKind.qa);
   }
 
   Future<void> _openResourceDialog(_ResourceKind kind) async {
@@ -1373,80 +1489,130 @@ class _MainScaffoldState extends State<MainScaffold> {
       onPressed: onTap,
       style: TextButton.styleFrom(
         foregroundColor: context.artC.ink,
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.zero,
+        minimumSize: Size.zero,
         shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(kRadiusMedium)),
+          borderRadius: BorderRadius.circular(8),
+        ),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: emphasized ? kCobalt : Colors.white.withOpacity(0.85),
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: kCobalt.withOpacity(0.08),
-                  blurRadius: 20,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Icon(icon,
-                color: emphasized ? Colors.white : kCobalt, size: 28),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: emphasized ? const Color(0xFFEAF1FF) : Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: emphasized
+                ? kCobalt.withValues(alpha: 0.46)
+                : Colors.white.withValues(alpha: 0.92),
+            width: emphasized ? 1.4 : 1,
           ),
-          const SizedBox(height: 10),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: context.artC.ink,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: emphasized ? 0.16 : 0.11),
+              blurRadius: emphasized ? 22 : 16,
+              offset: const Offset(0, 8),
             ),
-          ),
-          if (subtitle != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 9,
-                height: 1.25,
-                fontWeight: FontWeight.w600,
-                color: context.artC.ink.withOpacity(0.4),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: emphasized ? kCobalt : kCobalt.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                icon,
+                color: emphasized ? Colors.white : kCobalt,
+                size: 19,
+              ),
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      color: context.artC.ink,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        height: 1.2,
+                        fontWeight: FontWeight.w700,
+                        color: context.artC.ink.withValues(alpha: 0.58),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],
-        ],
+        ),
       ),
     );
   }
 
-  Future<void> _openLoginOrProfile() async {
-    if (!SupabaseService.isLoggedIn) {
-      await Navigator.of(context).push<void>(
-        MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
-      );
-      _loadProfile();
-      return;
-    }
-    setState(() => _currentIndex = 4);
+  Future<void> _openDotChatRoute() {
+    return _pushDotChatRoute();
+  }
+
+  Future<void> _pushDotChatRoute({String? initialQuery}) {
+    return Navigator.of(context).push<void>(
+      PageRouteBuilder<void>(
+        pageBuilder: (routeContext, animation, secondaryAnimation) =>
+            DotChatScreen(initialQuery: initialQuery),
+        transitionsBuilder: (_, animation, secondaryAnimation, child) {
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          );
+          return SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(-1, 0),
+              end: Offset.zero,
+            ).animate(curved),
+            child: child,
+          );
+        },
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final statusBarHeight = MediaQuery.of(context).padding.top;
-    final showTopHeader = (_currentIndex == 1 && !_usesWorkspaceTab) ||
-        _currentIndex == 2 ||
-        _currentIndex == 3;
-    final contentTop = _currentIndex == 0
+    final isSchoolSurface = _currentIndex == 1 && !_usesWorkspaceTab;
+    final isDiscoverSurface = _currentIndex == 2;
+    final isMessageSurface = _currentIndex == 3;
+    final isProfileSurface = _currentIndex == 4;
+    final showTopHeader = _shouldShowTopHeader;
+    final contentTop = _currentIndex == 0 ||
+            isSchoolSurface ||
+            isDiscoverSurface ||
+            isMessageSurface ||
+            isProfileSurface
         ? 0.0
         : statusBarHeight + (showTopHeader ? _headerHeight : 0);
-    final hideFloatingNav = _currentIndex == 0 && _homeNavHidden;
+    final hideFloatingNav =
+        _currentIndex == 0 || _homeNavHidden || _profileDrawerOpen;
 
     return Scaffold(
       backgroundColor: context.artC.porcelain,
@@ -1465,9 +1631,15 @@ class _MainScaffoldState extends State<MainScaffold> {
                 const HomeScreen(),
                 _usesWorkspaceTab
                     ? _buildWorkspaceScreen()
-                    : NewsScaffold(key: _newsKey),
+                    : NewsScaffold(
+                        key: _newsKey,
+                        onOpenDotChat: _openDotChatRoute,
+                      ),
                 ExploreScreen(
                   key: _exploreKey,
+                  onOpenDotChat: _openDotChatRoute,
+                  onCreateCircle: () =>
+                      _openCommunityDialog(_CommunityCreateKind.circle),
                   onTabChanged: () {
                     if (mounted) setState(() {});
                   },
@@ -1477,10 +1649,11 @@ class _MainScaffoldState extends State<MainScaffold> {
                   onTabChanged: () {
                     if (mounted) setState(() {});
                   },
-                  onCreateCircle: () =>
-                      _openCommunityDialog(_CommunityCreateKind.circle),
                 ),
-                ProfileScreen(onOpenMainTab: switchToTab),
+                ProfileScreen(
+                  onOpenMainTab: switchToTab,
+                  onDrawerChanged: _setProfileDrawerOpen,
+                ),
               ],
             ),
           ),
@@ -1535,11 +1708,14 @@ class _MainScaffoldState extends State<MainScaffold> {
   }
 
   Widget _buildFloatingNav() {
+    final leadingItems = _navItems.take(2);
+    final trailingItems = _navItems.skip(2);
+
     return Container(
-      constraints: const BoxConstraints(maxWidth: 500),
+      constraints: const BoxConstraints(maxWidth: 430),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: context.artC.cardIconBg.withValues(alpha: 0.92),
+        color: context.artC.cardIconBg.withValues(alpha: 0.94),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: context.artC.silver.withValues(alpha: 0.24)),
         boxShadow: [
@@ -1551,24 +1727,44 @@ class _MainScaffoldState extends State<MainScaffold> {
         ],
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: List.generate(_navItems.length, (index) {
-          final item = _navItems[index];
-          return _NavButton(
-            item: item,
-            isSelected: _currentIndex == index,
-            onTap: () {
-              if (index == 4 && !SupabaseService.isLoggedIn) {
-                _openLoginOrProfile();
-                return;
-              }
-              setState(() => _currentIndex = index);
-              if (index == 1 || index == 4) _loadProfile();
-            },
-          );
-        }),
+        children: [
+          ...leadingItems.map(_buildNavButtonSlot),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: _CreateNavButton(onTap: _showCreateSheet),
+          ),
+          ...trailingItems.map(_buildNavButtonSlot),
+        ],
       ),
     );
+  }
+
+  Widget _buildNavButtonSlot(_NavItem item) {
+    return Expanded(
+      child: _NavButton(
+        item: item,
+        isSelected: _currentIndex == item.tabIndex,
+        onTap: () {
+          if (item.tabIndex == 4 && !SupabaseService.isLoggedIn) {
+            _openLoginOrProfile();
+            return;
+          }
+          setState(() => _currentIndex = item.tabIndex);
+          if (item.tabIndex == 1 || item.tabIndex == 4) _loadProfile();
+        },
+      ),
+    );
+  }
+
+  Future<void> _openLoginOrProfile() async {
+    if (!SupabaseService.isLoggedIn) {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
+      );
+      _loadProfile();
+      return;
+    }
+    setState(() => _currentIndex = 4);
   }
 
   void _handleHeaderSearch(String keyword) {
@@ -1595,10 +1791,10 @@ class _MainScaffoldState extends State<MainScaffold> {
       return _usesWorkspaceTab ? _workspaceSearchHint : '搜索 RCA、插画、伦敦';
     }
     if (_currentIndex == 2) {
-      return _exploreKey.currentState?.searchHint ?? '搜索合作机会、展览、艺术家';
+      return _exploreKey.currentState?.searchHint ?? '搜索合作、活动、圈子';
     }
     if (_currentIndex == 3) {
-      return _forumKey.currentState?.searchHint ?? '搜索问题、学校、作品集经验';
+      return _forumKey.currentState?.searchHint ?? '搜索消息、联系人、通知';
     }
     return '搜索院校、灵感、作品集问题';
   }
@@ -1625,64 +1821,11 @@ class _MainScaffoldState extends State<MainScaffold> {
   }
 
   void _handleCommunityHeaderAction() {
-    switch (_forumKey.currentState?.activeTabIndex ?? 0) {
-      case 0:
-        _forumKey.currentState?.openQuestionComposer();
-        break;
-      case 1:
-        _openCommunityDialog(_CommunityCreateKind.circle);
-        break;
-      case 2:
-        _forumKey.currentState?.openMyReservations();
-        break;
-      case 3:
-        _forumKey.currentState?.refreshActiveTab();
-        break;
-    }
+    _forumKey.currentState?.refreshActiveTab();
   }
 
   String? get _headerActionLabel {
-    if (_currentIndex == 3 &&
-        (_forumKey.currentState?.activeTabIndex ?? 0) == 0) {
-      return '提问';
-    }
     return null;
-  }
-}
-
-class _SheetGroupTitle extends StatelessWidget {
-  final String title;
-  final String subtitle;
-
-  const _SheetGroupTitle({required this.title, required this.subtitle});
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              color: context.artC.ink,
-              fontSize: 13,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            subtitle,
-            style: TextStyle(
-              color: context.artC.ink.withOpacity(0.42),
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -1923,6 +2066,42 @@ class _TopHeaderState extends State<_TopHeader> {
 enum _ResourceKind { opportunity, event, artist }
 
 enum _CommunityCreateKind { qa, circle, salon }
+
+enum _CreateSectionKind { cooperation, activity, circle }
+
+enum _CreateActionKind {
+  opportunity,
+  artist,
+  exhibition,
+  salon,
+  circle,
+  question,
+  post,
+}
+
+class _CreateSheetSection {
+  final _CreateSectionKind kind;
+  final List<_CreateSheetAction> actions;
+
+  const _CreateSheetSection({
+    required this.kind,
+    required this.actions,
+  });
+}
+
+class _CreateSheetAction {
+  final _CreateActionKind kind;
+  final IconData icon;
+  final String label;
+  final String subtitle;
+
+  const _CreateSheetAction({
+    required this.kind,
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+  });
+}
 
 DateTime? _parseSalonDateTime(String value) {
   final normalized = value.trim().replaceFirst(' ', 'T');
@@ -2191,11 +2370,13 @@ class _CircleJoinModeCard extends StatelessWidget {
 }
 
 class _NavItem {
+  final int tabIndex;
   final IconData icon;
   final IconData activeIcon;
   final String label;
 
   const _NavItem({
+    required this.tabIndex,
     required this.icon,
     required this.activeIcon,
     required this.label,
@@ -2232,44 +2413,106 @@ class _NavButtonState extends State<_NavButton> {
       onTapCancel: () => setState(() => _pressed = false),
       onTap: widget.onTap,
       behavior: HitTestBehavior.opaque,
-      child: AnimatedScale(
-        scale: _pressed ? 0.85 : 1.0,
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOutCubic,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              widget.isSelected ? widget.item.activeIcon : widget.item.icon,
-              size: 22,
-              color: widget.isSelected
-                  ? activeColor
-                  : context.artC.ink.withValues(alpha: 0.34),
-            ),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 180),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeOutCubic,
-              child: widget.isSelected
-                  ? Padding(
-                      key: ValueKey(widget.item.label),
-                      padding: const EdgeInsets.only(top: 5),
-                      child: Text(
-                        widget.item.label,
-                        style: TextStyle(
-                          color: activeColor,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0,
+      child: Center(
+        child: AnimatedScale(
+          scale: _pressed ? 0.85 : 1.0,
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOutCubic,
+          child: SizedBox(
+            width: 52,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  widget.isSelected ? widget.item.activeIcon : widget.item.icon,
+                  size: 22,
+                  color: widget.isSelected
+                      ? activeColor
+                      : context.artC.ink.withValues(alpha: 0.34),
+                ),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 180),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeOutCubic,
+                  child: widget.isSelected
+                      ? Padding(
+                          key: ValueKey(widget.item.label),
+                          padding: const EdgeInsets.only(top: 5),
+                          child: Text(
+                            widget.item.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.visible,
+                            style: TextStyle(
+                              color: activeColor,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0,
+                            ),
+                          ),
+                        )
+                      : const SizedBox(
+                          key: ValueKey('empty'),
+                          height: 14,
                         ),
-                      ),
-                    )
-                  : const SizedBox(
-                      key: ValueKey('empty'),
-                      height: 14,
-                    ),
+                ),
+              ],
             ),
-          ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CreateNavButton extends StatefulWidget {
+  final VoidCallback onTap;
+
+  const _CreateNavButton({required this.onTap});
+
+  @override
+  State<_CreateNavButton> createState() => _CreateNavButtonState();
+}
+
+class _CreateNavButtonState extends State<_CreateNavButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    const createColor = kCobalt;
+
+    return Semantics(
+      button: true,
+      label: '发布',
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
+        onTap: widget.onTap,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedScale(
+          scale: _pressed ? 0.9 : 1,
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOutCubic,
+          child: Container(
+            width: 70,
+            height: 44,
+            decoration: BoxDecoration(
+              color: createColor,
+              borderRadius: BorderRadius.circular(15),
+              boxShadow: [
+                BoxShadow(
+                  color: createColor.withValues(alpha: 0.28),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.add_rounded,
+              size: 34,
+              color: Colors.white,
+            ),
+          ),
         ),
       ),
     );

@@ -76,6 +76,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         body: _contentCtrl.text.trim(),
         imageUrls: imageUrls,
         metadata: {
+          'kind': 'post',
           'post_type': _postType,
           'tags': _tagCtrl.text
               .split(RegExp(r'[,，、\s]+'))
@@ -148,7 +149,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          '发布图文',
+          '发布动态',
           style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
@@ -501,14 +502,17 @@ class _VisibilityRow extends StatelessWidget {
               ),
             ],
           ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            dense: true,
-            value: syncToPortfolio,
-            onChanged: onSyncChanged,
-            title: const Text(
-              '同步到作品集',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+          Material(
+            type: MaterialType.transparency,
+            child: SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              value: syncToPortfolio,
+              onChanged: onSyncChanged,
+              title: const Text(
+                '同步到作品集',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+              ),
             ),
           ),
         ],

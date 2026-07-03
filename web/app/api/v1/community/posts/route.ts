@@ -28,13 +28,19 @@ export async function GET(req: NextRequest) {
     const limit = Math.min(parseInt(searchParams.get("limit") || "20", 10), 50);
     const offset = parseInt(searchParams.get("offset") || "0", 10);
 
+    const user = await getUserFromBearer(req);
     const supabase = createServiceClient();
     let query = supabase
       .from("community_posts")
       .select("*")
-      .eq("status", "published")
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
+
+    if (user) {
+      query = query.or(`status.eq.published,and(author_id.eq.${user.id},status.neq.rejected)`);
+    } else {
+      query = query.eq("status", "published");
+    }
 
     const kind = searchParams.get("kind")?.trim();
     if (kind) query = query.eq("metadata->>kind", kind);
@@ -46,7 +52,6 @@ export async function GET(req: NextRequest) {
     }
 
     const posts = rows ?? [];
-    const user = await getUserFromBearer(req);
     const authorIds = [...new Set(posts.map((p: { author_id: string }) => p.author_id))];
     let profileMap: Record<string, { nickname: string | null; avatar_url: string | null }> = {};
     if (authorIds.length > 0) {
@@ -63,6 +68,7 @@ export async function GET(req: NextRequest) {
     }
     const postIds = posts.map((p: { id: string }) => p.id);
     let likedIds = new Set<string>();
+    let savedIds = new Set<string>();
     if (user && postIds.length > 0) {
       const { data: likes } = await supabase
         .from("community_post_likes")
@@ -70,12 +76,19 @@ export async function GET(req: NextRequest) {
         .eq("user_id", user.id)
         .in("post_id", postIds);
       likedIds = new Set((likes ?? []).map((item: { post_id: string }) => item.post_id));
+      const { data: saves } = await supabase
+        .from("community_post_saves")
+        .select("post_id")
+        .eq("user_id", user.id)
+        .in("post_id", postIds);
+      savedIds = new Set((saves ?? []).map((item: { post_id: string }) => item.post_id));
     }
 
     const data = posts.map((p: Record<string, unknown>) => ({
       ...p,
       user_profiles: profileMap[String(p.author_id)] ?? null,
       liked_by_me: likedIds.has(String(p.id)),
+      saved_by_me: savedIds.has(String(p.id)),
     }));
 
     return NextResponse.json({ success: true, data, pagination: { limit, offset } });

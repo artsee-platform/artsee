@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../widgets/artsee_ui.dart';
 import '../../widgets/common.dart';
 import '../schools/school_list_screen.dart';
+import '../schools/school_search_screen.dart';
 import 'package:artsee_app/theme/artsee_ui_colors.dart';
 import '../../services/backend_api_service.dart';
 import '../../services/supabase_service.dart';
@@ -10,7 +10,9 @@ import '_radar_compare_chart.dart';
 import '_application_workspace_widgets.dart';
 
 class NewsScaffold extends StatefulWidget {
-  const NewsScaffold({super.key});
+  final VoidCallback? onOpenDotChat;
+
+  const NewsScaffold({super.key, this.onOpenDotChat});
 
   @override
   State<NewsScaffold> createState() => NewsScaffoldState();
@@ -71,38 +73,251 @@ class NewsScaffoldState extends State<NewsScaffold>
     });
   }
 
+  void _openDotChat() {
+    widget.onOpenDotChat?.call();
+  }
+
+  Future<void> _openSchoolSearch() async {
+    final keyword = await Navigator.of(context).push<String>(
+      MaterialPageRoute<String>(
+        builder: (_) => SchoolSearchScreen(initialKeyword: schoolSearchKeyword),
+      ),
+    );
+    if (!mounted) return;
+    final normalized = keyword?.trim();
+    if (normalized != null && normalized.isNotEmpty) {
+      setSchoolSearchKeyword(normalized);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottom = mainTabBottomInset(context);
     return Scaffold(
       backgroundColor: context.artC.porcelain,
-      body: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: _NewsSegmentTabs(controller: _tabController),
-            ),
-            const SizedBox(height: 6),
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  SchoolListScreen(key: _schoolKey),
-                  _CompareTab(bottom: bottom),
-                  _ToolboxTab(
-                    key: _toolboxKey,
-                    bottom: bottom,
-                    onGoSchools: () {
-                      _tabController.animateTo(0);
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        _schoolKey.currentState?.openDecisionFilterSheet();
-                      });
-                    },
+      body: Stack(
+        children: [
+          SafeArea(
+            top: false,
+            child: Column(
+              children: [
+                _SchoolChannelHeader(
+                  controller: _tabController,
+                  onAiTap: _openDotChat,
+                  onSearchTap: _openSchoolSearch,
+                ),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      SchoolListScreen(key: _schoolKey),
+                      _CompareTab(bottom: bottom),
+                      _ToolboxTab(
+                        key: _toolboxKey,
+                        bottom: bottom,
+                        onGoSchools: () {
+                          _tabController.animateTo(0);
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            _schoolKey.currentState?.openDecisionFilterSheet();
+                          });
+                        },
+                      ),
+                    ],
                   ),
-                ],
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 22,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onHorizontalDragEnd: (details) {
+                final velocity = details.primaryVelocity ?? 0;
+                if (velocity > 320) _openDotChat();
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SchoolChannelHeader extends StatelessWidget {
+  final TabController controller;
+  final VoidCallback onAiTap;
+  final VoidCallback onSearchTap;
+
+  const _SchoolChannelHeader({
+    required this.controller,
+    required this.onAiTap,
+    required this.onSearchTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final dividerColor = context.artC.silver.withValues(alpha: 0.28);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: context.artC.cardIconBg,
+        border: Border(
+          bottom: BorderSide(
+            color: dividerColor,
+          ),
+        ),
+      ),
+      child: SafeArea(
+        top: true,
+        bottom: false,
+        child: SizedBox(
+          height: 62,
+          child: Row(
+            children: [
+              const SizedBox(width: 8),
+              _SchoolHeaderIconButton(
+                icon: Icons.chat_bubble_outline_rounded,
+                onTap: onAiTap,
+                tooltip: '问 Art Guide',
+              ),
+              Expanded(
+                child: Center(
+                  child: _SchoolChannelTabs(controller: controller),
+                ),
+              ),
+              _SchoolHeaderIconButton(
+                icon: Icons.search_rounded,
+                onTap: onSearchTap,
+                tooltip: '搜索院校',
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SchoolHeaderIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final String tooltip;
+
+  const _SchoolHeaderIconButton({
+    required this.icon,
+    required this.onTap,
+    required this.tooltip,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final iconColor = context.artC.ink.withValues(alpha: 0.84);
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(999),
+          child: SizedBox(
+            width: 36,
+            height: 36,
+            child: Icon(
+              icon,
+              size: 22,
+              color: iconColor,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SchoolChannelTabs extends StatelessWidget {
+  final TabController controller;
+
+  const _SchoolChannelTabs({required this.controller});
+
+  static const _labels = ['院校', '对比', '计划'];
+  static const _accent = Color(0xFFE64565);
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller.animation ?? controller,
+      builder: (context, _) {
+        final selected = controller.index;
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var index = 0; index < _labels.length; index++)
+              _SchoolChannelTab(
+                label: _labels[index],
+                selected: selected == index,
+                accent: _accent,
+                onTap: () => controller.animateTo(index),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _SchoolChannelTab extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final Color accent;
+  final VoidCallback onTap;
+
+  const _SchoolChannelTab({
+    required this.label,
+    required this.selected,
+    required this.accent,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor =
+        selected ? context.artC.ink : context.artC.ink.withValues(alpha: 0.42);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        width: 58,
+        height: 62,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SizedBox(height: 6),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: textColor,
+                fontSize: 16,
+                height: 1.08,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w400,
+                letterSpacing: 0,
+              ),
+            ),
+            const SizedBox(height: 7),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              width: selected ? (label.length > 2 ? 38 : 30) : 0,
+              height: 3.5,
+              decoration: BoxDecoration(
+                color: accent,
+                borderRadius: BorderRadius.circular(999),
               ),
             ),
           ],
@@ -1091,14 +1306,14 @@ class _CompareTabState extends State<_CompareTab> {
     setState(() => _comparing = true);
     try {
       final schoolIds = _selected.map(_schoolId).whereType<String>().toList();
-      
+
       // 验证所有 ID 都是有效的 UUID
       final uuidRegex = RegExp(
         r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
         caseSensitive: false,
       );
       final validIds = schoolIds.where((id) => uuidRegex.hasMatch(id)).toList();
-      
+
       if (validIds.length < 2) {
         if (!mounted) return;
         setState(() => _comparing = false);
@@ -1107,7 +1322,7 @@ class _CompareTabState extends State<_CompareTab> {
         );
         return;
       }
-      
+
       final report = await BackendApiService.compareSchools(
         schoolIds: validIds,
       );
@@ -3225,30 +3440,6 @@ class _InsightCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _NewsSegmentTabs extends StatelessWidget {
-  final TabController controller;
-
-  const _NewsSegmentTabs({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    const tabs = [
-      (label: '找院校', icon: Icons.school_outlined),
-      (label: '对比', icon: Icons.compare_arrows_rounded),
-      (label: '申请计划', icon: Icons.inventory_2_outlined),
-    ];
-
-    return ArtseeSegmentedTabs(
-      controller: controller,
-      tabs: tabs
-          .map((tab) => ArtseeSegmentTab(label: tab.label, icon: tab.icon))
-          .toList(),
-      labelFontSize: 10.5,
-      iconSize: 12.5,
     );
   }
 }

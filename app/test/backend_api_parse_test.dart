@@ -31,6 +31,21 @@ void main() {
     expect(p.auditReason, 'Ad/Suspected');
   });
 
+  test('AppCommunityPost.fromJson 兼容旧作品图片字段', () {
+    final p = AppCommunityPost.fromJson({
+      'id': 'a2',
+      'title': '旧作品动态',
+      'body': null,
+      'images': ['https://x.com/work.jpg'],
+      'like_count': 0,
+      'comment_count': 0,
+      'view_count': 0,
+      'created_at': '2026-01-01T00:00:00Z',
+    });
+
+    expect(p.imageUrls, ['https://x.com/work.jpg']);
+  });
+
   test('AppCommunityComment.fromJson 解析评论作者资料', () {
     final c = AppCommunityComment.fromJson({
       'id': 'c1',

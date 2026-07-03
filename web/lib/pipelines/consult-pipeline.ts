@@ -415,7 +415,7 @@ export async function* streamGenerate(
     maxTokens?: number;
   } = {}
 ): AsyncGenerator<{ text: string; done: boolean }> {
-  const { model = CHAT_MODEL, temperature = 0.7, maxTokens = 800 } = options;
+  const { model = CHAT_MODEL, temperature = 0.7, maxTokens = 1800 } = options;
 
   if (!CHAT_API_KEY) {
     throw new Error('Chat model API key is not configured');
@@ -471,9 +471,16 @@ export async function* streamGenerate(
 
           try {
             const parsed = JSON.parse(data);
-            const content = parsed.choices?.[0]?.delta?.content;
+            const choice = parsed.choices?.[0];
+            const content = choice?.delta?.content;
             if (content) {
               yield { text: content, done: false };
+            }
+            if (choice?.finish_reason === 'length') {
+              yield {
+                text: '\n\n（回答内容较长，已到达本轮输出上限。你可以回复“继续”，我会接着补完。）',
+                done: false,
+              };
             }
           } catch (e) {
             // Skip invalid JSON

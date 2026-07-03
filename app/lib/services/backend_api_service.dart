@@ -210,13 +210,29 @@ class BackendApiService {
         'offset': '$offset',
         if (kind != null) 'kind': kind,
       }),
-      headers: await _headers(),
+      headers: await _headers(withAuth: true),
     );
     final body = jsonDecode(r.body) as Map<String, dynamic>;
     if (r.statusCode != 200 || body['success'] != true) {
       throw Exception(body['error'] ?? 'community ${r.statusCode}');
     }
     final list = body['data'] as List<dynamic>? ?? [];
+    return list
+        .map((e) => AppCommunityPost.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  static Future<List<AppCommunityPost>> fetchSavedCommunityPosts({
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    final decoded = await _requestJson(
+      'GET',
+      '/api/v1/me/saved-community-posts',
+      withAuth: true,
+      query: {'limit': '$limit', 'offset': '$offset'},
+    );
+    final list = decoded['data'] as List<dynamic>? ?? [];
     return list
         .map((e) => AppCommunityPost.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -357,6 +373,34 @@ class BackendApiService {
     return (
       liked: data['liked'] as bool? ?? false,
       likeCount: data['like_count'] as int? ?? 0,
+    );
+  }
+
+  static Future<({bool saved, int saveCount})> saveCommunityPost(
+      String id) async {
+    final decoded = await _requestJson(
+      'POST',
+      '/api/v1/community/posts/$id/save',
+      withAuth: true,
+    );
+    final data = decoded['data'] as Map<String, dynamic>? ?? {};
+    return (
+      saved: data['saved'] as bool? ?? true,
+      saveCount: data['save_count'] as int? ?? 0,
+    );
+  }
+
+  static Future<({bool saved, int saveCount})> unsaveCommunityPost(
+      String id) async {
+    final decoded = await _requestJson(
+      'DELETE',
+      '/api/v1/community/posts/$id/save',
+      withAuth: true,
+    );
+    final data = decoded['data'] as Map<String, dynamic>? ?? {};
+    return (
+      saved: data['saved'] as bool? ?? false,
+      saveCount: data['save_count'] as int? ?? 0,
     );
   }
 
@@ -2114,6 +2158,49 @@ class BackendApiService {
       withAuth: true,
       body: {
         'target_user_id': targetUserId,
+        if (message != null && message.trim().isNotEmpty)
+          'message': message.trim(),
+      },
+    );
+    return decoded['data'] as Map<String, dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> createMyQrCode({
+    String type = 'user',
+    Map<String, dynamic>? metadata,
+  }) async {
+    final decoded = await _requestJson(
+      'POST',
+      '/api/v1/qr-codes',
+      withAuth: true,
+      body: {
+        'type': type,
+        if (metadata != null) 'metadata': metadata,
+      },
+    );
+    return decoded['data'] as Map<String, dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> resolveQrCode(String token) async {
+    final decoded = await _requestJson(
+      'GET',
+      '/api/v1/qr-codes/$token',
+      withAuth: Supabase.instance.client.auth.currentUser != null,
+    );
+    return decoded['data'] as Map<String, dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> performQrCodeAction({
+    required String token,
+    String? action,
+    String? message,
+  }) async {
+    final decoded = await _requestJson(
+      'POST',
+      '/api/v1/qr-codes/$token/action',
+      withAuth: true,
+      body: {
+        if (action != null) 'action': action,
         if (message != null && message.trim().isNotEmpty)
           'message': message.trim(),
       },

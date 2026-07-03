@@ -11,18 +11,17 @@ import '../../widgets/artsee_ui.dart';
 import '../../widgets/common.dart';
 import 'ask_question_screen.dart';
 import '../community/community_post_detail_screen.dart';
+import '../messages/add_friend_screen.dart';
 import '../messages/light_message_screen.dart';
 import '../profile/public_user_profile_screen.dart';
 import 'package:artsee_app/theme/artsee_ui_colors.dart';
 
 class ForumScreen extends StatefulWidget {
   final VoidCallback? onTabChanged;
-  final VoidCallback? onCreateCircle;
 
   const ForumScreen({
     super.key,
     this.onTabChanged,
-    this.onCreateCircle,
   });
 
   @override
@@ -30,27 +29,76 @@ class ForumScreen extends StatefulWidget {
 }
 
 class ForumScreenState extends State<ForumScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
+  static const int _tabCount = 1;
   late TabController _tabController;
-  final GlobalKey<_QaCommunityTabState> _qaKey =
-      GlobalKey<_QaCommunityTabState>();
-  final GlobalKey<_CircleTabState> _circleKey = GlobalKey<_CircleTabState>();
-  final GlobalKey<_SalonTabState> _salonKey = GlobalKey<_SalonTabState>();
+  final TextEditingController _searchController = TextEditingController();
   final GlobalKey<_ChatTabState> _chatKey = GlobalKey<_ChatTabState>();
-  final List<String> _searchKeywords = List.filled(4, '');
+  List<String> _searchKeywords = List.filled(
+    _tabCount,
+    '',
+    growable: true,
+  );
+  bool _searchExpanded = false;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
-    _tabController.addListener(_handleTabChanged);
+    _createTabController();
   }
 
   @override
   void dispose() {
     _tabController.removeListener(_handleTabChanged);
     _tabController.dispose();
+    _searchController.dispose();
     super.dispose();
+  }
+
+  void _createTabController({int initialIndex = 0}) {
+    _tabController = TabController(
+      length: _tabCount,
+      vsync: this,
+      initialIndex: initialIndex,
+    );
+    _tabController.addListener(_handleTabChanged);
+  }
+
+  void _ensureTabController() {
+    if (_tabController.length == _tabCount) return;
+    final currentIndex =
+        _tabController.index < _tabCount ? _tabController.index : _tabCount - 1;
+    final oldController = _tabController;
+    oldController.removeListener(_handleTabChanged);
+    _createTabController(initialIndex: currentIndex);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      oldController.dispose();
+    });
+  }
+
+  void _ensureSearchKeywords() {
+    if (_searchKeywords.length == _tabCount) return;
+    final next = List<String>.filled(_tabCount, '', growable: true);
+    for (var index = 0;
+        index < next.length && index < _searchKeywords.length;
+        index++) {
+      next[index] = _searchKeywords[index];
+    }
+    _searchKeywords = next;
+  }
+
+  int get _safeTabIndex {
+    const maxIndex = _tabCount - 1;
+    final index = _tabController.index;
+    if (index < 0) return 0;
+    if (index > maxIndex) return maxIndex;
+    return index;
+  }
+
+  String _searchKeywordAt(int index) {
+    _ensureSearchKeywords();
+    if (index < 0 || index >= _searchKeywords.length) return '';
+    return _searchKeywords[index];
   }
 
   void _handleTabChanged() {
@@ -58,126 +106,941 @@ class ForumScreenState extends State<ForumScreen>
     widget.onTabChanged?.call();
   }
 
-  int get activeTabIndex => _tabController.index;
+  int get activeTabIndex => _safeTabIndex;
 
-  String get searchKeyword => _searchKeywords[_tabController.index];
+  String get searchKeyword => _searchKeywordAt(_safeTabIndex);
 
-  String get searchHint => switch (_tabController.index) {
-        0 => '搜索问题、学校、作品集经验',
-        1 => '搜索圈子、专业方向、学校社群',
-        2 => '搜索活动、嘉宾、主题',
-        3 => '搜索联系人、合作消息、通知',
-        _ => '搜索社区内容',
+  String get searchHint => switch (_safeTabIndex) {
+        0 => '搜索消息、联系人、通知',
+        _ => '搜索消息',
       };
 
-  IconData get actionIcon => switch (_tabController.index) {
-        0 => Icons.question_answer_outlined,
-        1 => Icons.group_add_outlined,
-        2 => Icons.event_available_outlined,
-        3 => Icons.refresh_rounded,
+  IconData get actionIcon => switch (_safeTabIndex) {
+        0 => Icons.refresh_rounded,
         _ => Icons.add_rounded,
       };
 
   void applySearch(String keyword) {
-    setState(() => _searchKeywords[_tabController.index] = keyword.trim());
-  }
-
-  Future<void> openQuestionComposer({
-    String? initialTitle,
-    String? initialCategory,
-  }) async {
-    if (!await ensureLoggedIn(context, message: '请先登录后发布问题')) return;
-    final createdTitle = await Navigator.of(context).push<String?>(
-      MaterialPageRoute(
-        builder: (_) => AskQuestionScreen(
-          initialTitle: initialTitle,
-          initialCategory: initialCategory,
-          searchKeyword: searchKeyword,
-        ),
-      ),
-    );
-    if (!mounted || createdTitle == null) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _qaKey.currentState?._load();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('问题已发布，我们会推荐给相关方向用户'),
-        ),
+    final value = keyword.trim();
+    if (_searchController.text != value) {
+      _searchController.value = TextEditingValue(
+        text: value,
+        selection: TextSelection.collapsed(offset: value.length),
       );
-    });
+    }
+    setState(() => _searchKeywords[_safeTabIndex] = value);
   }
 
   void refreshActiveTab() {
-    switch (_tabController.index) {
+    switch (_safeTabIndex) {
       case 0:
-        _qaKey.currentState?._load();
-        break;
-      case 1:
-        _circleKey.currentState?._load();
-        break;
-      case 2:
-        _salonKey.currentState?._load();
-        break;
-      case 3:
         _chatKey.currentState?._load();
         break;
     }
   }
 
-  void addCreatedCircle(Map<String, dynamic> circle) {
-    _circleKey.currentState?.addCreatedCircle(circle);
+  void _toggleSearch() {
+    setState(() => _searchExpanded = !_searchExpanded);
   }
 
-  void openMyReservations() {
-    _salonKey.currentState?.openReservations();
+  void _closeSearch() {
+    applySearch('');
+    setState(() => _searchExpanded = false);
   }
 
-  void addCreatedSalon(Map<String, dynamic> salon) {
-    _salonKey.currentState?.addCreatedSalon(salon);
+  void _openFriendCandidates() {
+    _chatKey.currentState?._openFriendCandidates();
+  }
+
+  void _openCreateGroup() {
+    _chatKey.currentState?._openCreateGroupSheet();
+  }
+
+  void _openGroupPlaza() {
+    _chatKey.currentState?._openGroupPlazaSheet();
+  }
+
+  void _openScanEntry() {
+    _chatKey.currentState?._openScanEntrySheet();
+  }
+
+  void _showAddMenu() {
+    showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '关闭添加菜单',
+      barrierColor: Colors.black.withValues(alpha: 0.32),
+      transitionDuration: const Duration(milliseconds: 160),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        return _MessageAddMenuOverlay(
+          onDismiss: () => Navigator.of(dialogContext).pop(),
+          onCreateGroup: () => _closeAddMenuAndRun(
+            dialogContext,
+            _openCreateGroup,
+          ),
+          onGroupPlaza: () => _closeAddMenuAndRun(
+            dialogContext,
+            _openGroupPlaza,
+          ),
+          onAddFriend: () => _closeAddMenuAndRun(
+            dialogContext,
+            _openFriendCandidates,
+          ),
+          onScan: () => _closeAddMenuAndRun(
+            dialogContext,
+            _openScanEntry,
+          ),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return FadeTransition(
+          opacity: curved,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.96, end: 1).animate(curved),
+            alignment: Alignment.topRight,
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
+  void _closeAddMenuAndRun(BuildContext dialogContext, VoidCallback action) {
+    Navigator.of(dialogContext).pop();
+    Future<void>.delayed(const Duration(milliseconds: 90), () {
+      if (!mounted) return;
+      action();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    _ensureTabController();
+    _ensureSearchKeywords();
     final bottom = mainTabBottomInset(context);
     return Scaffold(
       backgroundColor: context.artC.porcelain,
       body: SafeArea(
-        top: false,
+        bottom: false,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 0),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: _SocialTabs(controller: _tabController),
+            _MessagePageHeader(
+              searchExpanded: _searchExpanded,
+              searchController: _searchController,
+              onSearchTap: _toggleSearch,
+              onSearchChanged: applySearch,
+              onSearchClose: _closeSearch,
+              onAddTap: _showAddMenu,
             ),
-            const SizedBox(height: 14),
             Expanded(
-              child: TabBarView(
-                controller: _tabController,
+              child: _ChatTab(
+                key: _chatKey,
+                bottom: bottom,
+                searchKeyword: _searchKeywordAt(0),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MessagePageHeader extends StatelessWidget {
+  final bool searchExpanded;
+  final TextEditingController searchController;
+  final VoidCallback onSearchTap;
+  final ValueChanged<String> onSearchChanged;
+  final VoidCallback onSearchClose;
+  final VoidCallback onAddTap;
+
+  const _MessagePageHeader({
+    required this.searchExpanded,
+    required this.searchController,
+    required this.onSearchTap,
+    required this.onSearchChanged,
+    required this.onSearchClose,
+    required this.onAddTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 180),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeOutCubic,
+        child: searchExpanded
+            ? SizedBox(
+                key: const ValueKey('message-search-mode'),
+                height: 44,
+                child: _MessageSearchField(
+                  controller: searchController,
+                  onChanged: onSearchChanged,
+                  onClose: onSearchClose,
+                ),
+              )
+            : SizedBox(
+                key: const ValueKey('message-title-mode'),
+                height: 44,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Center(
+                      child: Text(
+                        '消息',
+                        style: TextStyle(
+                          color: context.artC.ink,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      right: 0,
+                      child: Row(
+                        children: [
+                          _MessageHeaderIconButton(
+                            icon: Icons.search_rounded,
+                            tooltip: '搜索消息',
+                            onTap: onSearchTap,
+                          ),
+                          const SizedBox(width: 6),
+                          _MessageHeaderIconButton(
+                            icon: Icons.add_circle_outline_rounded,
+                            tooltip: '添加好友',
+                            onTap: onAddTap,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+      ),
+    );
+  }
+}
+
+class _MessageHeaderIconButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const _MessageHeaderIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: SizedBox(
+          width: 36,
+          height: 36,
+          child: Icon(
+            icon,
+            color: context.artC.ink.withValues(alpha: 0.82),
+            size: 22,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MessageSearchField extends StatelessWidget {
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClose;
+
+  const _MessageSearchField({
+    required this.controller,
+    required this.onChanged,
+    required this.onClose,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 40,
+            padding: const EdgeInsets.only(left: 13, right: 4),
+            decoration: BoxDecoration(
+              color: context.artC.silver.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.search_rounded,
+                  size: 19,
+                  color: context.artC.ink.withValues(alpha: 0.36),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: controller,
+                    autofocus: true,
+                    onChanged: onChanged,
+                    textInputAction: TextInputAction.search,
+                    cursorColor: kCobalt,
+                    style: TextStyle(
+                      color: context.artC.ink,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: '搜索联系人、合作、圈子、通知',
+                      hintStyle: TextStyle(
+                        color: context.artC.ink.withValues(alpha: 0.32),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      isCollapsed: true,
+                    ),
+                  ),
+                ),
+                ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: controller,
+                  builder: (context, value, _) {
+                    if (value.text.isEmpty) {
+                      return const SizedBox(width: 2);
+                    }
+                    return GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        controller.clear();
+                        onChanged('');
+                      },
+                      child: SizedBox(
+                        width: 34,
+                        height: 34,
+                        child: Icon(
+                          Icons.close_rounded,
+                          color: context.artC.ink.withValues(alpha: 0.42),
+                          size: 18,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onClose,
+          child: const SizedBox(
+            height: 40,
+            child: Center(
+              child: Text(
+                '取消',
+                maxLines: 1,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: kCobalt,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MessageAddMenuOverlay extends StatelessWidget {
+  final VoidCallback onDismiss;
+  final VoidCallback onCreateGroup;
+  final VoidCallback onGroupPlaza;
+  final VoidCallback onAddFriend;
+  final VoidCallback onScan;
+
+  const _MessageAddMenuOverlay({
+    required this.onDismiss,
+    required this.onCreateGroup,
+    required this.onGroupPlaza,
+    required this.onAddFriend,
+    required this.onScan,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final top = MediaQuery.paddingOf(context).top + 58;
+    return Material(
+      color: Colors.transparent,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: onDismiss,
+            ),
+          ),
+          Positioned(
+            top: top,
+            right: 18,
+            child: Container(
+              width: 162,
+              decoration: BoxDecoration(
+                color: context.artC.cardIconBg,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.07),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  _QaCommunityTab(
-                    key: _qaKey,
-                    bottom: bottom,
-                    searchKeyword: _searchKeywords[0],
-                    onAsk: openQuestionComposer,
+                  _MessageAddMenuItem(
+                    icon: Icons.add_comment_outlined,
+                    label: '创建群聊',
+                    onTap: onCreateGroup,
                   ),
-                  _CircleTab(
-                    key: _circleKey,
-                    bottom: bottom,
-                    searchKeyword: _searchKeywords[1],
-                    onCreateCircle: widget.onCreateCircle,
+                  const _MessageAddMenuDivider(),
+                  _MessageAddMenuItem(
+                    icon: Icons.groups_2_outlined,
+                    label: '群聊广场',
+                    onTap: onGroupPlaza,
                   ),
-                  _SalonTab(
-                    key: _salonKey,
-                    bottom: bottom,
-                    searchKeyword: _searchKeywords[2],
+                  const _MessageAddMenuDivider(),
+                  _MessageAddMenuItem(
+                    icon: Icons.person_add_alt_1_outlined,
+                    label: '添加好友',
+                    onTap: onAddFriend,
                   ),
-                  _ChatTab(
-                    key: _chatKey,
-                    bottom: bottom,
-                    searchKeyword: _searchKeywords[3],
+                  const _MessageAddMenuDivider(),
+                  _MessageAddMenuItem(
+                    icon: Icons.qr_code_scanner_rounded,
+                    label: '扫一扫',
+                    onTap: onScan,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MessageAddMenuItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _MessageAddMenuItem({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: SizedBox(
+        height: 50,
+        child: Row(
+          children: [
+            const SizedBox(width: 16),
+            Icon(
+              icon,
+              size: 22,
+              color: context.artC.ink.withValues(alpha: 0.82),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: context.artC.ink,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0,
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MessageAddMenuDivider extends StatelessWidget {
+  const _MessageAddMenuDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 52, right: 14),
+      child: Divider(
+        height: 1,
+        thickness: 1,
+        color: context.artC.silver.withValues(alpha: 0.38),
+      ),
+    );
+  }
+}
+
+class _CreateGroupPayload {
+  final String title;
+  final String scene;
+  final String visibility;
+  final String relatedTarget;
+  final String announcement;
+  final List<String> participantIds;
+
+  const _CreateGroupPayload({
+    required this.title,
+    required this.scene,
+    required this.visibility,
+    required this.relatedTarget,
+    required this.announcement,
+    required this.participantIds,
+  });
+}
+
+class _GroupSceneOption {
+  final String label;
+  final String subtitle;
+  final IconData icon;
+
+  const _GroupSceneOption({
+    required this.label,
+    required this.subtitle,
+    required this.icon,
+  });
+}
+
+const List<_GroupSceneOption> _groupSceneOptions = [
+  _GroupSceneOption(
+    label: '院校申请',
+    subtitle: '同校同专业申请交流',
+    icon: Icons.school_outlined,
+  ),
+  _GroupSceneOption(
+    label: '作品集互助',
+    subtitle: '项目反馈和进度互相督促',
+    icon: Icons.collections_bookmark_outlined,
+  ),
+  _GroupSceneOption(
+    label: '活动临时群',
+    subtitle: '展览、沙龙、开放日同行',
+    icon: Icons.event_available_outlined,
+  ),
+  _GroupSceneOption(
+    label: '合作项目',
+    subtitle: '找人共创、招募和委托沟通',
+    icon: Icons.handshake_outlined,
+  ),
+];
+
+class _CreateMessageGroupSheet extends StatefulWidget {
+  final List<Map<String, dynamic>> friends;
+  final Future<Map<String, dynamic>> Function(_CreateGroupPayload payload)
+      onCreate;
+  final VoidCallback onFindFriends;
+
+  const _CreateMessageGroupSheet({
+    required this.friends,
+    required this.onCreate,
+    required this.onFindFriends,
+  });
+
+  @override
+  State<_CreateMessageGroupSheet> createState() =>
+      _CreateMessageGroupSheetState();
+}
+
+class _CreateMessageGroupSheetState extends State<_CreateMessageGroupSheet> {
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _relatedController = TextEditingController();
+  final TextEditingController _announcementController = TextEditingController();
+  final Set<String> _selectedFriendIds = <String>{};
+  String _selectedScene = _groupSceneOptions.first.label;
+  String _visibility = '公开加入';
+  bool _busy = false;
+  String? _errorText;
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _relatedController.dispose();
+    _announcementController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_busy) return;
+    if (_selectedFriendIds.isEmpty) {
+      setState(() => _errorText = '至少选择 1 位好友；如果还没有好友，可以先从添加好友开始。');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _errorText = null;
+    });
+    final fallbackTitle = '$_selectedScene小组';
+    final title = _titleController.text.trim().isEmpty
+        ? fallbackTitle
+        : _titleController.text.trim();
+    try {
+      final conversation = await widget.onCreate(
+        _CreateGroupPayload(
+          title: title,
+          scene: _selectedScene,
+          visibility: _visibility,
+          relatedTarget: _relatedController.text.trim(),
+          announcement: _announcementController.text.trim(),
+          participantIds: _selectedFriendIds.toList(),
+        ),
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(conversation);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _errorText = '创建失败：$e';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.88,
+        ),
+        decoration: BoxDecoration(
+          color: context.artC.porcelain,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 10),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: context.artC.silver.withValues(alpha: 0.72),
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 14, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '创建群聊',
+                      style: TextStyle(
+                        color: context.artC.ink,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: '关闭',
+                    onPressed: _busy ? null : () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                children: [
+                  _MessageSheetTextField(
+                    controller: _titleController,
+                    label: '群聊名称',
+                    hint: '例如 RCA 申请互助小组',
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    '选择场景',
+                    style: TextStyle(
+                      color: context.artC.ink,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  GridView.count(
+                    crossAxisCount: 2,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisSpacing: 9,
+                    mainAxisSpacing: 9,
+                    childAspectRatio: 2.28,
+                    children: _groupSceneOptions
+                        .map(
+                          (option) => _GroupSceneTile(
+                            option: option,
+                            selected: option.label == _selectedScene,
+                            onTap: () =>
+                                setState(() => _selectedScene = option.label),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                  const SizedBox(height: 14),
+                  _MessageSegmentedChips(
+                    label: '加入方式',
+                    values: const ['公开加入', '邀请加入'],
+                    selected: _visibility,
+                    onChanged: (value) => setState(() => _visibility = value),
+                  ),
+                  const SizedBox(height: 14),
+                  _MessageSheetTextField(
+                    controller: _relatedController,
+                    label: '关联对象',
+                    hint: '学校、活动、机会或城市，可选',
+                  ),
+                  const SizedBox(height: 14),
+                  _MessageSheetTextField(
+                    controller: _announcementController,
+                    label: '群公告',
+                    hint: '写一句这个群适合谁、聊什么，可选',
+                    maxLines: 3,
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '选择好友',
+                          style: TextStyle(
+                            color: context.artC.ink,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '${_selectedFriendIds.length} 人',
+                        style: TextStyle(
+                          color: context.artC.ink.withValues(alpha: 0.42),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (widget.friends.isEmpty)
+                    Column(
+                      children: [
+                        const _MessageSheetNotice(
+                          icon: Icons.person_add_alt_1_outlined,
+                          title: '还没有可邀请的好友',
+                          subtitle: '先从右上角加号里的“添加好友”建立连接，再回来创建群聊。',
+                        ),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 42,
+                          child: OutlinedButton.icon(
+                            onPressed: _busy
+                                ? null
+                                : () {
+                                    Navigator.of(context).pop();
+                                    Future<void>.delayed(
+                                      const Duration(milliseconds: 90),
+                                      widget.onFindFriends,
+                                    );
+                                  },
+                            icon: const Icon(
+                              Icons.person_add_alt_1_outlined,
+                              size: 18,
+                            ),
+                            label: const Text('去添加好友'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: kCobalt,
+                              side: BorderSide(
+                                color: kCobalt.withValues(alpha: 0.36),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    ...widget.friends.map(
+                      (friend) {
+                        final id = _friendId(friend);
+                        if (id == null) return const SizedBox.shrink();
+                        final selected = _selectedFriendIds.contains(id);
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _GroupFriendTile(
+                            friend: friend,
+                            selected: selected,
+                            onTap: () {
+                              setState(() {
+                                if (selected) {
+                                  _selectedFriendIds.remove(id);
+                                } else {
+                                  _selectedFriendIds.add(id);
+                                }
+                                _errorText = null;
+                              });
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  if (_errorText != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      _errorText!,
+                      style: const TextStyle(
+                        color: Color(0xFFDC2626),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+              child: SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: FilledButton(
+                  onPressed: _busy ? null : _submit,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: kCobalt,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: _busy
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          '创建并进入群聊',
+                          style: TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GroupSceneTile extends StatelessWidget {
+  final _GroupSceneOption option;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _GroupSceneTile({
+    required this.option,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        decoration: BoxDecoration(
+          color: selected ? kCobalt.withValues(alpha: 0.08) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected
+                ? kCobalt.withValues(alpha: 0.5)
+                : context.artC.silver.withValues(alpha: 0.28),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              option.icon,
+              size: 20,
+              color:
+                  selected ? kCobalt : context.artC.ink.withValues(alpha: 0.6),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    option.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: context.artC.ink,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    option.subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: context.artC.ink.withValues(alpha: 0.42),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ],
               ),
@@ -185,6 +1048,900 @@ class ForumScreenState extends State<ForumScreen>
           ],
         ),
       ),
+    );
+  }
+}
+
+class _MessageSegmentedChips extends StatelessWidget {
+  final String label;
+  final List<String> values;
+  final String selected;
+  final ValueChanged<String> onChanged;
+
+  const _MessageSegmentedChips({
+    required this.label,
+    required this.values,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: context.artC.ink,
+            fontSize: 13,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: values
+              .map(
+                (value) => Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    selected: value == selected,
+                    label: Text(value),
+                    onSelected: (_) => onChanged(value),
+                    selectedColor: kCobalt.withValues(alpha: 0.12),
+                    backgroundColor: Colors.white,
+                    side: BorderSide(
+                      color: value == selected
+                          ? kCobalt.withValues(alpha: 0.48)
+                          : context.artC.silver.withValues(alpha: 0.3),
+                    ),
+                    labelStyle: TextStyle(
+                      color: value == selected ? kCobalt : context.artC.ink,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+      ],
+    );
+  }
+}
+
+class _MessageSheetTextField extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final String hint;
+  final int maxLines;
+
+  const _MessageSheetTextField({
+    required this.controller,
+    required this.label,
+    required this.hint,
+    this.maxLines = 1,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: context.artC.ink,
+            fontSize: 13,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          maxLines: maxLines,
+          minLines: maxLines,
+          cursorColor: kCobalt,
+          style: TextStyle(
+            color: context.artC.ink,
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+          ),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(
+              color: context.artC.ink.withValues(alpha: 0.32),
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: context.artC.silver.withValues(alpha: 0.28),
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: kCobalt.withValues(alpha: 0.54)),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MessageSheetNotice extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  const _MessageSheetNotice({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: context.artC.silver.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: kCobalt, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: context.artC.ink,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: context.artC.ink.withValues(alpha: 0.46),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GroupFriendTile extends StatelessWidget {
+  final Map<String, dynamic> friend;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _GroupFriendTile({
+    required this.friend,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final name = _friendName(friend);
+    final avatarUrl = _friendAvatarUrl(friend);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(11),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected
+                ? kCobalt.withValues(alpha: 0.48)
+                : context.artC.silver.withValues(alpha: 0.28),
+          ),
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: SizedBox(
+                width: 40,
+                height: 40,
+                child: avatarUrl.isNotEmpty
+                    ? Image.network(
+                        avatarUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            _FriendShortcutFallback(name: name),
+                      )
+                    : _FriendShortcutFallback(name: name),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: context.artC.ink,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    _friendRoleLabel(friend),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: context.artC.ink.withValues(alpha: 0.44),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              selected
+                  ? Icons.check_circle_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              color:
+                  selected ? kCobalt : context.artC.ink.withValues(alpha: 0.24),
+              size: 22,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GroupPlazaSheet extends StatefulWidget {
+  final void Function(
+    Map<String, dynamic> circle,
+    int index,
+    String joinStatus,
+  ) onOpenCircle;
+
+  const _GroupPlazaSheet({required this.onOpenCircle});
+
+  @override
+  State<_GroupPlazaSheet> createState() => _GroupPlazaSheetState();
+}
+
+class _GroupPlazaSheetState extends State<_GroupPlazaSheet> {
+  static const List<String> _filters = [
+    '推荐',
+    '院校',
+    '城市',
+    '专业',
+    '作品集',
+    '活动',
+    '合作',
+  ];
+
+  List<Map<String, dynamic>> _items = const [];
+  final Set<String> _joiningIds = <String>{};
+  String _selectedFilter = '推荐';
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final result = await BackendApiService.fetchCommunityCircles(limit: 40);
+      if (!mounted) return;
+      setState(() {
+        _items = result.data;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _joinCircle(Map<String, dynamic> circle, int index) async {
+    final status = _groupPlazaJoinStatus(circle);
+    if (status == 'joined') {
+      _openCircle(circle, index, status);
+      return;
+    }
+    if (status == 'pending') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('申请正在审核中')),
+      );
+      return;
+    }
+    final joinType = _circleJoinType(circle, index);
+    if (joinType == 'private') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('这个群暂时不可加入')),
+      );
+      return;
+    }
+    final loggedIn = await ensureLoggedIn(context, message: '请先登录后加入群聊');
+    if (!mounted || !loggedIn) return;
+    final id = circle['id']?.toString();
+    if (id == null || id.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('群聊资料缺少 ID，暂时无法加入')),
+      );
+      return;
+    }
+    setState(() => _joiningIds.add(id));
+    try {
+      final updated = await BackendApiService.joinCommunityCircle(id);
+      if (!mounted) return;
+      final nextStatus = updated['join_status']?.toString() ??
+          (joinType == 'approval' ? 'pending' : 'joined');
+      setState(() {
+        _joiningIds.remove(id);
+        if (index >= 0 && index < _items.length) {
+          _items[index] = {..._items[index], ...updated};
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(nextStatus == 'pending'
+              ? '申请已提交，审核通过后会通知你'
+              : '已加入「${circle['title'] ?? '群聊'}」'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _joiningIds.remove(id));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('加入失败：$e')),
+      );
+    }
+  }
+
+  void _openCircle(Map<String, dynamic> circle, int index, String status) {
+    Navigator.of(context).pop();
+    Future<void>.delayed(const Duration(milliseconds: 80), () {
+      widget.onOpenCircle(circle, index, status);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = _items.asMap().entries.where((entry) {
+      return _matchesGroupPlazaFilter(
+        entry.value,
+        entry.key,
+        _selectedFilter,
+      );
+    }).toList();
+
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.82,
+      ),
+      decoration: BoxDecoration(
+        color: context.artC.porcelain,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 10),
+          Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: context.artC.silver.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(99),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 14, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '群聊广场',
+                    style: TextStyle(
+                      color: context.artC.ink,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: '刷新',
+                  onPressed: _loading ? null : _load,
+                  icon: const Icon(Icons.refresh_rounded),
+                ),
+                IconButton(
+                  tooltip: '关闭',
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 38,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              itemCount: _filters.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, index) {
+                final filter = _filters[index];
+                final selected = filter == _selectedFilter;
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedFilter = filter),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: selected ? kCobalt : Colors.white,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: selected
+                            ? kCobalt
+                            : context.artC.silver.withValues(alpha: 0.32),
+                      ),
+                    ),
+                    child: Text(
+                      filter,
+                      style: TextStyle(
+                        color: selected ? Colors.white : context.artC.ink,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: Builder(
+              builder: (context) {
+                if (_loading) return const LoadingIndicator();
+                if (_error != null) {
+                  return _CommunityEmptyState(
+                    icon: Icons.groups_2_outlined,
+                    title: '群聊广场加载失败',
+                    subtitle: _error!,
+                    onRetry: _load,
+                  );
+                }
+                if (entries.isEmpty) {
+                  return _CommunityEmptyState(
+                    icon: Icons.groups_2_outlined,
+                    title: '暂无$_selectedFilter群聊',
+                    subtitle: '换个分类看看，或从创建群聊开始组织一个新的申请/合作小组。',
+                    onRetry: _load,
+                  );
+                }
+                return ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 22),
+                  itemCount: entries.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (_, visibleIndex) {
+                    final entry = entries[visibleIndex];
+                    final circle = entry.value;
+                    final id = circle['id']?.toString() ?? '$visibleIndex';
+                    final status = _groupPlazaJoinStatus(circle);
+                    return _GroupPlazaCard(
+                      circle: circle,
+                      index: entry.key,
+                      status: status,
+                      busy: _joiningIds.contains(id),
+                      onOpen: () => _openCircle(circle, entry.key, status),
+                      onJoin: () => _joinCircle(circle, entry.key),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GroupPlazaCard extends StatelessWidget {
+  final Map<String, dynamic> circle;
+  final int index;
+  final String status;
+  final bool busy;
+  final VoidCallback onOpen;
+  final VoidCallback onJoin;
+
+  const _GroupPlazaCard({
+    required this.circle,
+    required this.index,
+    required this.status,
+    required this.busy,
+    required this.onOpen,
+    required this.onJoin,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final title = circle['title']?.toString().trim().isNotEmpty == true
+        ? circle['title'].toString().trim()
+        : '艺术申请交流群';
+    final subtitle = circle['subtitle']?.toString().trim().isNotEmpty == true
+        ? circle['subtitle'].toString().trim()
+        : _groupPlazaSubtitle(circle, index);
+    final tags = _circleTags(circle, index);
+    final members = int.tryParse(circle['member_count']?.toString() ?? '') ??
+        (24 + index * 7);
+    final discussions =
+        int.tryParse(circle['today_post_count']?.toString() ?? '') ??
+            (3 + index);
+    final actionLabel = _groupPlazaActionLabel(circle, index, status);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: context.artC.silver.withValues(alpha: 0.24)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: _groupPlazaColor(index).withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(
+              _groupPlazaIcon(circle, index),
+              color: _groupPlazaColor(index),
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onOpen,
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: context.artC.ink,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: context.artC.ink.withValues(alpha: 0.48),
+                    fontSize: 11,
+                    height: 1.3,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 5,
+                  children:
+                      tags.take(3).map((tag) => _MiniTag(label: tag)).toList(),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '$members 人 · 今日 $discussions 条讨论',
+                  style: TextStyle(
+                    color: context.artC.ink.withValues(alpha: 0.36),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 72,
+            height: 34,
+            child: FilledButton(
+              onPressed: busy ? null : onJoin,
+              style: FilledButton.styleFrom(
+                backgroundColor: status == 'joined'
+                    ? context.artC.cardIconBg
+                    : status == 'pending'
+                        ? context.artC.silver.withValues(alpha: 0.5)
+                        : kCobalt,
+                foregroundColor:
+                    status == 'joined' ? context.artC.ink : Colors.white,
+                padding: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                elevation: 0,
+              ),
+              child: busy
+                  ? const SizedBox(
+                      width: 15,
+                      height: 15,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Text(
+                      actionLabel,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScanEntrySheet extends StatelessWidget {
+  const _ScanEntrySheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: context.artC.porcelain,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 10),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: context.artC.silver.withValues(alpha: 0.72),
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 14, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '扫一扫',
+                      style: TextStyle(
+                        color: context.artC.ink,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: '关闭',
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 22),
+              child: Column(
+                children: [
+                  _ScanEntryCard(
+                    icon: Icons.badge_outlined,
+                    title: '扫个人名片',
+                    subtitle: '添加好友、查看作品主页和申请背景',
+                  ),
+                  SizedBox(height: 10),
+                  _ScanEntryCard(
+                    icon: Icons.groups_2_outlined,
+                    title: '扫群邀请',
+                    subtitle: '加入院校申请、作品集互助或合作项目群',
+                  ),
+                  SizedBox(height: 10),
+                  _ScanEntryCard(
+                    icon: Icons.event_available_outlined,
+                    title: '活动签到',
+                    subtitle: '展览、沙龙、开放日现场签到和资料领取',
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ScanEntryCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  const _ScanEntryCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$title 功能正在接入二维码识别')),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border:
+              Border.all(color: context.artC.silver.withValues(alpha: 0.28)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: kCobalt.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: kCobalt, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: context.artC.ink,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: context.artC.ink.withValues(alpha: 0.48),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: context.artC.ink.withValues(alpha: 0.24),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class CommunityCircleSurface extends StatefulWidget {
+  final double bottom;
+  final String searchKeyword;
+  final VoidCallback? onCreateCircle;
+  final Future<void> Function({
+    String? initialTitle,
+    String? initialCategory,
+  })? onAsk;
+
+  const CommunityCircleSurface({
+    super.key,
+    required this.bottom,
+    required this.searchKeyword,
+    this.onCreateCircle,
+    this.onAsk,
+  });
+
+  @override
+  State<CommunityCircleSurface> createState() => CommunityCircleSurfaceState();
+}
+
+class CommunityCircleSurfaceState extends State<CommunityCircleSurface> {
+  final GlobalKey<_CircleTabState> _circleKey = GlobalKey<_CircleTabState>();
+  final GlobalKey<_QaCommunityTabState> _qaKey =
+      GlobalKey<_QaCommunityTabState>();
+
+  void refresh() {
+    _qaKey.currentState?._load();
+    _circleKey.currentState?._load();
+  }
+
+  void addCreatedCircle(Map<String, dynamic> circle) {
+    _circleKey.currentState?.addCreatedCircle(circle);
+    _qaKey.currentState?._load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final onAsk = widget.onAsk;
+    if (onAsk != null) {
+      return _QaCommunityTab(
+        key: _qaKey,
+        bottom: widget.bottom,
+        searchKeyword: widget.searchKeyword,
+        onAsk: onAsk,
+      );
+    }
+
+    return _CircleTab(
+      key: _circleKey,
+      bottom: widget.bottom,
+      searchKeyword: widget.searchKeyword,
+      onCreateCircle: widget.onCreateCircle,
+      onAsk: widget.onAsk,
     );
   }
 }
@@ -211,11 +1968,27 @@ class _QaCommunityTab extends StatefulWidget {
 class _QaCommunityTabState extends State<_QaCommunityTab> {
   List<AppCommunityHotTopic> _hotTopics = const [];
   List<AppCommunityPost> _posts = const [];
+  List<Map<String, dynamic>> _circles = const [];
+  final Map<String, String> _circleJoinStatusOverrides = {};
+  final Set<String> _joiningCircleIds = <String>{};
   bool _hotTopicsLoading = true;
   bool _postsLoading = true;
+  bool _circlesLoading = true;
   String? _hotTopicsError;
   String? _postsError;
-  String? _selectedBlock;
+  String? _circlesError;
+  String _selectedFilter = '推荐';
+
+  static const filters = [
+    '推荐',
+    '已加入',
+    '留学',
+    '作品集',
+    '院校',
+    '同城',
+    '就业',
+    '市场',
+  ];
 
   static const blocks = [
     (
@@ -252,9 +2025,32 @@ class _QaCommunityTabState extends State<_QaCommunityTab> {
 
   Future<void> _load() async {
     await Future.wait([
+      _loadCircles(),
       _loadHotTopics(),
       _loadPosts(),
     ]);
+  }
+
+  Future<void> _loadCircles() async {
+    setState(() {
+      _circlesLoading = true;
+      _circlesError = null;
+    });
+    try {
+      final result = await BackendApiService.fetchCommunityCircles(limit: 40);
+      if (!mounted) return;
+      setState(() {
+        _circles = result.data;
+        _circlesLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _circles = const [];
+        _circlesError = e.toString();
+        _circlesLoading = false;
+      });
+    }
   }
 
   Future<void> _loadHotTopics() async {
@@ -308,14 +2104,506 @@ class _QaCommunityTabState extends State<_QaCommunityTab> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredByBlock = _selectedBlock == null
+    final filteredByBlock = _hotTopics.where(_matchesHotTopicFilter).toList();
+    final visibleHotTopics = widget.searchKeyword.isEmpty
+        ? filteredByBlock
+        : filteredByBlock
+            .where((topic) => _matchesSearch(
+                  [
+                    topic.title,
+                    topic.category,
+                    topic.tag,
+                    topic.metadata['theme']?.toString() ?? '',
+                    ...topic.answers.map(
+                      (answer) => '${answer.stance} ${answer.content}',
+                    ),
+                  ].join(' '),
+                  widget.searchKeyword,
+                ))
+            .toList();
+    final filteredPostsByBlock = _posts.where(_matchesPostFilter).toList();
+    final visiblePosts = widget.searchKeyword.isEmpty
+        ? filteredPostsByBlock
+        : filteredPostsByBlock
+            .where((post) => _matchesSearch(
+                  [
+                    post.title,
+                    post.body ?? '',
+                    _postCategory(post),
+                    post.metadata['school']?.toString() ?? '',
+                    post.metadata['program']?.toString() ?? '',
+                    post.metadata['source_circle']?.toString() ?? '',
+                  ].join(' '),
+                  widget.searchKeyword,
+                ))
+            .toList();
+    final visibleCircleEntries = _visibleCircleEntries();
+    final showQuestionPosts =
+        _postsLoading || _postsError != null || visiblePosts.isNotEmpty;
+    return ListView(
+      padding: EdgeInsets.fromLTRB(20, 0, 20, widget.bottom + 32),
+      children: [
+        _PillFilterRow(
+          values: filters,
+          selected: _selectedFilter,
+          onSelected: (value) => setState(() => _selectedFilter = value),
+        ),
+        const SizedBox(height: 12),
+        _QuickAskCard(
+          onAsk: () => widget.onAsk(initialCategory: _questionInitialCategory),
+        ),
+        if (showQuestionPosts) ...[
+          const SizedBox(height: 18),
+          _QuestionPostStrip(
+            posts: visiblePosts,
+            loading: _postsLoading,
+            error: _postsError,
+            onRetry: _loadPosts,
+            onOpen: _openQuestionPost,
+          ),
+        ],
+        const SizedBox(height: 18),
+        _HotTopicStrip(
+          topics: visibleHotTopics,
+          loading: _hotTopicsLoading,
+          error: _hotTopicsError,
+          onRetry: _load,
+          onTopicOpen: _openHotTopicDiscussion,
+          onTopicAsk: _openHotTopicAsk,
+        ),
+        const SizedBox(height: 18),
+        _RelatedCircleStrip(
+          entries: visibleCircleEntries,
+          loading: _circlesLoading,
+          error: _circlesError,
+          selectedFilter: _selectedFilter,
+          joiningIds: _joiningCircleIds,
+          statusFor: _circleJoinStatus,
+          onRetry: _loadCircles,
+          onOpen: _openCircleDetail,
+          onJoin: _handleCircleAction,
+        ),
+      ],
+    );
+  }
+
+  String? get _questionInitialCategory => switch (_selectedFilter) {
+        '留学' || '院校' => '艺术留学',
+        '作品集' => '作品集',
+        '就业' => '行业就业',
+        '市场' => '艺术市场',
+        _ => null,
+      };
+
+  bool _matchesHotTopicFilter(AppCommunityHotTopic topic) {
+    if (_selectedFilter == '推荐') return true;
+    final text = [
+      topic.title,
+      topic.category,
+      topic.tag,
+      topic.metadata['theme']?.toString() ?? '',
+      topic.metadata['source_circle']?.toString() ?? '',
+      ...topic.answers.map((answer) => '${answer.stance} ${answer.content}'),
+    ].join(' ');
+    if (_selectedFilter == '已加入') {
+      return topic.isPinned || _matchesQaFilterText(text);
+    }
+    return _matchesQaFilterText(text);
+  }
+
+  bool _matchesPostFilter(AppCommunityPost post) {
+    if (_selectedFilter == '推荐') return true;
+    final sourceCircle = post.metadata['source_circle']?.toString() ?? '';
+    final text = [
+      post.title,
+      post.body ?? '',
+      _postCategory(post),
+      post.metadata['school']?.toString() ?? '',
+      post.metadata['program']?.toString() ?? '',
+      sourceCircle,
+    ].join(' ');
+    if (_selectedFilter == '已加入') {
+      return sourceCircle.isNotEmpty || _matchesQaFilterText(text);
+    }
+    return _matchesQaFilterText(text);
+  }
+
+  List<MapEntry<int, Map<String, dynamic>>> _visibleCircleEntries() {
+    return _circles.asMap().entries.where((entry) {
+      final index = entry.key;
+      final circle = entry.value;
+      if (!_matchesCircleFilter(circle, index)) return false;
+      if (widget.searchKeyword.isEmpty) return true;
+      return _matchesSearch(
+        _groupPlazaSearchText(circle, index),
+        widget.searchKeyword,
+      );
+    }).toList();
+  }
+
+  bool _matchesCircleFilter(Map<String, dynamic> circle, int index) {
+    if (_selectedFilter == '推荐') return true;
+    if (_selectedFilter == '已加入') {
+      return _circleJoinStatus(circle, index) == 'joined';
+    }
+    return _matchesQaFilterText(_groupPlazaSearchText(circle, index));
+  }
+
+  bool _matchesQaFilterText(String text) {
+    final normalized = text.toLowerCase();
+    return switch (_selectedFilter) {
+      '已加入' => _containsAny(normalized, ['圈', '社', '校友', '同学', '研习']),
+      '留学' => _containsAny(
+          normalized,
+          [
+            '留学',
+            '申请',
+            '院校',
+            'ual',
+            'rca',
+            'risd',
+            'parsons',
+            'sva',
+            'bu',
+            'neu',
+            'school',
+            'college',
+          ],
+        ),
+      '作品集' => _containsAny(
+          normalized,
+          ['作品集', 'portfolio', '项目', '叙事', '诊断', '反馈'],
+        ),
+      '院校' => _containsAny(
+          normalized,
+          [
+            '院校',
+            '学校',
+            '专业',
+            '申请',
+            '留学',
+            'ual',
+            'rca',
+            'risd',
+            'parsons',
+            'sva',
+            'bu',
+            'neu',
+            'university',
+            'college',
+            'school',
+          ],
+        ),
+      '同城' => _containsAny(
+          normalized,
+          [
+            '同城',
+            '城市',
+            '上海',
+            '北京',
+            '伦敦',
+            '纽约',
+            '波士顿',
+            '广州',
+            '深圳',
+            'city',
+          ],
+        ),
+      '就业' => _containsAny(
+          normalized,
+          ['就业', '实习', '职业', '岗位', 'career', 'job', '导师', '行业'],
+        ),
+      '市场' => _containsAny(
+          normalized,
+          ['市场', '展览', '收藏', '画廊', '策展', '品牌', '委托', 'market'],
+        ),
+      _ => true,
+    };
+  }
+
+  bool _containsAny(String text, List<String> keywords) =>
+      keywords.any((keyword) => text.contains(keyword.toLowerCase()));
+
+  String _postCategory(AppCommunityPost post) =>
+      post.metadata['category']?.toString() ?? '艺术留学';
+
+  String _circleId(Map<String, dynamic> circle, int index) =>
+      circle['id']?.toString() ?? '${circle['title'] ?? 'circle'}-$index';
+
+  String _circleJoinStatus(Map<String, dynamic> circle, int index) {
+    final override = _circleJoinStatusOverrides[_circleId(circle, index)];
+    if (override != null) return override;
+    return _groupPlazaJoinStatus(circle);
+  }
+
+  void _openQuestionPost(AppCommunityPost post) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CommunityPostDetailScreen(
+          postId: post.id,
+          initialPost: post,
+        ),
+      ),
+    );
+  }
+
+  void _openHotTopicDiscussion(AppCommunityHotTopic topic) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => _HotTopicDiscussionScreen(
+          topic: topic,
+          onAsk: () => _openHotTopicAsk(topic),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openHotTopicAsk(AppCommunityHotTopic topic) {
+    return widget.onAsk(
+      initialTitle: topic.title,
+      initialCategory: topic.category,
+    );
+  }
+
+  Future<void> _handleCircleAction(
+    Map<String, dynamic> circle,
+    int index,
+  ) async {
+    final status = _circleJoinStatus(circle, index);
+    if (status == 'joined') {
+      _openCircleDetail(circle, index);
+      return;
+    }
+    if (status == 'pending') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('申请正在审核中')),
+      );
+      return;
+    }
+    final joinType = _circleJoinType(circle, index);
+    if (joinType == 'private') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('这个圈子暂时不可加入')),
+      );
+      return;
+    }
+    final loggedIn = await ensureLoggedIn(context, message: '请先登录后加入圈子');
+    if (!mounted || !loggedIn) return;
+    final id = circle['id']?.toString();
+    if (id == null || id.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('圈子资料缺少 ID，暂时无法加入')),
+      );
+      return;
+    }
+    setState(() => _joiningCircleIds.add(id));
+    try {
+      final updated = await BackendApiService.joinCommunityCircle(id);
+      if (!mounted) return;
+      final nextStatus = updated['join_status']?.toString() ??
+          (joinType == 'approval' ? 'pending' : 'joined');
+      setState(() {
+        _joiningCircleIds.remove(id);
+        _circleJoinStatusOverrides[_circleId(circle, index)] = nextStatus;
+        if (index >= 0 && index < _circles.length) {
+          _circles[index] = {..._circles[index], ...updated};
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(nextStatus == 'pending'
+              ? '申请已提交，审核通过后会通知你'
+              : '已加入「${circle['title'] ?? '艺术圈子'}」'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _joiningCircleIds.remove(id));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('加入失败：$e')),
+      );
+    }
+  }
+
+  void _openCircleDetail(Map<String, dynamic> circle, int index) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CircleDetailScreen(
+          circle: circle,
+          index: index,
+          joinStatus: _circleJoinStatus(circle, index),
+          onJoinChanged: (status) {
+            setState(() {
+              _circleJoinStatusOverrides[_circleId(circle, index)] = status;
+              if (index >= 0 && index < _circles.length) {
+                _circles[index] = {..._circles[index], 'join_status': status};
+              }
+            });
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _CircleTab extends StatefulWidget {
+  final double bottom;
+  final String searchKeyword;
+  final VoidCallback? onCreateCircle;
+  final Future<void> Function({
+    String? initialTitle,
+    String? initialCategory,
+  })? onAsk;
+
+  const _CircleTab({
+    super.key,
+    required this.bottom,
+    required this.searchKeyword,
+    this.onCreateCircle,
+    this.onAsk,
+  });
+
+  @override
+  State<_CircleTab> createState() => _CircleTabState();
+}
+
+class _CircleTabState extends State<_CircleTab> {
+  List<Map<String, dynamic>> _items = const [];
+  List<AppCommunityHotTopic> _hotTopics = const [];
+  List<AppCommunityPost> _posts = const [];
+  final Map<String, String> _joinStatusOverrides = {};
+  bool _loading = true;
+  bool _hotTopicsLoading = true;
+  bool _postsLoading = true;
+  String? _error;
+  String? _hotTopicsError;
+  String? _postsError;
+  String _selectedFilter = '推荐';
+  String? _selectedBlock;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    await Future.wait([
+      _loadCircles(),
+      _loadHotTopics(),
+      _loadPosts(),
+    ]);
+  }
+
+  Future<void> _loadCircles() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final result = await BackendApiService.fetchCommunityCircles(limit: 40);
+      if (!mounted) return;
+      setState(() {
+        _items = result.data;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _loadHotTopics() async {
+    setState(() {
+      _hotTopicsLoading = true;
+      _hotTopicsError = null;
+    });
+    try {
+      final hotTopics = await BackendApiService.fetchCommunityHotTopics(
+        limit: 30,
+      );
+      if (!mounted) return;
+      setState(() {
+        _hotTopics = hotTopics;
+        _hotTopicsLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _hotTopics = const [];
+        _hotTopicsError = e.toString();
+        _hotTopicsLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadPosts() async {
+    setState(() {
+      _postsLoading = true;
+      _postsError = null;
+    });
+    try {
+      final posts = await BackendApiService.fetchCommunityPosts(
+        limit: 30,
+        kind: 'qa',
+      );
+      if (!mounted) return;
+      setState(() {
+        _posts = posts;
+        _postsLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _posts = const [];
+        _postsError = e.toString();
+        _postsLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const LoadingIndicator();
+    if (_error != null) {
+      return ListView(
+        padding: EdgeInsets.fromLTRB(20, 0, 20, widget.bottom + 32),
+        children: [
+          _CommunityEmptyState(
+            icon: Icons.groups_outlined,
+            title: '圈子加载失败',
+            subtitle: _error!,
+            onRetry: _load,
+          ),
+        ],
+      );
+    }
+    final searchItems = widget.searchKeyword.isEmpty
+        ? _items
+        : _items
+            .where((circle) => _matchesSearch(
+                  '${circle['title'] ?? ''} ${circle['subtitle'] ?? ''} ${circle['category'] ?? ''}',
+                  widget.searchKeyword,
+                ))
+            .toList();
+    final visibleItems = _filterCircles(searchItems);
+    final joinedItems = _items
+        .asMap()
+        .entries
+        .where((entry) => _circleJoinStatus(entry.value, entry.key) == 'joined')
+        .map((entry) => entry.value)
+        .toList();
+    final filteredHotTopicsByBlock = _selectedBlock == null
         ? _hotTopics
         : _hotTopics
             .where((topic) => topic.category == _selectedBlock)
             .toList();
     final visibleHotTopics = widget.searchKeyword.isEmpty
-        ? filteredByBlock
-        : filteredByBlock
+        ? filteredHotTopicsByBlock
+        : filteredHotTopicsByBlock
             .where((topic) => _matchesSearch(
                   [
                     topic.title,
@@ -349,173 +2637,6 @@ class _QaCommunityTabState extends State<_QaCommunityTab> {
                   widget.searchKeyword,
                 ))
             .toList();
-    return ListView(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, widget.bottom + 32),
-      children: [
-        _QuickAskCard(
-          onAsk: () => widget.onAsk(initialCategory: _selectedBlock),
-        ),
-        const SizedBox(height: 14),
-        const _CommunitySectionHeader(title: '问题方向', action: 'FILTER'),
-        const SizedBox(height: 10),
-        _BlockChipStrip(
-          blocks: blocks,
-          selectedBlock: _selectedBlock,
-          onSelected: (block) {
-            setState(() {
-              _selectedBlock = _selectedBlock == block ? null : block;
-            });
-          },
-        ),
-        const SizedBox(height: 22),
-        _HotTopicStrip(
-          topics: visibleHotTopics,
-          loading: _hotTopicsLoading,
-          error: _hotTopicsError,
-          onRetry: _load,
-          onTopicOpen: _openHotTopicDiscussion,
-          onTopicAsk: _openHotTopicAsk,
-        ),
-        const SizedBox(height: 18),
-        _QuestionPostStrip(
-          posts: visiblePosts,
-          loading: _postsLoading,
-          error: _postsError,
-          onRetry: _loadPosts,
-          onOpen: _openQuestionPost,
-        ),
-      ],
-    );
-  }
-
-  String _postCategory(AppCommunityPost post) =>
-      post.metadata['category']?.toString() ?? '艺术留学';
-
-  void _openQuestionPost(AppCommunityPost post) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => CommunityPostDetailScreen(
-          postId: post.id,
-          initialPost: post,
-        ),
-      ),
-    );
-  }
-
-  void _openHotTopicDiscussion(AppCommunityHotTopic topic) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => _HotTopicDiscussionScreen(
-          topic: topic,
-          onAsk: () => _openHotTopicAsk(topic),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _openHotTopicAsk(AppCommunityHotTopic topic) {
-    return widget.onAsk(
-      initialTitle: topic.title,
-      initialCategory: topic.category,
-    );
-  }
-}
-
-class _CircleTab extends StatefulWidget {
-  final double bottom;
-  final String searchKeyword;
-  final VoidCallback? onCreateCircle;
-
-  const _CircleTab({
-    super.key,
-    required this.bottom,
-    required this.searchKeyword,
-    this.onCreateCircle,
-  });
-
-  @override
-  State<_CircleTab> createState() => _CircleTabState();
-}
-
-class _CircleTabState extends State<_CircleTab> {
-  List<Map<String, dynamic>> _items = const [];
-  final Map<String, String> _joinStatusOverrides = {};
-  bool _loading = true;
-  String? _error;
-  String _selectedFilter = '推荐';
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final result = await BackendApiService.fetchCommunityCircles(limit: 40);
-      if (!mounted) return;
-      setState(() {
-        _items = result.data;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_loading) return const LoadingIndicator();
-    if (_error != null) {
-      return ListView(
-        padding: EdgeInsets.fromLTRB(20, 0, 20, widget.bottom + 32),
-        children: [
-          _CommunityEmptyState(
-            icon: Icons.groups_outlined,
-            title: '圈子加载失败',
-            subtitle: _error!,
-            onRetry: _load,
-          ),
-        ],
-      );
-    }
-    if (_items.isEmpty) {
-      return ListView(
-        padding: EdgeInsets.fromLTRB(20, 0, 20, widget.bottom + 32),
-        children: [
-          _CommunityEmptyState(
-            icon: Icons.groups_outlined,
-            title: '还没有圈子',
-            subtitle: '根据你的方向创建或加入第一个艺术社群。',
-            actionLabel: '刷新圈子',
-            onRetry: _load,
-          ),
-        ],
-      );
-    }
-    final searchItems = widget.searchKeyword.isEmpty
-        ? _items
-        : _items
-            .where((circle) => _matchesSearch(
-                  '${circle['title'] ?? ''} ${circle['subtitle'] ?? ''} ${circle['category'] ?? ''}',
-                  widget.searchKeyword,
-                ))
-            .toList();
-    final visibleItems = _filterCircles(searchItems);
-    final joinedItems = _items
-        .asMap()
-        .entries
-        .where((entry) => _circleJoinStatus(entry.value, entry.key) == 'joined')
-        .map((entry) => entry.value)
-        .toList();
 
     return ListView(
       padding: EdgeInsets.fromLTRB(20, 0, 20, widget.bottom + 72),
@@ -529,6 +2650,41 @@ class _CircleTabState extends State<_CircleTab> {
           },
         ),
         const SizedBox(height: 18),
+        if (widget.onAsk != null) ...[
+          _QuickAskCard(
+            onAsk: () => widget.onAsk?.call(initialCategory: _selectedBlock),
+          ),
+          const SizedBox(height: 14),
+        ],
+        const _CommunitySectionHeader(title: '圈内问答', action: 'QA'),
+        const SizedBox(height: 10),
+        _BlockChipStrip(
+          blocks: _QaCommunityTabState.blocks,
+          selectedBlock: _selectedBlock,
+          onSelected: (block) {
+            setState(() {
+              _selectedBlock = _selectedBlock == block ? null : block;
+            });
+          },
+        ),
+        const SizedBox(height: 18),
+        _HotTopicStrip(
+          topics: visibleHotTopics,
+          loading: _hotTopicsLoading,
+          error: _hotTopicsError,
+          onRetry: _loadHotTopics,
+          onTopicOpen: _openHotTopicDiscussion,
+          onTopicAsk: _openHotTopicAsk,
+        ),
+        const SizedBox(height: 18),
+        _QuestionPostStrip(
+          posts: visiblePosts,
+          loading: _postsLoading,
+          error: _postsError,
+          onRetry: _loadPosts,
+          onOpen: _openQuestionPost,
+        ),
+        const SizedBox(height: 22),
         _PillFilterRow(
           values: const ['推荐', '已加入', '留学', '作品集', '同城', '就业', '市场'],
           selected: _selectedFilter,
@@ -586,6 +2742,40 @@ class _CircleTabState extends State<_CircleTab> {
             },
           ),
       ],
+    );
+  }
+
+  String _postCategory(AppCommunityPost post) =>
+      post.metadata['category']?.toString() ?? '艺术留学';
+
+  void _openQuestionPost(AppCommunityPost post) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CommunityPostDetailScreen(
+          postId: post.id,
+          initialPost: post,
+        ),
+      ),
+    );
+  }
+
+  void _openHotTopicDiscussion(AppCommunityHotTopic topic) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => _HotTopicDiscussionScreen(
+          topic: topic,
+          onAsk: () => _openHotTopicAsk(topic),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openHotTopicAsk(AppCommunityHotTopic topic) {
+    final onAsk = widget.onAsk;
+    if (onAsk == null) return Future<void>.value();
+    return onAsk(
+      initialTitle: topic.title,
+      initialCategory: topic.category,
     );
   }
 
@@ -1028,14 +3218,10 @@ class _ChatTab extends StatefulWidget {
 
 class _ChatTabState extends State<_ChatTab> {
   List<Map<String, dynamic>> _items = const [];
-  List<Map<String, dynamic>> _friends = const [];
   bool _loading = true;
   bool _imConnecting = false;
-  bool _imReady = false;
   String? _error;
-  String? _imStatusText;
   String _selectedFilter = '全部';
-  String? _openingFriendId;
 
   @override
   void initState() {
@@ -1051,16 +3237,9 @@ class _ChatTabState extends State<_ChatTab> {
     });
     try {
       final result = await BackendApiService.fetchConversations(limit: 30);
-      var friends = const <Map<String, dynamic>>[];
-      try {
-        friends = await BackendApiService.fetchFriends(limit: 30);
-      } catch (e) {
-        debugPrint('Friend shortcuts not loaded: $e');
-      }
       if (!mounted) return;
       setState(() {
         _items = result.data;
-        _friends = friends;
         _loading = false;
       });
     } catch (e) {
@@ -1080,58 +3259,29 @@ class _ChatTabState extends State<_ChatTab> {
   Future<void> _warmTencentIm() async {
     if (_imConnecting) return;
     if (!SupabaseService.isLoggedIn) {
-      if (!mounted) return;
-      setState(() {
-        _imReady = false;
-        _imStatusText = '登录后启用腾讯云即时通讯';
-      });
       return;
     }
 
-    setState(() {
-      _imConnecting = true;
-      _imStatusText = '正在连接腾讯云 IM...';
-    });
+    setState(() => _imConnecting = true);
     try {
-      final state = await TencentImService.ensureLoggedIn();
+      await TencentImService.ensureLoggedIn();
       if (!mounted) return;
-      setState(() {
-        _imConnecting = false;
-        _imReady = true;
-        _imStatusText =
-            state == null ? '腾讯云 IM 已连接' : '腾讯云 IM 已连接：${state.identifier}';
-      });
+      setState(() => _imConnecting = false);
     } catch (e) {
       if (!mounted) return;
-      if (e is UnsupportedError) {
-        setState(() {
-          _imConnecting = false;
-          _imReady = false;
-          _imStatusText = e.message?.toString() ?? '即时通讯功能当前不可用';
-        });
-        return;
-      }
-      setState(() {
-        _imConnecting = false;
-        _imReady = false;
-        _imStatusText =
-            '腾讯云 IM 未连接：${e.toString().replaceFirst('Exception: ', '')}';
-      });
+      setState(() => _imConnecting = false);
     }
   }
 
   bool _matchesConversationFilter(Map<String, dynamic> conversation) {
     if (_selectedFilter == '全部') return true;
-    final isOrg = _conversationIsOrganization(conversation);
-    return _selectedFilter == '机构' ? isOrg : !isOrg;
-  }
-
-  bool _matchesFriendSearch(Map<String, dynamic> friend) {
-    if (widget.searchKeyword.isEmpty) return true;
-    return _matchesSearch(
-      '${_friendName(friend)} ${_friendRoleLabel(friend)} ${friend['friend_id'] ?? ''}',
-      widget.searchKeyword,
-    );
+    return switch (_selectedFilter) {
+      '合作' => _conversationIsCooperation(conversation),
+      '圈子' => _conversationIsCircle(conversation),
+      '私信' => !_conversationIsCooperation(conversation) &&
+          !_conversationIsCircle(conversation),
+      _ => true,
+    };
   }
 
   Future<void> _openConversation(Map<String, dynamic> conversation) async {
@@ -1143,102 +3293,103 @@ class _ChatTabState extends State<_ChatTab> {
     if (mounted) unawaited(_refreshAll());
   }
 
-  Future<void> _openFriend(Map<String, dynamic> friend) async {
-    final loggedIn = await ensureLoggedIn(context, message: '请先登录后打开私信');
-    if (!mounted || !loggedIn) return;
-    final friendId = friend['friend_id']?.toString();
-    if (friendId == null || friendId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('好友资料还没有完成同步')),
-      );
-      return;
-    }
-    if (_openingFriendId != null) return;
-    setState(() => _openingFriendId = friendId);
-    try {
-      final conversation = await BackendApiService.createConversation(
-        participantIds: [friendId],
-        type: 'direct',
-        metadata: {
-          'source': 'message_friend_shortcut',
-          'target_user_id': friendId,
-        },
-      );
-      if (!mounted) return;
-      setState(() => _openingFriendId = null);
-      await Navigator.of(context).push<void>(
-        MaterialPageRoute<void>(
-          builder: (_) => LightMessageScreen(conversation: conversation),
-        ),
-      );
-      if (mounted) unawaited(_refreshAll());
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _openingFriendId = null);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('打开私信失败：$e')),
-      );
-    }
-  }
-
   Future<void> _openFriendCandidates() async {
     final loggedIn = await ensureLoggedIn(context, message: '请先登录后添加好友');
     if (!mounted || !loggedIn) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => AddFriendScreen(onFriendAdded: _refreshAll),
+      ),
+    );
+    if (mounted) unawaited(_refreshAll());
+  }
+
+  Future<void> _openCreateGroupSheet() async {
+    final loggedIn = await ensureLoggedIn(context, message: '请先登录后创建群聊');
+    if (!mounted || !loggedIn) return;
     try {
-      final candidates = await BackendApiService.fetchFriendCandidates();
+      final friends = await BackendApiService.fetchFriends(limit: 60);
       if (!mounted) return;
-      if (candidates.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('暂无可添加的好友')),
-        );
-        return;
-      }
-      await showModalBottomSheet<void>(
+      final conversation = await showModalBottomSheet<Map<String, dynamic>>(
         context: context,
         isScrollControlled: true,
         useSafeArea: true,
         backgroundColor: Colors.transparent,
-        builder: (_) => _FriendCandidateSheet(
-          candidates: candidates,
-          onAdd: _addFriendCandidate,
+        builder: (_) => _CreateMessageGroupSheet(
+          friends: friends,
+          onCreate: _createGroupConversation,
+          onFindFriends: _openFriendCandidates,
         ),
       );
+      if (!mounted || conversation == null) return;
+      await _openConversation(conversation);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('加载好友候选失败：$e')),
+        SnackBar(content: Text('加载好友失败：$e')),
       );
     }
   }
 
-  Future<bool> _addFriendCandidate(Map<String, dynamic> candidate) async {
-    final targetId = candidate['id']?.toString();
-    if (targetId == null || targetId.isEmpty) {
-      if (!mounted) return false;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('用户资料还没有完成同步')),
-      );
-      return false;
-    }
-    try {
-      await BackendApiService.addFriend(
-        targetUserId: targetId,
-        message: '你好，我在 Artsee 艺见心看到了你的主页。',
-      );
-      if (!mounted) return true;
-      await _refreshAll();
-      if (!mounted) return true;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已添加 ${_candidateName(candidate)} 为好友')),
-      );
-      return true;
-    } catch (e) {
-      if (!mounted) return false;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('添加好友失败：$e')),
-      );
-      return false;
-    }
+  Future<Map<String, dynamic>> _createGroupConversation(
+    _CreateGroupPayload payload,
+  ) async {
+    final conversation = await BackendApiService.createConversation(
+      participantIds: payload.participantIds,
+      type: 'group',
+      title: payload.title,
+      metadata: {
+        'source': 'message_create_group',
+        'scene': payload.scene,
+        'visibility': payload.visibility,
+        if (payload.relatedTarget.isNotEmpty)
+          'related_target': payload.relatedTarget,
+        if (payload.announcement.isNotEmpty)
+          'announcement': payload.announcement,
+        'identity_label': _groupSceneIdentity(payload.scene),
+      },
+    );
+    if (mounted) await _refreshAll();
+    return conversation;
+  }
+
+  Future<void> _openGroupPlazaSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _GroupPlazaSheet(
+        onOpenCircle: _openCircleFromGroupPlaza,
+      ),
+    );
+  }
+
+  void _openCircleFromGroupPlaza(
+    Map<String, dynamic> circle,
+    int index,
+    String joinStatus,
+  ) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => CircleDetailScreen(
+          circle: circle,
+          index: index,
+          joinStatus: joinStatus,
+          onJoinChanged: (_) {},
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openScanEntrySheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _ScanEntrySheet(),
+    );
   }
 
   @override
@@ -1268,64 +3419,50 @@ class _ChatTabState extends State<_ChatTab> {
                 ))
             .toList();
     final visibleItems = searchItems.where(_matchesConversationFilter).toList();
-    final visibleFriends = _friends.where(_matchesFriendSearch).toList();
     final isFiltered = _selectedFilter != '全部';
+    final unreadCount = _items.fold<int>(
+      0,
+      (total, item) =>
+          total +
+          (item['unread_count'] is int
+              ? item['unread_count'] as int
+              : int.tryParse(item['unread_count']?.toString() ?? '') ?? 0),
+    );
+    final cooperationCount = _items.where(_conversationIsCooperation).length;
+    final circleCount = _items.where(_conversationIsCircle).length;
 
     return ListView(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, widget.bottom + 32),
+      padding: EdgeInsets.fromLTRB(20, 8, 20, widget.bottom + 32),
       children: [
-        _PillFilterRow(
-          values: const ['全部', '个人', '机构'],
-          selected: _selectedFilter,
-          onSelected: (value) => setState(() => _selectedFilter = value),
-        ),
-        const SizedBox(height: 16),
-        _TencentImStatusStrip(
-          connecting: _imConnecting,
-          ready: _imReady,
-          text: _imStatusText ?? '腾讯云 IM 待连接',
-          onRetry: _warmTencentIm,
-        ),
-        if (visibleFriends.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _FriendShortcutPanel(
-            friends: visibleFriends.take(12).toList(),
-            openingFriendId: _openingFriendId,
-            onOpenFriend: _openFriend,
+        _MessageQuickEntryRow(
+          interactionCount: unreadCount,
+          cooperationCount: cooperationCount,
+          circleCount: circleCount,
+          onInteractionTap: () => _showMessageCategoryHint(
+            '互动通知会聚合赞、收藏、评论和 @，后续会从作品动态和圈子同步到这里。',
           ),
-        ],
-        const SizedBox(height: 14),
+          onCooperationTap: () => setState(() => _selectedFilter = '合作'),
+          onCircleTap: () => setState(() => _selectedFilter = '圈子'),
+        ),
+        const SizedBox(height: 26),
         if (visibleItems.isEmpty)
-          Column(
-            children: [
-              _MessageEmptyActions(
-                hasFriends: visibleFriends.isNotEmpty,
-                onFindFriends: _openFriendCandidates,
-                onRefresh: _refreshAll,
-              ),
-              const SizedBox(height: 12),
-              _CommunityEmptyState(
-                icon: Icons.mark_chat_unread_outlined,
-                title: widget.searchKeyword.isNotEmpty
-                    ? '没有匹配的消息'
-                    : isFiltered
-                        ? '暂无$_selectedFilter消息'
-                        : '暂无私信',
-                subtitle: widget.searchKeyword.isNotEmpty
-                    ? '换个联系人、合作或通知关键词试试。'
-                    : isFiltered
-                        ? '切回全部，或等待新的$_selectedFilter消息。'
-                        : visibleFriends.isNotEmpty
-                            ? '选择上方好友即可开始腾讯云 IM 单聊。'
-                            : '先从公开主页添加好友，或等待合作邀约后在这里沟通。',
-                actionLabel: widget.searchKeyword.isEmpty && isFiltered
-                    ? '查看全部'
-                    : '刷新消息',
-                onRetry: widget.searchKeyword.isEmpty && isFiltered
-                    ? () => setState(() => _selectedFilter = '全部')
-                    : _refreshAll,
-              ),
-            ],
+          _CommunityEmptyState(
+            icon: Icons.mark_chat_unread_outlined,
+            title: widget.searchKeyword.isNotEmpty
+                ? '没有匹配的消息'
+                : isFiltered
+                    ? '暂无$_selectedFilter消息'
+                    : '暂无消息',
+            subtitle: widget.searchKeyword.isNotEmpty
+                ? '换个联系人、合作或通知关键词试试。'
+                : isFiltered
+                    ? '切回全部，或等待新的$_selectedFilter消息。'
+                    : '新的互动、合作邀约、圈子回复和私信会显示在这里。',
+            actionLabel:
+                widget.searchKeyword.isEmpty && isFiltered ? '查看全部' : '刷新消息',
+            onRetry: widget.searchKeyword.isEmpty && isFiltered
+                ? () => setState(() => _selectedFilter = '全部')
+                : _refreshAll,
           )
         else
           ...visibleItems.asMap().entries.map(
@@ -1341,6 +3478,150 @@ class _ChatTabState extends State<_ChatTab> {
       ],
     );
   }
+
+  void _showMessageCategoryHint(String text) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(text)),
+    );
+  }
+}
+
+class _MessageQuickEntryRow extends StatelessWidget {
+  final int interactionCount;
+  final int cooperationCount;
+  final int circleCount;
+  final VoidCallback onInteractionTap;
+  final VoidCallback onCooperationTap;
+  final VoidCallback onCircleTap;
+
+  const _MessageQuickEntryRow({
+    required this.interactionCount,
+    required this.cooperationCount,
+    required this.circleCount,
+    required this.onInteractionTap,
+    required this.onCooperationTap,
+    required this.onCircleTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _MessageQuickEntry(
+            icon: Icons.favorite_rounded,
+            label: '互动',
+            count: interactionCount,
+            color: const Color(0xFFFF5A5F),
+            background: const Color(0xFFFFECEE),
+            onTap: onInteractionTap,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _MessageQuickEntry(
+            icon: Icons.business_center_rounded,
+            label: '合作',
+            count: cooperationCount,
+            color: kCobalt,
+            background: const Color(0xFFEAF1FF),
+            onTap: onCooperationTap,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _MessageQuickEntry(
+            icon: Icons.forum_rounded,
+            label: '圈子',
+            count: circleCount,
+            color: const Color(0xFF21C997),
+            background: const Color(0xFFE8FBF4),
+            onTap: onCircleTap,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MessageQuickEntry extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final int count;
+  final Color color;
+  final Color background;
+  final VoidCallback onTap;
+
+  const _MessageQuickEntry({
+    required this.icon,
+    required this.label,
+    required this.count,
+    required this.color,
+    required this.background,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: Column(
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: background,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(icon, color: color, size: 24),
+              ),
+              if (count > 0)
+                Positioned(
+                  top: -2,
+                  right: -2,
+                  child: Container(
+                    constraints:
+                        const BoxConstraints(minWidth: 16, minHeight: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF2D55),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: Colors.white, width: 1.8),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      count > 99 ? '99+' : '$count',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 8,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 7),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: context.artC.ink,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _SocialTabs extends StatelessWidget {
@@ -1351,9 +3632,7 @@ class _SocialTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const tabs = [
-      (label: '问答', icon: Icons.help_outline),
       (label: '圈子', icon: Icons.groups_outlined),
-      (label: '沙龙', icon: Icons.auto_awesome),
       (label: '私信', icon: Icons.chat_bubble_outline),
     ];
     return ArtseeSegmentedTabs(
@@ -1377,13 +3656,14 @@ class _QuickAskCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
       decoration: BoxDecoration(
-        color: context.artC.ink,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: context.artC.silver.withValues(alpha: 0.34)),
         boxShadow: [
           BoxShadow(
-            color: context.artC.ink.withValues(alpha: 0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            color: context.artC.ink.withValues(alpha: 0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -1393,11 +3673,10 @@ class _QuickAskCard extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.1),
+              color: kCobalt.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(15),
             ),
-            child:
-                const Icon(Icons.auto_awesome, color: Colors.white, size: 20),
+            child: const Icon(Icons.auto_awesome, color: kCobalt, size: 20),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -1405,18 +3684,18 @@ class _QuickAskCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  '有申请、作品集或就业问题？',
+                  '发起问题',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Color(0xFF15171A),
                     fontSize: 15,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '向校友、导师和行业从业者提问',
+                  '带上学校、专业、城市或作品方向',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.52),
+                    color: context.artC.ink.withValues(alpha: 0.44),
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1429,13 +3708,13 @@ class _QuickAskCard extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: context.artC.ink,
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
                 '提问',
                 style: TextStyle(
-                  color: context.artC.ink,
+                  color: Colors.white,
                   fontSize: 11,
                   fontWeight: FontWeight.w900,
                 ),
@@ -1519,6 +3798,592 @@ class _BlockChipStrip extends StatelessWidget {
   }
 }
 
+class _RelatedCircleStrip extends StatelessWidget {
+  final List<MapEntry<int, Map<String, dynamic>>> entries;
+  final bool loading;
+  final String? error;
+  final String selectedFilter;
+  final Set<String> joiningIds;
+  final String Function(Map<String, dynamic> circle, int index) statusFor;
+  final VoidCallback onRetry;
+  final void Function(Map<String, dynamic> circle, int index) onOpen;
+  final void Function(Map<String, dynamic> circle, int index) onJoin;
+
+  const _RelatedCircleStrip({
+    required this.entries,
+    required this.loading,
+    required this.error,
+    required this.selectedFilter,
+    required this.joiningIds,
+    required this.statusFor,
+    required this.onRetry,
+    required this.onOpen,
+    required this.onJoin,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Widget body;
+    if (loading) {
+      body = const Column(
+        children: [
+          _RelatedCircleSkeletonCard(),
+          SizedBox(height: 10),
+          _RelatedCircleSkeletonCard(),
+        ],
+      );
+    } else if (error != null) {
+      body = _RelatedCircleNotice(
+        icon: Icons.groups_outlined,
+        title: '圈子加载失败',
+        subtitle: error!,
+        actionLabel: '刷新',
+        onTap: onRetry,
+      );
+    } else if (entries.isEmpty) {
+      final joined = selectedFilter == '已加入';
+      body = _RelatedCircleNotice(
+        icon: Icons.groups_outlined,
+        title: joined ? '还没有加入圈子' : '暂无相关圈子',
+        subtitle: joined ? '先切到推荐或专业方向加入一个圈子。' : '换个方向看看，新的圈子会在这里出现。',
+        actionLabel: '刷新',
+        onTap: onRetry,
+      );
+    } else {
+      final previewEntries = entries.take(2).toList();
+      body = GridView.builder(
+        padding: EdgeInsets.zero,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: previewEntries.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          mainAxisExtent: 188,
+        ),
+        itemBuilder: (_, visibleIndex) {
+          final entry = previewEntries[visibleIndex];
+          final circle = entry.value;
+          final id = circle['id']?.toString() ?? '${entry.key}';
+          final status = statusFor(circle, entry.key);
+          return _RelatedCircleCard(
+            circle: circle,
+            index: entry.key,
+            status: status,
+            busy: joiningIds.contains(id),
+            onOpen: () => onOpen(circle, entry.key),
+            onJoin: () => onJoin(circle, entry.key),
+            compact: true,
+          );
+        },
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(child: _CommunitySectionHeader(title: '相关圈子')),
+            if (!loading && error == null && entries.length > 2)
+              GestureDetector(
+                onTap: () => _openAllCirclesSheet(context),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '全部 ${entries.length}',
+                      style: const TextStyle(
+                        color: kCobalt,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right, color: kCobalt, size: 14),
+                  ],
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        body,
+      ],
+    );
+  }
+
+  void _openAllCirclesSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.78,
+          minChildSize: 0.45,
+          maxChildSize: 0.92,
+          expand: false,
+          builder: (context, scrollController) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Color(0xFFF6F7F9),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 10),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 18, 14, 10),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '相关圈子',
+                            style: TextStyle(
+                              color: context.artC.ink,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.of(sheetContext).pop(),
+                          icon: const Icon(Icons.close_rounded),
+                          color: context.artC.ink,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: GridView.builder(
+                      controller: scrollController,
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+                      itemCount: entries.length,
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 10,
+                        mainAxisSpacing: 10,
+                        mainAxisExtent: 188,
+                      ),
+                      itemBuilder: (_, visibleIndex) {
+                        final entry = entries[visibleIndex];
+                        final circle = entry.value;
+                        final id = circle['id']?.toString() ?? '${entry.key}';
+                        final status = statusFor(circle, entry.key);
+                        return _RelatedCircleCard(
+                          circle: circle,
+                          index: entry.key,
+                          status: status,
+                          busy: joiningIds.contains(id),
+                          compact: true,
+                          onOpen: () {
+                            Navigator.of(sheetContext).pop();
+                            onOpen(circle, entry.key);
+                          },
+                          onJoin: () => onJoin(circle, entry.key),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _RelatedCircleCard extends StatelessWidget {
+  final Map<String, dynamic> circle;
+  final int index;
+  final String status;
+  final bool busy;
+  final bool compact;
+  final VoidCallback onOpen;
+  final VoidCallback onJoin;
+
+  const _RelatedCircleCard({
+    required this.circle,
+    required this.index,
+    required this.status,
+    required this.busy,
+    this.compact = false,
+    required this.onOpen,
+    required this.onJoin,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final title = circle['title']?.toString().trim().isNotEmpty == true
+        ? circle['title'].toString().trim()
+        : '艺术申请圈';
+    final subtitle = circle['subtitle']?.toString().trim().isNotEmpty == true
+        ? circle['subtitle'].toString().trim()
+        : _groupPlazaSubtitle(circle, index);
+    final category = _circleCategoryBadgeLabel(circle, index);
+    final members = int.tryParse(circle['member_count']?.toString() ?? '') ??
+        (24 + index * 7);
+    final discussions =
+        int.tryParse(circle['today_post_count']?.toString() ?? '') ??
+            (3 + index);
+    final actionLabel = _groupPlazaActionLabel(circle, index, status);
+
+    return GestureDetector(
+      onTap: onOpen,
+      child: Container(
+        padding: EdgeInsets.all(compact ? 13 : 16),
+        decoration: BoxDecoration(
+          color: context.artC.cardIconBg,
+          borderRadius: BorderRadius.circular(18),
+          border:
+              Border.all(color: context.artC.silver.withValues(alpha: 0.38)),
+          boxShadow: [
+            BoxShadow(
+              color: context.artC.ink.withValues(alpha: 0.026),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                _QuestionBadge(label: category, dark: true),
+                if (!compact) ...[
+                  const SizedBox(width: 6),
+                  _QuestionBadge(
+                    label: _circleTags(circle, index).first,
+                    dark: false,
+                  ),
+                ],
+                const Spacer(),
+                Text(
+                  compact ? '$members人' : '$members 人',
+                  style: TextStyle(
+                    color: context.artC.ink.withValues(alpha: 0.34),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: compact ? 10 : 12),
+            Text(
+              title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: context.artC.ink,
+                fontSize: compact ? 14.5 : 16,
+                height: compact ? 1.18 : 1.24,
+                fontWeight: FontWeight.w900,
+                fontFamily: 'Noto Serif SC',
+              ),
+            ),
+            SizedBox(height: compact ? 6 : 8),
+            Text(
+              subtitle,
+              maxLines: compact ? 1 : 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: context.artC.ink.withValues(alpha: 0.52),
+                fontSize: compact ? 10.5 : 11,
+                height: 1.45,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const Spacer(),
+            Row(
+              children: [
+                Icon(
+                  Icons.forum_outlined,
+                  size: 14,
+                  color: context.artC.ink.withValues(alpha: 0.34),
+                ),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    compact ? '今日 $discussions 条' : '今日 $discussions 条讨论',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: context.artC.ink.withValues(alpha: 0.38),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                if (!compact)
+                  _CircleActionButton(
+                    actionLabel: actionLabel,
+                    status: status,
+                    busy: busy,
+                    onJoin: onJoin,
+                  ),
+              ],
+            ),
+            if (compact) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: _CircleActionButton(
+                  actionLabel: actionLabel,
+                  status: status,
+                  busy: busy,
+                  onJoin: onJoin,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CircleActionButton extends StatelessWidget {
+  final String actionLabel;
+  final String status;
+  final bool busy;
+  final VoidCallback onJoin;
+
+  const _CircleActionButton({
+    required this.actionLabel,
+    required this.status,
+    required this.busy,
+    required this.onJoin,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 30,
+      child: FilledButton(
+        onPressed: busy ? null : onJoin,
+        style: FilledButton.styleFrom(
+          backgroundColor: status == 'joined'
+              ? Colors.white
+              : status == 'pending'
+                  ? context.artC.silver.withValues(alpha: 0.5)
+                  : context.artC.ink,
+          foregroundColor: status == 'joined' ? context.artC.ink : Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 13),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999),
+            side: BorderSide(
+              color: status == 'joined'
+                  ? context.artC.silver.withValues(alpha: 0.48)
+                  : Colors.transparent,
+            ),
+          ),
+          elevation: 0,
+        ),
+        child: busy
+            ? const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : Text(
+                actionLabel,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+      ),
+    );
+  }
+}
+
+String _circleCategoryBadgeLabel(Map<String, dynamic> circle, int index) {
+  final raw = circle['category']?.toString().trim().toLowerCase() ?? '';
+  final text = _groupPlazaSearchText(circle, index).toLowerCase();
+  if (raw.contains('architecture') ||
+      raw.contains('space') ||
+      text.contains('建筑') ||
+      text.contains('空间')) {
+    return '建筑空间';
+  }
+  if (raw.contains('portfolio') ||
+      text.contains('作品集') ||
+      text.contains('portfolio')) {
+    return '作品集';
+  }
+  if (raw.contains('school') ||
+      raw.contains('college') ||
+      text.contains('院校') ||
+      text.contains('留学') ||
+      text.contains('申请') ||
+      text.contains('ual') ||
+      text.contains('rca')) {
+    return '院校申请';
+  }
+  if (raw.contains('city') ||
+      text.contains('同城') ||
+      text.contains('城市') ||
+      text.contains('伦敦') ||
+      text.contains('纽约') ||
+      text.contains('上海')) {
+    return '同城';
+  }
+  if (raw.contains('career') ||
+      raw.contains('job') ||
+      text.contains('就业') ||
+      text.contains('实习')) {
+    return '就业';
+  }
+  if (raw.contains('market') ||
+      text.contains('市场') ||
+      text.contains('展览') ||
+      text.contains('画廊')) {
+    return '艺术市场';
+  }
+  if (raw.contains('art') || text.contains('媒介') || text.contains('艺术')) {
+    return text.contains('媒介') ? '媒介艺术' : '艺术研究';
+  }
+  return _circleTags(circle, index).first.replaceFirst('#', '');
+}
+
+class _RelatedCircleNotice extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String actionLabel;
+  final VoidCallback onTap;
+
+  const _RelatedCircleNotice({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.actionLabel,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: context.artC.silver.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: kCobalt.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Icon(icon, color: kCobalt, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: context.artC.ink,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: context.artC.ink.withValues(alpha: 0.42),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: onTap,
+            style: TextButton.styleFrom(
+              foregroundColor: kCobalt,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: const Size(44, 32),
+            ),
+            child: Text(
+              actionLabel,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RelatedCircleSkeletonCard extends StatelessWidget {
+  const _RelatedCircleSkeletonCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: context.artC.silver.withValues(alpha: 0.24)),
+      ),
+      child: const Row(
+        children: [
+          _SkeletonLine(width: 48, height: 48, radius: 16),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _SkeletonLine(width: 128, height: 14),
+                SizedBox(height: 9),
+                _SkeletonLine(width: 180, height: 10),
+                SizedBox(height: 9),
+                _SkeletonLine(width: 120, height: 10),
+              ],
+            ),
+          ),
+          SizedBox(width: 12),
+          _SkeletonLine(width: 72, height: 34, radius: 10),
+        ],
+      ),
+    );
+  }
+}
+
 class _HotTopicStrip extends StatelessWidget {
   final List<AppCommunityHotTopic> topics;
   final bool loading;
@@ -1563,8 +4428,9 @@ class _HotTopicStrip extends StatelessWidget {
         onRetry: onRetry,
       );
     } else {
+      final previewTopics = topics.take(2).toList();
       body = Column(
-        children: topics
+        children: previewTopics
             .map(
               (topic) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
@@ -1582,10 +4448,115 @@ class _HotTopicStrip extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _CommunitySectionHeader(title: '本周热议'),
+        Row(
+          children: [
+            const Expanded(child: _CommunitySectionHeader(title: '本周热议')),
+            if (!loading && error == null && topics.length > 2)
+              GestureDetector(
+                onTap: () => _openAllHotTopicsSheet(context),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '全部 ${topics.length}',
+                      style: const TextStyle(
+                        color: kCobalt,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right, color: kCobalt, size: 14),
+                  ],
+                ),
+              ),
+          ],
+        ),
         const SizedBox(height: 10),
         body,
       ],
+    );
+  }
+
+  void _openAllHotTopicsSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.78,
+          minChildSize: 0.45,
+          maxChildSize: 0.92,
+          expand: false,
+          builder: (context, scrollController) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Color(0xFFF6F7F9),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 10),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 18, 14, 10),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '本周热议',
+                            style: TextStyle(
+                              color: context.artC.ink,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.of(sheetContext).pop(),
+                          icon: const Icon(Icons.close_rounded),
+                          color: context.artC.ink,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView.separated(
+                      controller: scrollController,
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+                      itemCount: topics.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (_, index) {
+                        final topic = topics[index];
+                        return _HotTopicCard(
+                          topic: topic,
+                          onOpen: () {
+                            Navigator.of(sheetContext).pop();
+                            onTopicOpen(topic);
+                          },
+                          onAsk: () {
+                            Navigator.of(sheetContext).pop();
+                            onTopicAsk(topic);
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
@@ -1650,7 +4621,7 @@ class _QuestionPostStrip extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _CommunitySectionHeader(title: '最新问答', action: 'LIVE'),
+        const _CommunitySectionHeader(title: '问答'),
         const SizedBox(height: 10),
         body,
       ],
@@ -2997,22 +5968,18 @@ class _PillFilterRow extends StatelessWidget {
                     vertical: 9,
                   ),
                   decoration: BoxDecoration(
-                    color: selected == value
-                        ? kCobalt.withValues(alpha: 0.08)
-                        : context.artC.cardIconBg,
+                    color: selected == value ? context.artC.ink : Colors.white,
                     borderRadius: BorderRadius.circular(999),
                     border: Border.all(
-                      color: selected == value
-                          ? kCobalt.withValues(alpha: 0.32)
-                          : context.artC.silver.withValues(alpha: 0.42),
+                      color: context.artC.silver.withValues(alpha: 0.4),
                     ),
                   ),
                   child: Text(
                     value,
                     style: TextStyle(
                       color: selected == value
-                          ? kCobalt
-                          : context.artC.ink.withValues(alpha: 0.54),
+                          ? Colors.white
+                          : context.artC.ink.withValues(alpha: 0.58),
                       fontSize: 11,
                       fontWeight: FontWeight.w900,
                     ),
@@ -5982,530 +8949,110 @@ class _ChatCard extends StatelessWidget {
         ? _conversationOrganizationIdentity(conversation)
         : _conversationPersonIdentityLabel(conversation);
 
-    return ArtseeSurface(
-      onTap: onTap,
-      padding: const EdgeInsets.all(15),
-      radius: 8,
-      child: Row(
-        children: [
-          Stack(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(isOrg ? 13 : 27),
-                child: SizedBox(
-                  width: 54,
-                  height: 54,
-                  child: avatarUrl != null && avatarUrl.isNotEmpty
-                      ? Image.network(
-                          avatarUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
-                              _ChatAvatarFallback(seed: index, org: isOrg),
-                        )
-                      : _ChatAvatarFallback(seed: index, org: isOrg),
-                ),
-              ),
-              Positioned(
-                right: 1,
-                bottom: 1,
-                child: Container(
-                  width: 13,
-                  height: 13,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF22C55E),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 3),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: context.artC.ink,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      time,
-                      style: TextStyle(
-                        color: context.artC.ink.withOpacity(0.24),
-                        fontSize: 9,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                _ChatIdentityTag(label: identity, org: isOrg),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        body,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: context.artC.ink.withOpacity(0.44),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    if (unread > 0)
-                      Container(
-                        width: 20,
-                        height: 20,
-                        alignment: Alignment.center,
-                        decoration: const BoxDecoration(
-                          color: kCobalt,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Text(
-                          '$unread',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TencentImStatusStrip extends StatelessWidget {
-  final bool connecting;
-  final bool ready;
-  final String text;
-  final VoidCallback onRetry;
-
-  const _TencentImStatusStrip({
-    required this.connecting,
-    required this.ready,
-    required this.text,
-    required this.onRetry,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = ready ? const Color(0xFF047857) : kCobalt;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.16)),
-      ),
-      child: Row(
-        children: [
-          connecting
-              ? SizedBox(
-                  width: 15,
-                  height: 15,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: color,
-                  ),
-                )
-              : Icon(
-                  ready
-                      ? Icons.check_circle_outline_rounded
-                      : Icons.info_outline_rounded,
-                  color: color,
-                  size: 17,
-                ),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Text(
-              text,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: context.artC.ink.withValues(alpha: 0.58),
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-          IconButton(
-            tooltip: '重新连接',
-            visualDensity: VisualDensity.compact,
-            onPressed: connecting ? null : onRetry,
-            icon: Icon(Icons.sync_rounded, color: color, size: 18),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FriendShortcutPanel extends StatelessWidget {
-  final List<Map<String, dynamic>> friends;
-  final String? openingFriendId;
-  final ValueChanged<Map<String, dynamic>> onOpenFriend;
-
-  const _FriendShortcutPanel({
-    required this.friends,
-    required this.openingFriendId,
-    required this.onOpenFriend,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ArtseeSurface(
-      padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
-      radius: 8,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.people_alt_outlined, size: 17, color: kCobalt),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  '好友快捷聊天',
-                  style: TextStyle(
-                    color: context.artC.ink,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              Text(
-                '${friends.length} 位',
-                style: TextStyle(
-                  color: context.artC.ink.withValues(alpha: 0.34),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 94,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: friends.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 10),
-              itemBuilder: (_, index) {
-                final friend = friends[index];
-                final friendId = friend['friend_id']?.toString();
-                return _FriendShortcutChip(
-                  friend: friend,
-                  busy: friendId != null && friendId == openingFriendId,
-                  onTap: () => onOpenFriend(friend),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FriendShortcutChip extends StatelessWidget {
-  final Map<String, dynamic> friend;
-  final bool busy;
-  final VoidCallback onTap;
-
-  const _FriendShortcutChip({
-    required this.friend,
-    required this.busy,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final avatarUrl = _friendAvatarUrl(friend);
-    final name = _friendName(friend);
     return InkWell(
       borderRadius: BorderRadius.circular(8),
-      onTap: busy ? null : onTap,
-      child: SizedBox(
-        width: 78,
-        child: Column(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        child: Row(
           children: [
             Stack(
-              alignment: Alignment.center,
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(28),
                   child: SizedBox(
-                    width: 48,
-                    height: 48,
+                    width: 56,
+                    height: 56,
                     child: avatarUrl != null && avatarUrl.isNotEmpty
                         ? Image.network(
                             avatarUrl,
                             fit: BoxFit.cover,
                             errorBuilder: (_, __, ___) =>
-                                _FriendShortcutFallback(name: name),
+                                _ChatAvatarFallback(seed: index, org: isOrg),
                           )
-                        : _FriendShortcutFallback(name: name),
+                        : _ChatAvatarFallback(seed: index, org: isOrg),
                   ),
                 ),
-                if (busy)
-                  Container(
-                    width: 48,
-                    height: 48,
+                Positioned(
+                  right: 1,
+                  bottom: 1,
+                  child: Container(
+                    width: 13,
+                    height: 13,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.72),
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: const Center(
-                      child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: kCobalt,
-                        ),
-                      ),
+                      color: const Color(0xFF22C55E),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 3),
                     ),
                   ),
+                ),
               ],
             ),
-            const SizedBox(height: 7),
-            Text(
-              name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: context.artC.ink,
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              _friendRoleLabel(friend),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: context.artC.ink.withValues(alpha: 0.38),
-                fontSize: 9,
-                fontWeight: FontWeight.w800,
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: context.artC.ink,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        time,
+                        style: TextStyle(
+                          color: context.artC.ink.withValues(alpha: 0.34),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 7),
+                  Row(
+                    children: [
+                      _ChatIdentityTag(label: identity, org: isOrg),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          body,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: context.artC.ink.withValues(alpha: 0.42),
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      if (unread > 0)
+                        Container(
+                          width: 9,
+                          height: 9,
+                          alignment: Alignment.center,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFFF2D55),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _FriendCandidateSheet extends StatefulWidget {
-  final List<Map<String, dynamic>> candidates;
-  final Future<bool> Function(Map<String, dynamic>) onAdd;
-
-  const _FriendCandidateSheet({
-    required this.candidates,
-    required this.onAdd,
-  });
-
-  @override
-  State<_FriendCandidateSheet> createState() => _FriendCandidateSheetState();
-}
-
-class _FriendCandidateSheetState extends State<_FriendCandidateSheet> {
-  String? _busyId;
-
-  Future<void> _add(Map<String, dynamic> candidate) async {
-    final id = candidate['id']?.toString();
-    if (id == null || id.isEmpty || _busyId != null) return;
-    setState(() => _busyId = id);
-    final ok = await widget.onAdd(candidate);
-    if (!mounted) return;
-    setState(() => _busyId = null);
-    if (ok) Navigator.of(context).pop();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final height = MediaQuery.of(context).size.height * 0.72;
-    return Container(
-      height: height,
-      decoration: BoxDecoration(
-        color: context.artC.porcelain,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        children: [
-          const SizedBox(height: 10),
-          Container(
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(
-              color: context.artC.silver.withValues(alpha: 0.72),
-              borderRadius: BorderRadius.circular(99),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '添加好友',
-                    style: TextStyle(
-                      color: context.artC.ink,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  tooltip: '关闭',
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close_rounded),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 22),
-              itemCount: widget.candidates.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (_, index) {
-                final candidate = widget.candidates[index];
-                final id = candidate['id']?.toString();
-                return _FriendCandidateTile(
-                  candidate: candidate,
-                  busy: id != null && id == _busyId,
-                  disabled: _busyId != null && id != _busyId,
-                  onAdd: () => _add(candidate),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FriendCandidateTile extends StatelessWidget {
-  final Map<String, dynamic> candidate;
-  final bool busy;
-  final bool disabled;
-  final VoidCallback onAdd;
-
-  const _FriendCandidateTile({
-    required this.candidate,
-    required this.busy,
-    required this.disabled,
-    required this.onAdd,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final name = _candidateName(candidate);
-    final avatarUrl = candidate['avatar_url']?.toString();
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: context.artC.silver.withValues(alpha: 0.32)),
-      ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(22),
-            child: SizedBox(
-              width: 44,
-              height: 44,
-              child: avatarUrl != null && avatarUrl.isNotEmpty
-                  ? Image.network(
-                      avatarUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          _FriendShortcutFallback(name: name),
-                    )
-                  : _FriendShortcutFallback(name: name),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: context.artC.ink,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _candidateRoleLabel(candidate),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: context.artC.ink.withValues(alpha: 0.46),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          FilledButton(
-            onPressed: busy || disabled ? null : onAdd,
-            style: FilledButton.styleFrom(
-              backgroundColor: kCobalt,
-              foregroundColor: Colors.white,
-              minimumSize: const Size(72, 38),
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: busy
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Text('加好友'),
-          ),
-        ],
       ),
     );
   }
@@ -6588,112 +9135,6 @@ class _ChatIdentityTag extends StatelessWidget {
             fontSize: 10,
             fontWeight: FontWeight.w900,
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MessageEmptyActions extends StatelessWidget {
-  final bool hasFriends;
-  final VoidCallback? onFindFriends;
-  final VoidCallback onRefresh;
-
-  const _MessageEmptyActions({
-    required this.hasFriends,
-    this.onFindFriends,
-    required this.onRefresh,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: context.artC.silver.withValues(alpha: 0.32)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _ActionTile(
-              icon: hasFriends
-                  ? Icons.chat_bubble_outline_rounded
-                  : Icons.person_add_alt_1_outlined,
-              title: hasFriends ? '选择好友' : '先加好友',
-              subtitle: hasFriends ? '开始单聊' : '从公开主页添加',
-              onTap: hasFriends
-                  ? () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('选择上方好友即可开始单聊')),
-                      );
-                    }
-                  : onFindFriends,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: _ActionTile(
-              icon: Icons.sync_rounded,
-              title: '刷新消息',
-              subtitle: '同步会话状态',
-              onTap: onRefresh,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ActionTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback? onTap;
-
-  const _ActionTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(17),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: context.artC.silver.withValues(alpha: 0.28),
-          borderRadius: BorderRadius.circular(17),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: kCobalt, size: 18),
-            const SizedBox(height: 10),
-            Text(
-              title,
-              style: TextStyle(
-                color: context.artC.ink,
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              subtitle,
-              style: TextStyle(
-                color: context.artC.ink.withValues(alpha: 0.38),
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -6878,6 +9319,146 @@ bool _matchesSearch(String text, String keyword) {
   return text.toLowerCase().contains(query);
 }
 
+String _groupSceneIdentity(String scene) => switch (scene) {
+      '院校申请' => '院校申请群',
+      '作品集互助' => '作品集互助群',
+      '活动临时群' => '活动群',
+      '合作项目' => '合作项目群',
+      _ => '群聊',
+    };
+
+String? _friendId(Map<String, dynamic> friend) {
+  final friendId = friend['friend_id']?.toString();
+  if (friendId != null && friendId.isNotEmpty) return friendId;
+  final profileId = _stringMap(friend['profile'])?['id']?.toString();
+  if (profileId != null && profileId.isNotEmpty) return profileId;
+  final id = friend['id']?.toString();
+  if (id != null && id.isNotEmpty) return id;
+  return null;
+}
+
+Map<String, dynamic> _friendProfile(Map<String, dynamic> friend) {
+  return _stringMap(friend['profile']) ?? friend;
+}
+
+String _friendName(Map<String, dynamic> friend) {
+  final profile = _friendProfile(friend);
+  final nickname = profile['nickname']?.toString().trim();
+  if (nickname != null && nickname.isNotEmpty) return nickname;
+  final id = _friendId(friend);
+  if (id != null && id.length >= 8) return '用户 ${id.substring(0, 8)}';
+  return 'Artsee 好友';
+}
+
+String _friendAvatarUrl(Map<String, dynamic> friend) {
+  final profile = _friendProfile(friend);
+  return profile['avatar_url']?.toString().trim() ?? '';
+}
+
+String _friendRoleLabel(Map<String, dynamic> friend) {
+  final profile = _friendProfile(friend);
+  return _candidateRoleLabel(profile);
+}
+
+String _groupPlazaJoinStatus(Map<String, dynamic> circle) {
+  final raw = circle['join_status']?.toString().trim();
+  if (raw != null && raw.isNotEmpty) return raw;
+  final metadata = _stringMap(circle['metadata']);
+  final metaRaw = metadata?['join_status']?.toString().trim();
+  if (metaRaw != null && metaRaw.isNotEmpty) return metaRaw;
+  return 'none';
+}
+
+bool _matchesGroupPlazaFilter(
+  Map<String, dynamic> circle,
+  int index,
+  String filter,
+) {
+  if (filter == '推荐') return true;
+  final text = _groupPlazaSearchText(circle, index).toLowerCase();
+  return switch (filter) {
+    '院校' =>
+      ['院校', '申请', '留学', 'rca', 'ual', 'risd', 'bu', 'neu'].any(text.contains),
+    '城市' => ['城市', '同城', '伦敦', '纽约', '波士顿', '上海', '北京'].any(text.contains),
+    '专业' => ['专业', '设计', '插画', '建筑', '空间', '摄影', '策展', '交互'].any(text.contains),
+    '作品集' => ['作品集', 'portfolio', '项目', '排版', '诊断'].any(text.contains),
+    '活动' => ['活动', '展览', '沙龙', '讲座', '工作坊', '开放日'].any(text.contains),
+    '合作' => ['合作', '机会', '招募', '征集', '共创', '委托', '艺术家'].any(text.contains),
+    _ => true,
+  };
+}
+
+String _groupPlazaSearchText(Map<String, dynamic> circle, int index) {
+  final metadata = _stringMap(circle['metadata']);
+  final tags = _circleTags(circle, index).join(' ');
+  return [
+    circle['title'],
+    circle['subtitle'],
+    circle['category'],
+    circle['hot_topic'],
+    tags,
+    metadata?['scene'],
+    metadata?['related_target'],
+    metadata?['announcement'],
+  ].whereType<Object>().join(' ');
+}
+
+String _groupPlazaSubtitle(Map<String, dynamic> circle, int index) {
+  final text = _groupPlazaSearchText(circle, index).toLowerCase();
+  if (['合作', '机会', '招募', '共创'].any(text.contains)) {
+    return '合作机会、项目招募和共创沟通';
+  }
+  if (['活动', '展览', '沙龙', '开放日'].any(text.contains)) {
+    return '活动同行、现场交流和资料同步';
+  }
+  if (['作品集', 'portfolio', '诊断'].any(text.contains)) {
+    return '作品集进度、反馈和项目复盘';
+  }
+  if (['城市', '同城', '伦敦', '纽约', '波士顿'].any(text.contains)) {
+    return '同城生活、租房、活动和院校信息';
+  }
+  return '院校申请、专业方向和经验互助';
+}
+
+Color _groupPlazaColor(int index) {
+  const colors = [
+    kCobalt,
+    Color(0xFF0F9F7A),
+    Color(0xFF7C3AED),
+    Color(0xFFE11D48),
+    Color(0xFFEA580C),
+  ];
+  return colors[index % colors.length];
+}
+
+IconData _groupPlazaIcon(Map<String, dynamic> circle, int index) {
+  final text = _groupPlazaSearchText(circle, index).toLowerCase();
+  if (['合作', '机会', '招募', '共创'].any(text.contains)) {
+    return Icons.handshake_outlined;
+  }
+  if (['活动', '展览', '沙龙', '开放日'].any(text.contains)) {
+    return Icons.event_available_outlined;
+  }
+  if (['作品集', 'portfolio', '诊断'].any(text.contains)) {
+    return Icons.collections_bookmark_outlined;
+  }
+  if (['城市', '同城'].any(text.contains)) return Icons.location_city_outlined;
+  return Icons.school_outlined;
+}
+
+String _groupPlazaActionLabel(
+  Map<String, dynamic> circle,
+  int index,
+  String status,
+) {
+  if (status == 'joined') return '进入';
+  if (status == 'pending') return '审核中';
+  final joinType = _circleJoinType(circle, index);
+  if (joinType == 'approval') return '申请';
+  if (joinType == 'private') return '私密';
+  return '加入';
+}
+
 String _conversationSearchText(Map<String, dynamic> conversation) {
   final peer = _stringMap(conversation['peer_profile']);
   final latest = _stringMap(conversation['latest_message']);
@@ -6892,43 +9473,6 @@ String _conversationSearchText(Map<String, dynamic> conversation) {
     metadata?['organization_name'],
     metadata?['identity_label'],
   ].whereType<Object>().join(' ');
-}
-
-String _friendName(Map<String, dynamic> friend) {
-  final profile = _stringMap(friend['profile']);
-  final nickname = profile?['nickname']?.toString().trim();
-  if (nickname != null && nickname.isNotEmpty) return nickname;
-  final id = friend['friend_id']?.toString();
-  if (id != null && id.length >= 8) return '用户 ${id.substring(0, 8)}';
-  return 'Artsee 用户';
-}
-
-String? _friendAvatarUrl(Map<String, dynamic> friend) {
-  final profile = _stringMap(friend['profile']);
-  final raw = profile?['avatar_url']?.toString().trim();
-  return raw == null || raw.isEmpty ? null : raw;
-}
-
-String _friendRoleLabel(Map<String, dynamic> friend) {
-  final profile = _stringMap(friend['profile']);
-  final role =
-      profile?['user_role']?.toString() ?? profile?['user_type']?.toString();
-  return switch (role) {
-    'artist' => '艺术家',
-    'mentor' => '导师',
-    'student' => '学生',
-    'business' => '机构',
-    'institution' => '机构',
-    _ => '好友',
-  };
-}
-
-String _candidateName(Map<String, dynamic> candidate) {
-  final nickname = candidate['nickname']?.toString().trim();
-  if (nickname != null && nickname.isNotEmpty) return nickname;
-  final id = candidate['id']?.toString();
-  if (id != null && id.length >= 8) return '用户 ${id.substring(0, 8)}';
-  return 'Artsee 用户';
 }
 
 String _candidateRoleLabel(Map<String, dynamic> candidate) {
@@ -7105,6 +9649,47 @@ bool _conversationIsOrganization(Map<String, dynamic> conversation) {
       type == 'organization' ||
       type == 'cooperation' ||
       metadata['organization_name'] != null;
+}
+
+bool _conversationIsCooperation(Map<String, dynamic> conversation) {
+  if (_conversationIsOrganization(conversation)) return true;
+  final text = _conversationSearchText(conversation).toLowerCase();
+  return [
+    'cooperation',
+    'opportunity',
+    'application',
+    'apply',
+    'offer',
+    'artist',
+    '合作',
+    '机会',
+    '申请',
+    '邀约',
+    '招募',
+    '艺术家',
+    '机构',
+  ].any(text.contains);
+}
+
+bool _conversationIsCircle(Map<String, dynamic> conversation) {
+  final metadata = _stringMap(conversation['metadata']);
+  final type = conversation['type']?.toString().toLowerCase() ?? '';
+  if (type == 'group' || type == 'circle' || type == 'community') return true;
+  final source = metadata?['source']?.toString().toLowerCase() ?? '';
+  if (source.contains('circle') || source.contains('community')) return true;
+  final text = _conversationSearchText(conversation).toLowerCase();
+  return [
+    'circle',
+    'community',
+    'group',
+    '圈子',
+    '群聊',
+    '问答',
+    '评论',
+    '@',
+    '院校圈',
+    '作品集',
+  ].any(text.contains);
 }
 
 String _conversationPersonIdentityLabel(Map<String, dynamic> conversation) {

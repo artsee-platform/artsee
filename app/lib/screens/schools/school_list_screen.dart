@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import '../../data/school_display_aliases.dart';
 import '../../services/backend_api_service.dart';
@@ -32,7 +30,6 @@ class SchoolListScreenState extends State<SchoolListScreen>
     with TickerProviderStateMixin {
   final List<Map<String, dynamic>> _items = [];
   final TextEditingController _searchController = TextEditingController();
-  final FocusNode _searchFocusNode = FocusNode();
   String? _selectedRegionTag;
   String? _selectedCountry;
   String? _selectedSchoolType;
@@ -46,7 +43,6 @@ class SchoolListScreenState extends State<SchoolListScreen>
   int _offset = 0;
   int _loadGeneration = 0;
   final int _limit = 20;
-  Timer? _searchDebounce;
   final Set<String> _savedSchoolIds = {};
   final Set<String> _savingSchoolIds = {};
 
@@ -59,8 +55,6 @@ class SchoolListScreenState extends State<SchoolListScreen>
 
   @override
   void dispose() {
-    _searchDebounce?.cancel();
-    _searchFocusNode.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -241,24 +235,6 @@ class SchoolListScreenState extends State<SchoolListScreen>
     }
   }
 
-  void _onSearchChanged(String value) {
-    _searchDebounce?.cancel();
-    _searchDebounce = Timer(const Duration(milliseconds: 360), _refresh);
-  }
-
-  void _submitSearch() {
-    _searchDebounce?.cancel();
-    _refresh();
-    _searchFocusNode.unfocus();
-  }
-
-  void _clearSearch() {
-    if (_searchController.text.isEmpty) return;
-    _searchDebounce?.cancel();
-    _searchController.clear();
-    _refresh();
-  }
-
   void _setRegionTag(String? value) {
     setState(() => _selectedRegionTag = value);
     _refresh();
@@ -393,17 +369,6 @@ class SchoolListScreenState extends State<SchoolListScreen>
               count: _items.length,
               hasMore: _hasMore,
               onOpen: openDecisionFilterSheet,
-            ),
-            const SizedBox(height: 10),
-            _SchoolQuickFilterRow(
-              selectedCountry: _selectedCountry,
-              selectedSchoolType: _selectedSchoolType,
-              maxRank: _maxRank,
-              sortKey: _sortKey,
-              onCountryChanged: _setCountry,
-              onSchoolTypeChanged: _setSchoolType,
-              onRankChanged: _setRankRange,
-              onSortChanged: _setSortKey,
             ),
             const SizedBox(height: 12),
             AnimatedSize(
@@ -669,125 +634,6 @@ class _SchoolSortBar extends StatelessWidget {
             tooltip: '筛选与排序',
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _SortQuickChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _SortQuickChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: selected
-              ? kCobalt.withValues(alpha: 0.08)
-              : context.artC.cardIconBg,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: selected
-                ? kCobalt.withValues(alpha: 0.28)
-                : context.artC.silver.withValues(alpha: 0.34),
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            color:
-                selected ? kCobalt : context.artC.ink.withValues(alpha: 0.62),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SchoolQuickFilterRow extends StatelessWidget {
-  final String? selectedCountry;
-  final String? selectedSchoolType;
-  final int? maxRank;
-  final _SchoolSortKey sortKey;
-  final ValueChanged<String?> onCountryChanged;
-  final ValueChanged<String?> onSchoolTypeChanged;
-  final ValueChanged<int?> onRankChanged;
-  final ValueChanged<_SchoolSortKey> onSortChanged;
-
-  const _SchoolQuickFilterRow({
-    required this.selectedCountry,
-    required this.selectedSchoolType,
-    required this.maxRank,
-    required this.sortKey,
-    required this.onCountryChanged,
-    required this.onSchoolTypeChanged,
-    required this.onRankChanged,
-    required this.onSortChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final items = <({String label, bool selected, VoidCallback onTap})>[
-      (
-        label: '英国',
-        selected: selectedCountry == '英国',
-        onTap: () => onCountryChanged(selectedCountry == '英国' ? null : '英国'),
-      ),
-      (
-        label: '美国',
-        selected: selectedCountry == '美国',
-        onTap: () => onCountryChanged(selectedCountry == '美国' ? null : '美国'),
-      ),
-      (
-        label: 'Top 30',
-        selected: maxRank == 30,
-        onTap: () => onRankChanged(maxRank == 30 ? null : 30),
-      ),
-      (
-        label: '设计学院',
-        selected: selectedSchoolType == 'design_school',
-        onTap: () => onSchoolTypeChanged(
-              selectedSchoolType == 'design_school' ? null : 'design_school',
-            ),
-      ),
-      (
-        label: '作品集友好',
-        selected: sortKey == _SchoolSortKey.difficultyLow,
-        onTap: () => onSortChanged(
-              sortKey == _SchoolSortKey.difficultyLow
-                  ? _SchoolSortKey.recommended
-                  : _SchoolSortKey.difficultyLow,
-            ),
-      ),
-    ];
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: items
-            .map(
-              (item) => Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: _SortQuickChip(
-                  label: item.label,
-                  selected: item.selected,
-                  onTap: item.onTap,
-                ),
-              ),
-            )
-            .toList(),
       ),
     );
   }

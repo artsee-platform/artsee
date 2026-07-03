@@ -80,8 +80,10 @@ class AppCommunityPost {
   final Map<String, dynamic> metadata;
   final int likeCount;
   final int commentCount;
+  final int saveCount;
   final int viewCount;
   final bool likedByMe;
+  final bool savedByMe;
   final String createdAt;
   final String? authorId;
   final String? authorNickname;
@@ -98,8 +100,10 @@ class AppCommunityPost {
     this.metadata = const {},
     required this.likeCount,
     required this.commentCount,
+    required this.saveCount,
     required this.viewCount,
     this.likedByMe = false,
+    this.savedByMe = false,
     required this.createdAt,
     this.authorId,
     this.authorNickname,
@@ -116,21 +120,41 @@ class AppCommunityPost {
     if (up is Map<String, dynamic>) {
       avatarUrl = up['avatar_url'] as String?;
     }
-    final urls = json['image_urls'];
+    final imageUrls = <String>[];
+    void addImageUrls(dynamic value) {
+      if (value is List) {
+        for (final item in value) {
+          final url = item.toString().trim();
+          if (url.isNotEmpty && !imageUrls.contains(url)) imageUrls.add(url);
+        }
+        return;
+      }
+      final url = value?.toString().trim();
+      if (url != null && url.isNotEmpty && !imageUrls.contains(url)) {
+        imageUrls.add(url);
+      }
+    }
+
+    addImageUrls(json['image_urls']);
+    if (imageUrls.isEmpty) addImageUrls(json['images']);
+    if (imageUrls.isEmpty) addImageUrls(json['media_urls']);
+    if (imageUrls.isEmpty) addImageUrls(json['image_url']);
     final rawMetadata = json['metadata'];
     return AppCommunityPost(
       id: json['id'] as String,
       title: json['title'] as String? ?? '',
       body: json['body'] as String?,
-      imageUrls: urls is List ? urls.map((e) => e.toString()).toList() : [],
+      imageUrls: imageUrls,
       status: json['status'] as String? ?? 'published',
       auditStatus: json['audit_status'] as String?,
       auditReason: json['audit_reason'] as String?,
       metadata: rawMetadata is Map<String, dynamic> ? rawMetadata : {},
       likeCount: json['like_count'] as int? ?? 0,
       commentCount: json['comment_count'] as int? ?? 0,
+      saveCount: json['save_count'] as int? ?? 0,
       viewCount: json['view_count'] as int? ?? 0,
       likedByMe: json['liked_by_me'] as bool? ?? false,
+      savedByMe: json['saved_by_me'] as bool? ?? false,
       createdAt: json['created_at'] as String,
       authorId: (json['author_id'] ?? json['user_id']) as String?,
       authorNickname: nick,

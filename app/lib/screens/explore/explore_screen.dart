@@ -1,37 +1,57 @@
 import 'package:flutter/material.dart';
 
+import '../../models/models.dart';
 import '../../services/backend_api_service.dart';
 import '../../utils/auth_gate.dart';
 import '../../widgets/artsee_ui.dart';
 import '../../widgets/common.dart';
+import '../community/community_post_detail_screen.dart';
+import '../forum/ask_question_screen.dart';
+import '../forum/forum_screen.dart';
 import '../profile/public_user_profile_screen.dart';
 import '../publish/publish_artist_screen.dart';
+import 'discover_search_screen.dart';
 import 'package:artsee_app/theme/artsee_ui_colors.dart';
 
 class ExploreScreen extends StatefulWidget {
   final VoidCallback? onTabChanged;
+  final VoidCallback? onOpenDotChat;
+  final VoidCallback? onCreateCircle;
 
-  const ExploreScreen({super.key, this.onTabChanged});
+  const ExploreScreen({
+    super.key,
+    this.onTabChanged,
+    this.onOpenDotChat,
+    this.onCreateCircle,
+  });
 
   @override
   State<ExploreScreen> createState() => ExploreScreenState();
 }
 
 class ExploreScreenState extends State<ExploreScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
+  static const int _tabCount = 4;
   late TabController _tabController;
-  final GlobalKey<_OpportunityTabState> _opportunityKey =
-      GlobalKey<_OpportunityTabState>();
+  final GlobalKey<_CooperationTabState> _cooperationKey =
+      GlobalKey<_CooperationTabState>();
   final GlobalKey<_ExhibitionTabState> _exhibitionKey =
       GlobalKey<_ExhibitionTabState>();
-  final GlobalKey<_ArtistTabState> _artistKey = GlobalKey<_ArtistTabState>();
-  final List<String> _searchKeywords = List.filled(3, '');
+  final GlobalKey<_CommunityFeedTabState> _feedKey =
+      GlobalKey<_CommunityFeedTabState>();
+  final GlobalKey<CommunityCircleSurfaceState> _circleKey =
+      GlobalKey<CommunityCircleSurfaceState>();
+  List<String> _searchKeywords = List.filled(
+    _tabCount,
+    '',
+    growable: true,
+  );
+  int _activeTabIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-    _tabController.addListener(_handleTabChanged);
+    _createTabController();
   }
 
   @override
@@ -41,99 +61,691 @@ class ExploreScreenState extends State<ExploreScreen>
     super.dispose();
   }
 
+  int _clampTabIndex(int index) {
+    if (index < 0) return 0;
+    if (index >= _tabCount) return _tabCount - 1;
+    return index;
+  }
+
+  void _createTabController({int initialIndex = 0}) {
+    _activeTabIndex = _clampTabIndex(initialIndex);
+    _tabController = TabController(
+      length: _tabCount,
+      vsync: this,
+      initialIndex: _activeTabIndex,
+    );
+    _tabController.addListener(_handleTabChanged);
+  }
+
+  void _ensureTabController() {
+    if (_tabController.length == _tabCount) return;
+    final currentIndex = _clampTabIndex(_activeTabIndex);
+    final oldController = _tabController;
+    oldController.removeListener(_handleTabChanged);
+    _createTabController(initialIndex: currentIndex);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      oldController.dispose();
+    });
+  }
+
+  void _ensureSearchKeywords() {
+    if (_searchKeywords.length == _tabCount) return;
+    final next = List<String>.filled(_tabCount, '', growable: true);
+    for (var index = 0;
+        index < next.length && index < _searchKeywords.length;
+        index++) {
+      next[index] = _searchKeywords[index];
+    }
+    _searchKeywords = next;
+  }
+
+  int get _safeTabIndex {
+    return _clampTabIndex(_activeTabIndex);
+  }
+
+  String _searchKeywordAt(int index) {
+    _ensureSearchKeywords();
+    if (index < 0 || index >= _searchKeywords.length) return '';
+    return _searchKeywords[index];
+  }
+
   void _handleTabChanged() {
-    if (_tabController.indexIsChanging) return;
+    final nextIndex = _clampTabIndex(_tabController.index);
+    if (_activeTabIndex != nextIndex) {
+      setState(() => _activeTabIndex = nextIndex);
+      widget.onTabChanged?.call();
+      return;
+    }
+    if (!_tabController.indexIsChanging) {
+      widget.onTabChanged?.call();
+      setState(() {});
+    }
+  }
+
+  int get activeTabIndex => _safeTabIndex;
+
+  bool get isDynamicTabActive => _safeTabIndex == 2;
+
+  void _selectTab(int index) {
+    final nextIndex = _clampTabIndex(index);
+    if (_activeTabIndex != nextIndex) {
+      setState(() => _activeTabIndex = nextIndex);
+      widget.onTabChanged?.call();
+    }
+    if (_tabController.index != nextIndex) {
+      _tabController.animateTo(nextIndex);
+    }
+  }
+
+  String get searchKeyword => _searchKeywordAt(_safeTabIndex);
+
+  String get searchHint => switch (_safeTabIndex) {
+        0 => '搜索合作机会、艺术家、驻留、城市',
+        1 => '搜索活动、展览、沙龙、讲座、城市',
+        2 => '搜索作品、动态、作者、标签',
+        3 => '搜索问答、专业方向、学校社群',
+        _ => '搜索发现资源',
+      };
+
+  Future<void> openQuestionComposer({
+    String? initialTitle,
+    String? initialCategory,
+  }) {
+    return _openQuestionComposer(
+      initialTitle: initialTitle,
+      initialCategory: initialCategory,
+    );
+  }
+
+  void applySearch(String keyword) {
+    setState(() => _searchKeywords[_safeTabIndex] = keyword.trim());
+  }
+
+  Future<void> _openQuestionComposer({
+    String? initialTitle,
+    String? initialCategory,
+  }) async {
+    final loggedIn = await ensureLoggedIn(context, message: '请先登录后发布问题');
+    if (!mounted || !loggedIn) return;
+    final navigator = Navigator.of(context);
+    final createdTitle = await navigator.push<String?>(
+      MaterialPageRoute(
+        builder: (_) => AskQuestionScreen(
+          initialTitle: initialTitle,
+          initialCategory: initialCategory,
+          searchKeyword: searchKeyword,
+        ),
+      ),
+    );
+    if (!mounted || createdTitle == null) return;
+    _circleKey.currentState?.refresh();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('问题已发布，会推荐给相关方向用户')),
+    );
+  }
+
+  Future<void> _openSearchScreen() async {
+    final result = await Navigator.of(context).push<String>(
+      MaterialPageRoute<String>(
+        builder: (_) => DiscoverSearchScreen(
+          initialKeyword: searchKeyword,
+          initialTabIndex: _safeTabIndex,
+        ),
+      ),
+    );
+    if (!mounted || result == null) return;
+    applySearch(result);
+  }
+
+  Future<void> _openArtCalendar() async {
+    await showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '关闭艺术日历',
+      barrierColor: Colors.black.withValues(alpha: 0.32),
+      transitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        return _ArtCalendarDrawer(
+          onDismiss: () => Navigator.of(dialogContext).pop(),
+          onOpenActivities: () => _closeCalendarAndRun(
+            dialogContext,
+            () => _switchToActivityTab(),
+          ),
+          onOpenEvent: (event) => _closeCalendarAndRun(
+            dialogContext,
+            () => _focusActivity(event),
+          ),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return FadeTransition(
+          opacity: curved,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(-1, 0),
+              end: Offset.zero,
+            ).animate(curved),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
+  void _closeCalendarAndRun(BuildContext dialogContext, VoidCallback action) {
+    Navigator.of(dialogContext).pop();
+    Future<void>.delayed(const Duration(milliseconds: 90), () {
+      if (!mounted) return;
+      action();
+    });
+  }
+
+  void _switchToActivityTab() {
+    _tabController.animateTo(1);
     widget.onTabChanged?.call();
     setState(() {});
   }
 
-  int get activeTabIndex => _tabController.index;
-
-  String get searchKeyword => _searchKeywords[_tabController.index];
-
-  String get searchHint => switch (_tabController.index) {
-        0 => '搜索合作机会、驻留、预算、城市',
-        1 => '搜索展览、城市、场馆、工作坊',
-        2 => '搜索艺术家、风格、城市、合作方向',
-        _ => '搜索发现资源',
-      };
-
-  void applySearch(String keyword) {
-    setState(() => _searchKeywords[_tabController.index] = keyword.trim());
+  void _focusActivity(Map<String, dynamic> event) {
+    final title = event['title']?.toString().trim() ?? '';
+    _tabController.animateTo(1);
+    if (title.isNotEmpty) {
+      setState(() => _searchKeywords[1] = title);
+    } else {
+      setState(() {});
+    }
+    widget.onTabChanged?.call();
   }
 
   void refreshActiveTab() {
-    switch (_tabController.index) {
+    switch (_safeTabIndex) {
       case 0:
-        _opportunityKey.currentState?._load();
+        _cooperationKey.currentState?._load();
         break;
       case 1:
         _exhibitionKey.currentState?._load();
         break;
       case 2:
-        _artistKey.currentState?._load();
+        _feedKey.currentState?._load();
+        break;
+      case 3:
+        _circleKey.currentState?.refresh();
         break;
     }
   }
 
+  void addCreatedCircle(Map<String, dynamic> circle) {
+    _circleKey.currentState?.addCreatedCircle(circle);
+  }
+
   @override
   Widget build(BuildContext context) {
+    _ensureTabController();
+    _ensureSearchKeywords();
     final bottom = mainTabBottomInset(context);
     return Scaffold(
       backgroundColor: context.artC.porcelain,
-      body: SafeArea(
-        top: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 0),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: _SegmentTabs(
-                controller: _tabController,
-                tabs: const [
-                  (label: '合作机会', icon: Icons.business_center_outlined),
-                  (label: '展览活动', icon: Icons.grid_view_rounded),
-                  (label: '艺术家库', icon: Icons.palette_outlined),
-                ],
-              ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _ExploreChannelHeader(
+            controller: _tabController,
+            selectedIndex: _safeTabIndex,
+            onTabSelected: _selectTab,
+            onCalendarTap: _openArtCalendar,
+            onSearchTap: _openSearchScreen,
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _CooperationTab(
+                  key: _cooperationKey,
+                  bottom: bottom,
+                  searchKeyword: _searchKeywordAt(0),
+                ),
+                _ExhibitionTab(
+                  key: _exhibitionKey,
+                  bottom: bottom,
+                  searchKeyword: _searchKeywordAt(1),
+                ),
+                _CommunityFeedTab(
+                  key: _feedKey,
+                  bottom: bottom,
+                  searchKeyword: _searchKeywordAt(2),
+                ),
+                CommunityCircleSurface(
+                  key: _circleKey,
+                  bottom: bottom,
+                  searchKeyword: _searchKeywordAt(3),
+                  onCreateCircle: widget.onCreateCircle,
+                  onAsk: _openQuestionComposer,
+                ),
+              ],
             ),
-            const SizedBox(height: 14),
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _OpportunityTab(
-                    key: _opportunityKey,
-                    bottom: bottom,
-                    searchKeyword: _searchKeywords[0],
-                  ),
-                  _ExhibitionTab(
-                    key: _exhibitionKey,
-                    bottom: bottom,
-                    searchKeyword: _searchKeywords[1],
-                  ),
-                  _ArtistTab(
-                    key: _artistKey,
-                    bottom: bottom,
-                    searchKeyword: _searchKeywords[2],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
+
+class _CooperationTab extends StatefulWidget {
+  final double bottom;
+  final String searchKeyword;
+
+  const _CooperationTab({
+    super.key,
+    required this.bottom,
+    required this.searchKeyword,
+  });
+
+  @override
+  State<_CooperationTab> createState() => _CooperationTabState();
+}
+
+class _CooperationTabState extends State<_CooperationTab> {
+  final GlobalKey<_CooperationRecommendTabState> _feedKey =
+      GlobalKey<_CooperationRecommendTabState>();
+
+  void _load() {
+    _feedKey.currentState?._load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _CooperationRecommendTab(
+      key: _feedKey,
+      bottom: widget.bottom,
+      searchKeyword: widget.searchKeyword,
+    );
+  }
+}
+
+class _CooperationRecommendTab extends StatefulWidget {
+  final double bottom;
+  final String searchKeyword;
+
+  const _CooperationRecommendTab({
+    super.key,
+    required this.bottom,
+    required this.searchKeyword,
+  });
+
+  @override
+  State<_CooperationRecommendTab> createState() =>
+      _CooperationRecommendTabState();
+}
+
+class _CooperationRecommendTabState extends State<_CooperationRecommendTab> {
+  List<Map<String, dynamic>> _opportunities = const [];
+  List<Map<String, dynamic>> _artists = const [];
+  final Set<String> _appliedIds = {};
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final opportunitiesFuture =
+          BackendApiService.fetchOpportunities(limit: 12);
+      final artistsFuture = BackendApiService.fetchArtists(limit: 12);
+      final opportunitiesResult = await opportunitiesFuture;
+      final artistsResult = await artistsFuture;
+      if (!mounted) return;
+      setState(() {
+        _opportunities = opportunitiesResult.data;
+        _artists = artistsResult.data;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  Future<bool> _applyOpportunity(Map<String, dynamic> item) async {
+    if (!await ensureLoggedIn(context, message: '请先登录后申请合作机会')) {
+      return false;
+    }
+    final id = item['id']?.toString();
+    if (id == null || id.isEmpty) return false;
+    if (_appliedIds.contains(id)) return true;
+    try {
+      await BackendApiService.applyOpportunity(
+        opportunityId: id,
+        proposal: '我想申请这个推荐机会，请联系我补充作品集、背景和合作方案。',
+      );
+      if (!mounted) return false;
+      setState(() => _appliedIds.add(id));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('申请已提交，可在机会进度里继续追踪')),
+      );
+      return true;
+    } catch (e) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('申请失败：$e')),
+      );
+      return false;
+    }
+  }
+
+  void _openOpportunityDetail(Map<String, dynamic> item) {
+    final id = item['id']?.toString() ?? '';
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => OpportunityDetailScreen(
+          item: item,
+          applied: _appliedIds.contains(id),
+          onApply: () => _applyOpportunity(item),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return _LoadingState(bottom: widget.bottom);
+    if (_error != null) {
+      return _ResourceState(
+        bottom: widget.bottom,
+        title: '推荐加载失败',
+        subtitle: _error!,
+        onRetry: _load,
+      );
+    }
+
+    final opportunityItems = _filterMaps(_opportunities, widget.searchKeyword);
+    final artistSource = _withCooperationMockArtists(_artists);
+    final certifiedArtistItems = _filterMaps(
+      artistSource.where(_isCertifiedArtist).toList(),
+      widget.searchKeyword,
+    );
+    final allArtistItems = _filterMaps(artistSource, widget.searchKeyword);
+    final artistItems =
+        certifiedArtistItems.isNotEmpty ? certifiedArtistItems : allArtistItems;
+    final feedItems = _buildCooperationFeedItems(
+      opportunities: opportunityItems,
+      artists: artistItems,
+    );
+
+    return ListView(
+      padding: EdgeInsets.fromLTRB(20, 0, 20, widget.bottom + 88),
+      children: [
+        if (feedItems.isEmpty)
+          _EmptyPanel(
+            title: widget.searchKeyword.trim().isEmpty ? '暂无推荐合作' : '没有匹配推荐',
+            subtitle: widget.searchKeyword.trim().isEmpty
+                ? '机会和艺术家审核通过后会显示在这里。'
+                : '换一个城市、方向或合作关键词试试。',
+          )
+        else
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
+            itemCount: feedItems.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              mainAxisExtent: 168,
+            ),
+            itemBuilder: (context, index) {
+              final feedItem = feedItems[index];
+              return switch (feedItem.kind) {
+                _CooperationFeedKind.opportunity => _CompactOpportunityCard(
+                    item: feedItem.item,
+                    onOpen: () => _openOpportunityDetail(feedItem.item),
+                  ),
+                _CooperationFeedKind.artist => _CompactArtistCard(
+                    artist: feedItem.item,
+                  ),
+              };
+            },
+          ),
+      ],
+    );
+  }
+}
+
+enum _CooperationFeedKind { opportunity, artist }
+
+class _CooperationFeedItem {
+  final _CooperationFeedKind kind;
+  final Map<String, dynamic> item;
+
+  const _CooperationFeedItem({
+    required this.kind,
+    required this.item,
+  });
+}
+
+List<_CooperationFeedItem> _buildCooperationFeedItems({
+  required List<Map<String, dynamic>> opportunities,
+  required List<Map<String, dynamic>> artists,
+}) {
+  final items = <_CooperationFeedItem>[];
+  var opportunityIndex = 0;
+  var artistIndex = 0;
+  final startWithOpportunities = opportunities.length >= artists.length;
+
+  void addOpportunities(int count) {
+    for (var i = 0;
+        i < count && opportunityIndex < opportunities.length;
+        i += 1) {
+      items.add(
+        _CooperationFeedItem(
+          kind: _CooperationFeedKind.opportunity,
+          item: opportunities[opportunityIndex],
+        ),
+      );
+      opportunityIndex += 1;
+    }
+  }
+
+  void addArtists(int count) {
+    for (var i = 0; i < count && artistIndex < artists.length; i += 1) {
+      items.add(
+        _CooperationFeedItem(
+          kind: _CooperationFeedKind.artist,
+          item: artists[artistIndex],
+        ),
+      );
+      artistIndex += 1;
+    }
+  }
+
+  while (
+      opportunityIndex < opportunities.length || artistIndex < artists.length) {
+    if (startWithOpportunities) {
+      addOpportunities(2);
+      addArtists(2);
+    } else {
+      addArtists(2);
+      addOpportunities(2);
+    }
+  }
+  return items;
+}
+
+List<Map<String, dynamic>> _withCooperationMockArtists(
+  List<Map<String, dynamic>> artists,
+) {
+  if (artists.length >= 6) return artists;
+
+  final seen = artists
+      .map((item) =>
+          item['id']?.toString() ??
+          item['user_id']?.toString() ??
+          item['handle']?.toString() ??
+          item['display_name']?.toString() ??
+          '')
+      .where((item) => item.isNotEmpty)
+      .toSet();
+  final merged = <Map<String, dynamic>>[...artists];
+
+  for (final mock in _cooperationMockArtists) {
+    final key = mock['id']?.toString() ?? '';
+    if (!seen.add(key)) continue;
+    merged.add(mock);
+    if (merged.length >= 6) break;
+  }
+  return merged;
+}
+
+const List<Map<String, dynamic>> _cooperationMockArtists = [
+  {
+    'id': 'mock-artist-lin-ye',
+    'user_id': '',
+    'display_name': '林也',
+    'handle': 'linye.studio',
+    'avatar_url':
+        'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=240&q=80',
+    'city': '上海',
+    'status': 'published',
+    'verification_status': 'verified',
+    'verification_badges': ['平台认证', '展览认证'],
+    'art_fields': ['装置', '新媒体'],
+    'cooperation_status': 'available',
+    'cooperation_intent': '寻找空间共创、展览委托和声音装置项目合作。',
+    'portfolio_count': 18,
+    'exhibition_count': 6,
+    'bio': '关注城市声音、材料记忆与空间叙事的艺术家。',
+    'metadata': {
+      'cooperation_types': ['exhibition', 'public_art'],
+    },
+  },
+  {
+    'id': 'mock-artist-chen-mo',
+    'user_id': '',
+    'display_name': '陈墨',
+    'handle': 'chenmo.photo',
+    'avatar_url':
+        'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=240&q=80',
+    'city': '伦敦',
+    'status': 'published',
+    'verification_status': 'approved',
+    'verification_badges': ['教育背景认证'],
+    'art_fields': ['摄影', '影像'],
+    'cooperation_status': 'available',
+    'cooperation_intent': '开放艺术家访谈、出版拍摄和留学作品集项目合作。',
+    'portfolio_count': 24,
+    'exhibition_count': 4,
+    'bio': '摄影与影像创作者，长期拍摄迁徙、身份和青年文化。',
+    'metadata': {
+      'cooperation_types': ['workshop', 'brand'],
+    },
+  },
+  {
+    'id': 'mock-artist-yu-nan',
+    'user_id': '',
+    'display_name': '余南',
+    'handle': 'yunan.painting',
+    'avatar_url':
+        'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?auto=format&fit=crop&w=240&q=80',
+    'city': '北京',
+    'status': 'published',
+    'verification_status': 'verified',
+    'verification_badges': ['职业认证'],
+    'art_fields': ['绘画', '插画'],
+    'cooperation_status': 'busy',
+    'cooperation_intent': '近期接受小型联名、艺术书和插画委托排期。',
+    'portfolio_count': 31,
+    'exhibition_count': 8,
+    'bio': '绘画与插画艺术家，作品围绕梦境、身体和日常物件展开。',
+    'metadata': {
+      'cooperation_types': ['brand', 'exhibition'],
+    },
+  },
+  {
+    'id': 'mock-artist-maya',
+    'user_id': '',
+    'display_name': 'Maya Zhou',
+    'handle': 'maya.zhou',
+    'avatar_url':
+        'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=240&q=80',
+    'city': '纽约',
+    'status': 'published',
+    'verification_status': 'verified',
+    'verification_badges': ['平台认证'],
+    'art_fields': ['策展', '公共艺术'],
+    'cooperation_status': 'available',
+    'cooperation_intent': '可参与青年艺术家群展策划、驻留项目评审和工作坊。',
+    'portfolio_count': 12,
+    'exhibition_count': 11,
+    'bio': '独立策展人，关注公共空间、社群协作和艺术教育。',
+    'metadata': {
+      'cooperation_types': ['public_art', 'workshop'],
+    },
+  },
+  {
+    'id': 'mock-artist-he-shu',
+    'user_id': '',
+    'display_name': '何述',
+    'handle': 'heshu.design',
+    'avatar_url':
+        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=240&q=80',
+    'city': '广州',
+    'status': 'published',
+    'verification_status': 'approved',
+    'verification_badges': ['职业认证'],
+    'art_fields': ['视觉设计', '品牌'],
+    'cooperation_status': 'available',
+    'cooperation_intent': '接收品牌视觉、展览视觉系统和艺术衍生品合作。',
+    'portfolio_count': 27,
+    'exhibition_count': 3,
+    'bio': '视觉设计师，服务艺术机构、独立出版和文化品牌。',
+    'metadata': {
+      'cooperation_types': ['brand'],
+    },
+  },
+  {
+    'id': 'mock-artist-noah',
+    'user_id': '',
+    'display_name': 'Noah Kim',
+    'handle': 'noah.kim.media',
+    'avatar_url':
+        'https://images.unsplash.com/photo-1527980965255-d3b416303d12?auto=format&fit=crop&w=240&q=80',
+    'city': '首尔',
+    'status': 'published',
+    'verification_status': 'verified',
+    'verification_badges': ['展览认证'],
+    'art_fields': ['互动媒体', 'AI 艺术'],
+    'cooperation_status': 'available',
+    'cooperation_intent': '寻找互动影像、AI 展演和跨校创作小组合作。',
+    'portfolio_count': 15,
+    'exhibition_count': 5,
+    'bio': '互动媒体艺术家，使用机器学习、影像和实时声音创作。',
+    'metadata': {
+      'cooperation_types': ['exhibition', 'workshop'],
+    },
+  },
+];
 
 class _OpportunityTab extends StatefulWidget {
   final double bottom;
   final String searchKeyword;
 
   const _OpportunityTab({
-    super.key,
     required this.bottom,
     required this.searchKeyword,
   });
@@ -370,7 +982,7 @@ class _OpportunityTabState extends State<_OpportunityTab> {
     return ListView(
       padding: EdgeInsets.fromLTRB(20, 0, 20, widget.bottom + 88),
       children: [
-        _SectionHeader(title: '推荐机会 (Hot)', action: '${visibleItems.length} 条'),
+        _SectionHeader(title: '合作机会', action: '${visibleItems.length} 条'),
         const SizedBox(height: 8),
         _FilterHintBar(
           chips: const ['全部', '高预算', '同城', '本周截止', '适合学生', '驻留项目'],
@@ -401,6 +1013,408 @@ class _OpportunityTabState extends State<_OpportunityTab> {
       ],
     );
   }
+}
+
+class _CommunityFeedTab extends StatefulWidget {
+  final double bottom;
+  final String searchKeyword;
+
+  const _CommunityFeedTab({
+    super.key,
+    required this.bottom,
+    required this.searchKeyword,
+  });
+
+  @override
+  State<_CommunityFeedTab> createState() => _CommunityFeedTabState();
+}
+
+class _CommunityFeedTabState extends State<_CommunityFeedTab> {
+  List<AppCommunityPost> _posts = const [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final posts = await BackendApiService.fetchCommunityPosts(limit: 40);
+      if (!mounted) return;
+      setState(() {
+        _posts = posts
+            .where((post) => post.metadata['kind']?.toString() != 'qa')
+            .toList();
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _posts = const [];
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  void _openPost(AppCommunityPost post) {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => CommunityPostDetailScreen(
+          postId: post.id,
+          initialPost: post,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return _LoadingState(bottom: widget.bottom);
+    if (_error != null) {
+      return _ResourceState(
+        bottom: widget.bottom,
+        title: '动态加载失败',
+        subtitle: _error!,
+        onRetry: _load,
+      );
+    }
+
+    final keyword = widget.searchKeyword.trim().toLowerCase();
+    final visiblePosts = keyword.isEmpty
+        ? _posts
+        : _posts.where((post) {
+            return [
+              post.title,
+              post.body ?? '',
+              post.authorNickname ?? '',
+              post.metadata['post_type']?.toString() ?? '',
+              post.metadata['tags']?.toString() ?? '',
+            ].join(' ').toLowerCase().contains(keyword);
+          }).toList();
+
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(20, 0, 20, widget.bottom + 88),
+        children: [
+          if (visiblePosts.isEmpty)
+            _EmptyPanel(
+              title: keyword.isEmpty ? '暂无动态' : '没有匹配动态',
+              subtitle: keyword.isEmpty
+                  ? '用户发布的作品、现场和灵感记录会显示在这里。'
+                  : '换一个作品、作者或标签关键词试试。',
+            )
+          else
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: EdgeInsets.zero,
+              itemCount: visiblePosts.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 12,
+                mainAxisExtent: 252,
+              ),
+              itemBuilder: (context, index) {
+                final post = visiblePosts[index];
+                return _CommunityFeedCard(
+                  post: post,
+                  onTap: () => _openPost(post),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CommunityFeedCard extends StatelessWidget {
+  final AppCommunityPost post;
+  final VoidCallback onTap;
+
+  const _CommunityFeedCard({
+    required this.post,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = post.imageUrls.isNotEmpty ? post.imageUrls.first : null;
+    final author = post.authorNickname?.trim().isNotEmpty == true
+        ? post.authorNickname!.trim()
+        : 'Artsee 用户';
+    final title = post.title.trim().isNotEmpty
+        ? post.title.trim()
+        : (post.body?.trim().isNotEmpty == true ? post.body!.trim() : '作品动态');
+    final statusLabel = switch (post.status) {
+      'reviewing' => '审核中',
+      'draft' => '草稿',
+      _ => null,
+    };
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: context.artC.cardIconBg,
+          borderRadius: BorderRadius.circular(8),
+          border:
+              Border.all(color: context.artC.silver.withValues(alpha: 0.28)),
+          boxShadow: [
+            BoxShadow(
+              color: context.artC.ink.withValues(alpha: 0.028),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              height: 150,
+              width: double.infinity,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  imageUrl != null && imageUrl.isNotEmpty
+                      ? Image.network(
+                          imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _CommunityFeedFallback(
+                            seed: post.id,
+                            title: title,
+                          ),
+                        )
+                      : _CommunityFeedFallback(seed: post.id, title: title),
+                  if (statusLabel != null)
+                    Positioned(
+                      left: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.56),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          statusLabel,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(9, 8, 9, 0),
+              child: Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: context.artC.ink,
+                  fontSize: 13,
+                  height: 1.28,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            const Spacer(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(9, 7, 9, 9),
+              child: Row(
+                children: [
+                  _CommunityFeedAvatar(
+                    name: author,
+                    imageUrl: post.authorAvatarUrl,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      author,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: context.artC.ink.withValues(alpha: 0.48),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Icon(
+                    post.likedByMe
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                    size: 13,
+                    color: post.likedByMe
+                        ? const Color(0xFFE64565)
+                        : context.artC.ink.withValues(alpha: 0.34),
+                  ),
+                  const SizedBox(width: 2),
+                  Text(
+                    _compactExploreCount(post.likeCount),
+                    style: TextStyle(
+                      color: context.artC.ink.withValues(alpha: 0.42),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CommunityFeedAvatar extends StatelessWidget {
+  final String name;
+  final String? imageUrl;
+
+  const _CommunityFeedAvatar({
+    required this.name,
+    required this.imageUrl,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = name.isEmpty ? '艺' : name.characters.first;
+    return ClipOval(
+      child: SizedBox(
+        width: 18,
+        height: 18,
+        child: imageUrl != null && imageUrl!.isNotEmpty
+            ? Image.network(
+                imageUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    _CommunityFeedAvatarFallback(initial: initial),
+              )
+            : _CommunityFeedAvatarFallback(initial: initial),
+      ),
+    );
+  }
+}
+
+class _CommunityFeedAvatarFallback extends StatelessWidget {
+  final String initial;
+
+  const _CommunityFeedAvatarFallback({required this.initial});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: kCobalt.withValues(alpha: 0.12),
+      alignment: Alignment.center,
+      child: Text(
+        initial,
+        style: const TextStyle(
+          color: kCobalt,
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _CommunityFeedFallback extends StatelessWidget {
+  final String seed;
+  final String title;
+
+  const _CommunityFeedFallback({
+    required this.seed,
+    required this.title,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final encoded = Uri.encodeComponent(seed);
+    return Image.network(
+      'https://picsum.photos/seed/artsee_feed_$encoded/420/520',
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => _CommunityFeedColorFallback(
+        seed: seed,
+        title: title,
+      ),
+    );
+  }
+}
+
+class _CommunityFeedColorFallback extends StatelessWidget {
+  final String seed;
+  final String title;
+
+  const _CommunityFeedColorFallback({
+    required this.seed,
+    required this.title,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = [
+      (const Color(0xFFE7EEF8), const Color(0xFF4C6FFF)),
+      (const Color(0xFFF0ECE4), const Color(0xFF8A6F4D)),
+      (const Color(0xFFE8F3EE), const Color(0xFF2F7D5E)),
+      (const Color(0xFFF4E8EA), const Color(0xFFB94F68)),
+    ];
+    final item = colors[seed.hashCode.abs() % colors.length];
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [item.$1, item.$2.withValues(alpha: 0.18)],
+        ),
+      ),
+      alignment: Alignment.bottomLeft,
+      child: Text(
+        title,
+        maxLines: 3,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: context.artC.ink.withValues(alpha: 0.72),
+          fontSize: 13,
+          height: 1.25,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+String _compactExploreCount(int value) {
+  if (value >= 10000) {
+    final v = value / 10000;
+    return '${v.toStringAsFixed(v >= 10 ? 0 : 1)}w';
+  }
+  if (value >= 1000) {
+    final v = value / 1000;
+    return '${v.toStringAsFixed(v >= 10 ? 0 : 1)}k';
+  }
+  return '$value';
 }
 
 class _ExhibitionTab extends StatefulWidget {
@@ -436,10 +1450,13 @@ class _ExhibitionTabState extends State<_ExhibitionTab> {
       _error = null;
     });
     try {
-      final result = await BackendApiService.fetchEvents(limit: 30);
+      final results = await Future.wait([
+        BackendApiService.fetchEvents(limit: 30),
+        BackendApiService.fetchEvents(limit: 30, type: 'salon'),
+      ]);
       if (!mounted) return;
       setState(() {
-        _items = result.data;
+        _items = _mergeEventLists(results.map((result) => result.data));
         _loading = false;
       });
     } catch (e) {
@@ -480,7 +1497,7 @@ class _ExhibitionTabState extends State<_ExhibitionTab> {
   }
 
   Future<bool?> _showEventApplyConfirm(Map<String, dynamic> item) {
-    final title = item['title']?.toString() ?? '未命名展览';
+    final title = item['title']?.toString() ?? '未命名活动';
     final city = item['city']?.toString();
     final venue = item['venue']?.toString();
     return showModalBottomSheet<bool>(
@@ -580,69 +1597,13 @@ class _ExhibitionTabState extends State<_ExhibitionTab> {
     );
   }
 
-  void _openSchedule() {
-    final appliedItems = _items
-        .where((item) => _appliedIds.contains(item['id'].toString()))
-        .toList();
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) => Padding(
-        padding: const EdgeInsets.all(12),
-        child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: context.artC.porcelain,
-            borderRadius: BorderRadius.circular(28),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '我的展览日程',
-                  style: TextStyle(
-                    color: context.artC.ink,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                    fontFamily: 'Noto Serif SC',
-                  ),
-                ),
-                const SizedBox(height: 14),
-                if (appliedItems.isEmpty)
-                  Text(
-                    '暂无报名。报名展览、工作坊或导览后会显示在这里。',
-                    style: TextStyle(
-                      color: context.artC.ink.withOpacity(0.48),
-                      fontSize: 13,
-                      height: 1.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  )
-                else
-                  ...appliedItems.map(
-                    (item) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _ScheduleRow(item: item),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_loading) return _LoadingState(bottom: widget.bottom);
     if (_error != null) {
       return _ResourceState(
         bottom: widget.bottom,
-        title: '展览加载失败',
+        title: '活动加载失败',
         subtitle: _error!,
         onRetry: _load,
       );
@@ -650,41 +1611,21 @@ class _ExhibitionTabState extends State<_ExhibitionTab> {
     final visibleItems = _filterMaps(_items, widget.searchKeyword)
         .where((item) => _matchesExhibitionQuickFilter(item, _quickFilter))
         .toList();
-    final featured = visibleItems.isNotEmpty ? visibleItems.first : null;
-    final featuredId = featured?['id']?.toString();
     return ListView(
       padding: EdgeInsets.fromLTRB(20, 0, 20, widget.bottom + 88),
       children: [
-        _FeatureExhibition(
-          item: featured,
-          applied: featuredId != null && _appliedIds.contains(featuredId),
-          onOpen: featured == null ? null : () => _openDetail(featured),
-          onApply: featured == null ? null : () => _apply(featured),
-        ),
-        const SizedBox(height: 14),
-        _ScheduleSummaryCard(
-          appliedCount: _appliedIds.length,
-          onTap: _openSchedule,
-        ),
-        const SizedBox(height: 14),
         _FilterHintBar(
-          chips: const ['全部', '本周', '同城', '免费', '预约制', '线上'],
+          chips: const ['全部', '展览', '沙龙', '讲座', '工作坊', '开放日', '说明会'],
           selected: _quickFilter,
           onSelected: (filter) => setState(() => _quickFilter = filter),
-        ),
-        const SizedBox(height: 26),
-        _SectionHeader(
-          title: '展览与活动日历',
-          action: '${visibleItems.length} 场',
-          icon: Icons.location_on_outlined,
         ),
         const SizedBox(height: 14),
         if (visibleItems.isEmpty)
           _EmptyPanel(
             title: widget.searchKeyword.trim().isEmpty ? '暂无展览活动' : '没有匹配活动',
             subtitle: widget.searchKeyword.trim().isEmpty
-                ? '点击右上角 + 发布展览或沙龙。'
-                : '换一个关键词，或发布新的展览活动。',
+                ? '点击右上角 + 发布展览、沙龙或工作坊。'
+                : '换一个关键词，或发布新的活动。',
           )
         else
           ...visibleItems.map(
@@ -698,8 +1639,6 @@ class _ExhibitionTabState extends State<_ExhibitionTab> {
               ),
             ),
           ),
-        const SizedBox(height: 14),
-        _MuseumPanel(),
       ],
     );
   }
@@ -710,7 +1649,6 @@ class _ArtistTab extends StatefulWidget {
   final String searchKeyword;
 
   const _ArtistTab({
-    super.key,
     required this.bottom,
     required this.searchKeyword,
   });
@@ -891,19 +1829,1080 @@ class _ArtistTabState extends State<_ArtistTab> {
   }
 }
 
-class _SegmentTabs extends StatelessWidget {
+class _ExploreChannelHeader extends StatelessWidget {
   final TabController controller;
-  final List<({String label, IconData icon})> tabs;
+  final int selectedIndex;
+  final ValueChanged<int> onTabSelected;
+  final VoidCallback onCalendarTap;
+  final VoidCallback onSearchTap;
 
-  const _SegmentTabs({required this.controller, required this.tabs});
+  const _ExploreChannelHeader({
+    required this.controller,
+    required this.selectedIndex,
+    required this.onTabSelected,
+    required this.onCalendarTap,
+    required this.onSearchTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return ArtseeSegmentedTabs(
-      controller: controller,
-      tabs: tabs
-          .map((tab) => ArtseeSegmentTab(label: tab.label, icon: tab.icon))
-          .toList(),
+    final dividerColor = context.artC.silver.withValues(alpha: 0.28);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: context.artC.cardIconBg,
+        border: Border(
+          bottom: BorderSide(color: dividerColor),
+        ),
+      ),
+      child: SafeArea(
+        top: true,
+        bottom: false,
+        child: SizedBox(
+          height: 62,
+          child: Row(
+            children: [
+              const SizedBox(width: 8),
+              _ExploreHeaderIconButton(
+                icon: Icons.calendar_month_outlined,
+                onTap: onCalendarTap,
+                tooltip: '艺术日历',
+              ),
+              Expanded(
+                child: Center(
+                  child: _ExploreChannelTabs(
+                    controller: controller,
+                    selectedIndex: selectedIndex,
+                    onTabSelected: onTabSelected,
+                  ),
+                ),
+              ),
+              _ExploreHeaderIconButton(
+                icon: Icons.search_rounded,
+                onTap: onSearchTap,
+                tooltip: '搜索发现',
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ExploreHeaderIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final String tooltip;
+
+  const _ExploreHeaderIconButton({
+    required this.icon,
+    required this.onTap,
+    required this.tooltip,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final iconColor = context.artC.ink.withValues(alpha: 0.84);
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(999),
+          child: SizedBox(
+            width: 36,
+            height: 36,
+            child: Icon(
+              icon,
+              size: 22,
+              color: iconColor,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ArtCalendarDrawer extends StatefulWidget {
+  final VoidCallback onDismiss;
+  final VoidCallback onOpenActivities;
+  final ValueChanged<Map<String, dynamic>> onOpenEvent;
+
+  const _ArtCalendarDrawer({
+    required this.onDismiss,
+    required this.onOpenActivities,
+    required this.onOpenEvent,
+  });
+
+  @override
+  State<_ArtCalendarDrawer> createState() => _ArtCalendarDrawerState();
+}
+
+class _ArtCalendarDrawerState extends State<_ArtCalendarDrawer> {
+  List<Map<String, dynamic>> _events = const [];
+  List<Map<String, dynamic>> _myEvents = const [];
+  bool _loading = true;
+  String? _error;
+  int _selectedDay = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final results = await Future.wait([
+        BackendApiService.fetchEvents(limit: 40),
+        BackendApiService.fetchEvents(limit: 40, type: 'salon'),
+      ]);
+      var events = _mergeEventLists(results.map((result) => result.data));
+      var myEvents = <Map<String, dynamic>>[];
+      try {
+        final applications =
+            await BackendApiService.fetchMyEventApplications(limit: 30);
+        myEvents = applications.data
+            .map((application) {
+              final event = application['events'];
+              if (event is Map<String, dynamic>) {
+                return {
+                  ...event,
+                  'application_status': application['status'],
+                  'ticket_code': application['ticket_code'],
+                };
+              }
+              if (event is Map) {
+                return {
+                  ...Map<String, dynamic>.from(event),
+                  'application_status': application['status'],
+                  'ticket_code': application['ticket_code'],
+                };
+              }
+              return <String, dynamic>{};
+            })
+            .where((event) => event.isNotEmpty)
+            .toList();
+        events = _mergeEventLists([myEvents, events]);
+      } catch (_) {
+        myEvents = const [];
+      }
+      events.sort(_compareEventsByStart);
+      myEvents.sort(_compareEventsByStart);
+      if (!mounted) return;
+      setState(() {
+        _events = events;
+        _myEvents = myEvents;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  List<DateTime> get _days {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return List<DateTime>.generate(
+      7,
+      (index) => today.add(Duration(days: index)),
+    );
+  }
+
+  List<Map<String, dynamic>> get _selectedDayEvents {
+    final day = _days[_selectedDay];
+    return _events.where((event) {
+      final start = _eventStartDate(event);
+      return start != null && _isSameDay(start, day);
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> get _upcomingEvents {
+    final now = DateTime.now();
+    return _events
+        .where((event) {
+          final start = _eventStartDate(event);
+          return start == null ||
+              start.isAfter(now.subtract(const Duration(hours: 2)));
+        })
+        .take(6)
+        .toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final panelWidth = width >= 430 ? 374.0 : width * 0.86;
+    final selectedEvents = _selectedDayEvents;
+    final fallbackEvents =
+        selectedEvents.isEmpty ? _upcomingEvents : selectedEvents;
+    final todayText = _calendarFullDate(DateTime.now());
+
+    return Material(
+      color: Colors.transparent,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: widget.onDismiss,
+            ),
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              width: panelWidth,
+              height: double.infinity,
+              decoration: BoxDecoration(
+                color: context.artC.porcelain,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.12),
+                    blurRadius: 24,
+                    offset: const Offset(12, 0),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                bottom: false,
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 10, 12, 12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '我的艺术日历',
+                                  style: TextStyle(
+                                    color: context.artC.ink,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  todayText,
+                                  style: TextStyle(
+                                    color: context.artC.ink
+                                        .withValues(alpha: 0.42),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: '关闭',
+                            onPressed: widget.onDismiss,
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(
+                      height: 64,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        itemCount: _days.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        itemBuilder: (_, index) {
+                          final day = _days[index];
+                          return _CalendarDayChip(
+                            day: day,
+                            selected: index == _selectedDay,
+                            onTap: () => setState(() => _selectedDay = index),
+                          );
+                        },
+                      ),
+                    ),
+                    Expanded(
+                      child: Builder(
+                        builder: (context) {
+                          if (_loading) return const LoadingIndicator();
+                          if (_error != null) {
+                            return _CalendarErrorPanel(
+                              message: _error!,
+                              onRetry: _load,
+                            );
+                          }
+                          return ListView(
+                            padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+                            children: [
+                              _CalendarSummaryCard(
+                                todayCount: _selectedDayEvents.length,
+                                weekCount: _events
+                                    .where((event) => _isInNextDays(event, 7))
+                                    .length,
+                                myCount: _myEvents.length,
+                                onTap: widget.onOpenActivities,
+                              ),
+                              const SizedBox(height: 18),
+                              _CalendarSectionTitle(
+                                title:
+                                    selectedEvents.isEmpty ? '近期可参加' : '当天活动',
+                                action: '${fallbackEvents.length} 场',
+                              ),
+                              const SizedBox(height: 10),
+                              if (fallbackEvents.isEmpty)
+                                _CalendarEmptyPanel(
+                                  onOpen: widget.onOpenActivities,
+                                )
+                              else
+                                ...fallbackEvents.map(
+                                  (event) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 10),
+                                    child: _CalendarEventTile(
+                                      event: event,
+                                      mine: _eventIsMine(event, _myEvents),
+                                      onTap: () => widget.onOpenEvent(event),
+                                    ),
+                                  ),
+                                ),
+                              const SizedBox(height: 18),
+                              const _CalendarSectionTitle(
+                                title: '待处理提醒',
+                                action: 'REMIND',
+                              ),
+                              const SizedBox(height: 10),
+                              _CalendarReminderTile(
+                                icon: Icons.how_to_reg_outlined,
+                                title: '已报名待确认',
+                                subtitle: _myEvents.isEmpty
+                                    ? '报名活动后会在这里显示确认和签到提醒'
+                                    : '${_myEvents.length} 场活动可查看报名状态',
+                              ),
+                              _CalendarReminderTile(
+                                icon: Icons.handshake_outlined,
+                                title: '合作机会截止',
+                                subtitle: '后续会同步你收藏或申请的合作截止日期',
+                              ),
+                              _CalendarReminderTile(
+                                icon: Icons.forum_outlined,
+                                title: '圈子问答回复',
+                                subtitle: '你的提问、回答和圈子活动提醒会聚合到这里',
+                              ),
+                              const SizedBox(height: 24),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _CalendarBottomAction(
+                                      icon: Icons.add_rounded,
+                                      label: '发布活动',
+                                      onTap: widget.onOpenActivities,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: _CalendarBottomAction(
+                                      icon: Icons.qr_code_scanner_rounded,
+                                      label: '扫码签到',
+                                      onTap: () {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                            content: Text('活动签到会接入扫一扫'),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CalendarDayChip extends StatelessWidget {
+  final DateTime day;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _CalendarDayChip({
+    required this.day,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        width: 56,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? kCobalt : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected
+                ? kCobalt
+                : context.artC.silver.withValues(alpha: 0.34),
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              _calendarChipTitle(day),
+              style: TextStyle(
+                color: selected
+                    ? Colors.white
+                    : context.artC.ink.withValues(alpha: 0.48),
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              '${day.day}',
+              style: TextStyle(
+                color: selected ? Colors.white : context.artC.ink,
+                fontSize: 17,
+                fontWeight: FontWeight.w900,
+                fontFamily: 'Noto Serif SC',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CalendarSummaryCard extends StatelessWidget {
+  final int todayCount;
+  final int weekCount;
+  final int myCount;
+  final VoidCallback onTap;
+
+  const _CalendarSummaryCard({
+    required this.todayCount,
+    required this.weekCount,
+    required this.myCount,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ArtseeSurface(
+      onTap: onTap,
+      padding: const EdgeInsets.all(14),
+      radius: 18,
+      child: Row(
+        children: [
+          _CalendarMetric(label: '今天', value: '$todayCount'),
+          _CalendarMetric(label: '本周', value: '$weekCount'),
+          _CalendarMetric(label: '我的', value: '$myCount'),
+        ],
+      ),
+    );
+  }
+}
+
+class _CalendarMetric extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _CalendarMetric({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: const TextStyle(
+              color: kCobalt,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              fontFamily: 'Noto Serif SC',
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            label,
+            style: TextStyle(
+              color: context.artC.ink.withValues(alpha: 0.42),
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CalendarSectionTitle extends StatelessWidget {
+  final String title;
+  final String action;
+
+  const _CalendarSectionTitle({
+    required this.title,
+    required this.action,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            style: TextStyle(
+              color: context.artC.ink,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+        Text(
+          action,
+          style: TextStyle(
+            color: context.artC.ink.withValues(alpha: 0.34),
+            fontSize: 10,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CalendarEventTile extends StatelessWidget {
+  final Map<String, dynamic> event;
+  final bool mine;
+  final VoidCallback onTap;
+
+  const _CalendarEventTile({
+    required this.event,
+    required this.mine,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final title = event['title']?.toString() ?? '未命名活动';
+    final start = _eventStartDate(event);
+    final venue = event['venue']?.toString();
+    final city = event['city']?.toString();
+    return ArtseeSurface(
+      onTap: onTap,
+      padding: const EdgeInsets.all(12),
+      radius: 14,
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 54,
+            decoration: BoxDecoration(
+              color: kCobalt.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  start == null ? '--' : _monthLabel(start.month),
+                  style: TextStyle(
+                    color: context.artC.ink.withValues(alpha: 0.4),
+                    fontSize: 8,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  start == null ? '--' : '${start.day}',
+                  style: const TextStyle(
+                    color: kCobalt,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    fontFamily: 'Noto Serif SC',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    _CalendarTypePill(label: _eventTypeLabel(event)),
+                    if (mine) ...[
+                      const SizedBox(width: 6),
+                      const _CalendarTypePill(label: '已报名', strong: true),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: context.artC.ink,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    height: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  [
+                    _calendarTime(start),
+                    if (city != null && city.isNotEmpty) city,
+                    if (venue != null && venue.isNotEmpty) venue,
+                  ].join(' · '),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: context.artC.ink.withValues(alpha: 0.42),
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: context.artC.ink.withValues(alpha: 0.24),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CalendarTypePill extends StatelessWidget {
+  final String label;
+  final bool strong;
+
+  const _CalendarTypePill({required this.label, this.strong = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: strong ? kCobalt : context.artC.silver.withValues(alpha: 0.34),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color:
+              strong ? Colors.white : context.artC.ink.withValues(alpha: 0.5),
+          fontSize: 9,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _CalendarReminderTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  const _CalendarReminderTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(11),
+              border: Border.all(
+                  color: context.artC.silver.withValues(alpha: 0.28)),
+            ),
+            child: Icon(icon,
+                size: 17, color: context.artC.ink.withValues(alpha: 0.72)),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: context.artC.ink,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: context.artC.ink.withValues(alpha: 0.38),
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CalendarBottomAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _CalendarBottomAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        height: 70,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border:
+              Border.all(color: context.artC.silver.withValues(alpha: 0.28)),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon,
+                color: context.artC.ink.withValues(alpha: 0.72), size: 22),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: context.artC.ink.withValues(alpha: 0.56),
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CalendarEmptyPanel extends StatelessWidget {
+  final VoidCallback onOpen;
+
+  const _CalendarEmptyPanel({required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    return ArtseeSurface(
+      onTap: onOpen,
+      padding: const EdgeInsets.all(16),
+      radius: 16,
+      child: Row(
+        children: [
+          const Icon(Icons.event_available_outlined, color: kCobalt, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              '暂无活动，去活动页看看展览、沙龙、讲座和开放日。',
+              style: TextStyle(
+                color: context.artC.ink.withValues(alpha: 0.56),
+                fontSize: 12,
+                height: 1.4,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CalendarErrorPanel extends StatelessWidget {
+  final String message;
+  final Future<void> Function() onRetry;
+
+  const _CalendarErrorPanel({
+    required this.message,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+      children: [
+        Icon(
+          Icons.event_busy_outlined,
+          color: context.artC.ink.withValues(alpha: 0.3),
+          size: 34,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          '艺术日历加载失败',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: context.artC.ink,
+            fontSize: 15,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          message,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: context.artC.ink.withValues(alpha: 0.44),
+            fontSize: 12,
+            height: 1.4,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Center(
+          child: TextButton(onPressed: onRetry, child: const Text('重试')),
+        ),
+      ],
+    );
+  }
+}
+
+class _ExploreChannelTabs extends StatelessWidget {
+  final TabController controller;
+  final int selectedIndex;
+  final ValueChanged<int> onTabSelected;
+
+  const _ExploreChannelTabs({
+    required this.controller,
+    required this.selectedIndex,
+    required this.onTabSelected,
+  });
+
+  static const _labels = ['合作', '活动', '动态', '问答'];
+  static const _accent = Color(0xFFE64565);
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller.animation ?? controller,
+      builder: (context, _) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var index = 0; index < _labels.length; index++)
+              _ExploreChannelTab(
+                label: _labels[index],
+                selected: selectedIndex == index,
+                accent: _accent,
+                onTap: () => onTabSelected(index),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ExploreChannelTab extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final Color accent;
+  final VoidCallback onTap;
+
+  const _ExploreChannelTab({
+    required this.label,
+    required this.selected,
+    required this.accent,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor =
+        selected ? context.artC.ink : context.artC.ink.withValues(alpha: 0.42);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        width: 58,
+        height: 62,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SizedBox(height: 6),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: textColor,
+                fontSize: 16,
+                height: 1.08,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w400,
+                letterSpacing: 0,
+              ),
+            ),
+            const SizedBox(height: 7),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              width: selected ? (label.length > 2 ? 38 : 30) : 0,
+              height: 3.5,
+              decoration: BoxDecoration(
+                color: accent,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CompactOpportunityCard extends StatelessWidget {
+  final Map<String, dynamic> item;
+  final VoidCallback onOpen;
+
+  const _CompactOpportunityCard({
+    required this.item,
+    required this.onOpen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final title = item['title']?.toString() ?? '未命名机会';
+    final type = item['type']?.toString() ?? 'collaboration';
+    final city = item['city']?.toString().trim();
+    final deadline = item['deadline'];
+    final budget = _formatBudget(item['budget_min'], item['budget_max']);
+    final typeLabel = _opportunityTypeLabel(type);
+    final deadlineText = _formatDeadlineUrgency(deadline);
+    final meta = [
+      if (city != null && city.isNotEmpty) city,
+      budget,
+    ].where((item) => item.trim().isNotEmpty).join(' · ');
+
+    return ArtseeSurface(
+      onTap: onOpen,
+      padding: const EdgeInsets.all(12),
+      radius: 8,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _MiniBadge(text: typeLabel, color: kCobalt),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  deadlineText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    color: _deadlineColor(deadline, context),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                title,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: context.artC.ink,
+                  fontSize: 15,
+                  height: 1.18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
+            decoration: BoxDecoration(
+              color: context.artC.silver.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              meta.isEmpty ? '详情待补充' : meta,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: context.artC.ink.withValues(alpha: 0.42),
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -925,7 +2924,7 @@ class _OpportunityCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final title = item['title']?.toString() ?? '未命名机会';
     final type = item['type']?.toString() ?? 'collaboration';
-    final city = item['city']?.toString();
+    final city = item['city']?.toString().trim();
     final requirements = item['requirements']?.toString() ?? '';
     final deadline = item['deadline'];
     final budget = _formatBudget(item['budget_min'], item['budget_max']);
@@ -934,32 +2933,33 @@ class _OpportunityCard extends StatelessWidget {
         : const <String, dynamic>{};
     final organization = metadata['organization']?.toString();
     final showOrganization = metadata['show_organization'] != false;
-    final deliverable = metadata['deliverable']?.toString();
-    final materials = metadata['required_materials'] is List
-        ? (metadata['required_materials'] as List)
-            .map((e) => e.toString())
-            .toList()
-        : const <String>[];
-
     final tags = _extractOpportunityTags(city, requirements);
     final typeLabel = _opportunityTypeLabel(type);
     final deadlineText = _formatDeadlineUrgency(deadline);
+    final host =
+        !showOrganization || organization == null || organization.isEmpty
+            ? '平台认证项目方'
+            : organization;
+    final description =
+        requirements.isEmpty ? '适合有成熟作品集、可执行方案或合作经验的创作者。' : requirements;
 
     return ArtseeSurface(
       onTap: onOpen,
-      padding: const EdgeInsets.all(15),
-      radius: 18,
+      padding: const EdgeInsets.all(14),
+      radius: 8,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              _MiniBadge(text: typeLabel, color: kCobalt),
+              const _MiniBadge(text: '机会', color: kCobalt),
+              const SizedBox(width: 6),
+              _MiniBadge(text: typeLabel, color: const Color(0xFF7A6A56)),
               const Spacer(),
               Text(
                 deadlineText,
                 style: TextStyle(
-                  fontSize: 10,
+                  fontSize: 11,
                   color: _deadlineColor(deadline, context),
                   fontWeight: FontWeight.w900,
                 ),
@@ -972,40 +2972,15 @@ class _OpportunityCard extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 17,
               height: 1.25,
               fontWeight: FontWeight.w900,
               color: context.artC.ink,
-              fontFamily: 'Noto Serif SC',
             ),
-          ),
-          const SizedBox(height: 7),
-          _OpportunityDecisionLine(
-            label: '合作方',
-            value: !showOrganization ||
-                    organization == null ||
-                    organization.isEmpty
-                ? '平台认证项目方'
-                : organization,
-          ),
-          const SizedBox(height: 6),
-          _OpportunityDecisionLine(
-            label: '交付',
-            value: deliverable == null || deliverable.isEmpty
-                ? '作品集方案 / 初步合作提案'
-                : deliverable,
-          ),
-          const SizedBox(height: 6),
-          _OpportunityDecisionLine(
-            label: '材料',
-            value:
-                materials.isEmpty ? '作品集 + 简历 + 初步方案' : materials.join(' + '),
           ),
           const SizedBox(height: 8),
           Text(
-            requirements.isEmpty
-                ? '适合：有成熟作品集、可执行方案或合作经验的创作者。'
-                : '适合：$requirements',
+            description,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
@@ -1015,15 +2990,34 @@ class _OpportunityCard extends StatelessWidget {
               color: context.artC.ink.withOpacity(0.46),
             ),
           ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 5,
-            runSpacing: 5,
-            children: tags.map((tag) => _SoftTag(text: tag)).toList(),
-          ),
-          const SizedBox(height: 12),
-          Container(height: 1, color: context.artC.silver.withOpacity(0.26)),
           const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _CooperationMetaLine(
+                  icon: Icons.apartment_rounded,
+                  text: host,
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (city != null && city.isNotEmpty)
+                _CooperationMetaLine(
+                  icon: Icons.place_outlined,
+                  text: city,
+                ),
+            ],
+          ),
+          if (tags.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 5,
+              runSpacing: 5,
+              children: tags.take(3).map((tag) => _SoftTag(text: tag)).toList(),
+            ),
+          ],
+          const SizedBox(height: 10),
+          Container(height: 1, color: context.artC.silver.withOpacity(0.26)),
+          const SizedBox(height: 9),
           Row(
             children: [
               Expanded(
@@ -1040,7 +3034,7 @@ class _OpportunityCard extends StatelessWidget {
                 onTap: applied ? onOpen : onApply,
                 child: Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
                     color: applied
                         ? context.artC.silver.withOpacity(0.2)
@@ -1069,157 +3063,39 @@ class _OpportunityCard extends StatelessWidget {
   }
 }
 
-class _FeatureExhibition extends StatelessWidget {
-  final Map<String, dynamic>? item;
-  final bool applied;
-  final VoidCallback? onOpen;
-  final VoidCallback? onApply;
+class _CooperationMetaLine extends StatelessWidget {
+  final IconData icon;
+  final String text;
 
-  const _FeatureExhibition({
-    this.item,
-    required this.applied,
-    this.onOpen,
-    this.onApply,
+  const _CooperationMetaLine({
+    required this.icon,
+    required this.text,
   });
 
   @override
   Widget build(BuildContext context) {
-    final title = item?['title']?.toString() ?? '镜中之镜 - 线上VR大展';
-    final coverUrl = item?['cover_url']?.toString();
-    final city = item?['city']?.toString();
-    final venue = item?['venue']?.toString();
-    final date = DateTime.tryParse(item?['start_time']?.toString() ?? '');
-    final summary = item?['summary']?.toString();
-    return GestureDetector(
-      onTap: onOpen,
-      child: AspectRatio(
-        aspectRatio: 1.25,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(26),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              coverUrl != null && coverUrl.isNotEmpty
-                  ? Image.network(
-                      coverUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        color: context.artC.silver.withOpacity(0.3),
-                        child: Icon(
-                          Icons.image_outlined,
-                          size: 60,
-                          color: context.artC.ink.withOpacity(0.2),
-                        ),
-                      ),
-                    )
-                  : Container(
-                      color: context.artC.silver.withOpacity(0.3),
-                      child: Icon(
-                        Icons.photo_library_outlined,
-                        size: 60,
-                        color: context.artC.ink.withOpacity(0.2),
-                      ),
-                    ),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                      context.artC.ink.withOpacity(0.9),
-                      Colors.transparent
-                    ],
-                  ),
-                ),
-              ),
-              Positioned(
-                left: 22,
-                right: 22,
-                bottom: 22,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'FEATURED EXHIBIT HIGHLIGHTS',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.5),
-                        fontSize: 8,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      title,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        height: 1.05,
-                        fontWeight: FontWeight.w900,
-                        fontStyle: FontStyle.italic,
-                        fontFamily: 'Noto Serif SC',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        _FeaturePill(
-                            text: date == null ? '预约制' : _formatDate(date)),
-                        const SizedBox(width: 8),
-                        _FeaturePill(
-                          text: [
-                            if (city != null && city.isNotEmpty) city,
-                            if (venue != null && venue.isNotEmpty) venue,
-                          ].join(' · ').isEmpty
-                              ? '线上 / 线下活动'
-                              : [
-                                  if (city != null && city.isNotEmpty) city,
-                                  if (venue != null && venue.isNotEmpty) venue,
-                                ].join(' · '),
-                        ),
-                      ],
-                    ),
-                    if (summary != null && summary.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      Text(
-                        summary,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.72),
-                          fontSize: 12,
-                          height: 1.45,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        _FeatureActionButton(
-                          label: '查看详情',
-                          icon: Icons.arrow_forward_rounded,
-                          onTap: onOpen,
-                          filled: false,
-                        ),
-                        const SizedBox(width: 8),
-                        _FeatureActionButton(
-                          label: applied ? '已报名' : '立即报名',
-                          icon: applied
-                              ? Icons.check_circle_rounded
-                              : Icons.event_available_rounded,
-                          onTap: applied ? null : onApply,
-                          filled: true,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          icon,
+          size: 13,
+          color: context.artC.ink.withValues(alpha: 0.32),
+        ),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: context.artC.ink.withValues(alpha: 0.44),
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -1239,7 +3115,7 @@ class _ExhibitionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = item['title']?.toString() ?? '未命名展览';
+    final title = item['title']?.toString() ?? '未命名活动';
     final subtitle = item['summary']?.toString() ??
         item['venue']?.toString() ??
         item['hotel_name']?.toString() ??
@@ -1250,6 +3126,7 @@ class _ExhibitionCard extends StatelessWidget {
     final city = item['city']?.toString();
     final venue = item['venue']?.toString();
     final fee = _formatEventFee(item['fee_amount']);
+    final typeLabel = _eventTypeLabel(item);
     return ArtseeSurface(
       onTap: onOpen,
       padding: const EdgeInsets.all(15),
@@ -1316,6 +3193,8 @@ class _ExhibitionCard extends StatelessWidget {
                 const SizedBox(height: 10),
                 Row(
                   children: [
+                    _MiniBadge(text: typeLabel, color: kCobalt),
+                    const SizedBox(width: 8),
                     Icon(Icons.location_on_outlined,
                         size: 11, color: context.artC.ink.withOpacity(0.38)),
                     const SizedBox(width: 3),
@@ -1446,200 +3325,6 @@ class _FilterHintBar extends StatelessWidget {
   }
 }
 
-class _FeaturePill extends StatelessWidget {
-  final String text;
-
-  const _FeaturePill({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Flexible(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.18),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: Colors.white.withOpacity(0.18)),
-        ),
-        child: Text(
-          text,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 10,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FeatureActionButton extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final VoidCallback? onTap;
-  final bool filled;
-
-  const _FeatureActionButton({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-    required this.filled,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: filled ? Colors.white : Colors.white.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: Colors.white.withOpacity(0.22)),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon,
-                  size: 14, color: filled ? context.artC.ink : Colors.white),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  color: filled ? context.artC.ink : Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ScheduleSummaryCard extends StatelessWidget {
-  final int appliedCount;
-  final VoidCallback onTap;
-
-  const _ScheduleSummaryCard({
-    required this.appliedCount,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: context.artC.cardIconBg,
-          borderRadius: BorderRadius.circular(18),
-          border:
-              Border.all(color: context.artC.silver.withValues(alpha: 0.32)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: kCobalt.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: const Icon(Icons.event_note_outlined, color: kCobalt),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '我的展览日程',
-                    style: TextStyle(
-                      color: context.artC.ink,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    appliedCount == 0
-                        ? '报名后会在这里管理状态'
-                        : '$appliedCount 场已报名 · 待确认',
-                    style: TextStyle(
-                      color: context.artC.ink.withOpacity(0.42),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right_rounded, color: kCobalt),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ScheduleRow extends StatelessWidget {
-  final Map<String, dynamic> item;
-
-  const _ScheduleRow({required this.item});
-
-  @override
-  Widget build(BuildContext context) {
-    final title = item['title']?.toString() ?? '未命名活动';
-    return Container(
-      padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(
-        color: context.artC.cardIconBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: context.artC.silver.withValues(alpha: 0.22)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: context.artC.ink,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  _formatDate(item['start_time']),
-                  style: TextStyle(
-                    color: context.artC.ink.withOpacity(0.42),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          _MiniBadge(text: '待确认', color: kCobalt),
-        ],
-      ),
-    );
-  }
-}
-
 class ExhibitionDetailScreen extends StatefulWidget {
   final Map<String, dynamic> item;
   final bool applied;
@@ -1674,7 +3359,7 @@ class _ExhibitionDetailScreenState extends State<ExhibitionDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final item = widget.item;
-    final title = item['title']?.toString() ?? '未命名展览';
+    final title = item['title']?.toString() ?? '未命名活动';
     final summary =
         item['summary']?.toString() ?? item['description']?.toString();
     final city = item['city']?.toString();
@@ -1719,7 +3404,7 @@ class _ExhibitionDetailScreenState extends State<ExhibitionDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _MiniBadge(text: 'EXHIBITION / EVENT', color: kCobalt),
+                  _MiniBadge(text: 'EVENT', color: kCobalt),
                   const SizedBox(height: 12),
                   Text(
                     title,
@@ -1795,50 +3480,117 @@ class _ExhibitionDetailScreenState extends State<ExhibitionDetailScreen> {
   }
 }
 
-class _MuseumPanel extends StatelessWidget {
+class _CompactArtistCard extends StatelessWidget {
+  final Map<String, dynamic> artist;
+
+  const _CompactArtistCard({required this.artist});
+
   @override
   Widget build(BuildContext context) {
-    const museums = ['龙美术馆', '艺仓艺术馆', 'UCCA Edge', '复星艺术中心'];
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: context.artC.ink,
-        borderRadius: BorderRadius.circular(28),
-      ),
+    final name = artist['display_name']?.toString() ?? '未命名艺术家';
+    final handle = _artistHandle(artist);
+    final fields = _artistFields(artist);
+    final city = artist['city']?.toString().trim();
+    final avatarUrl = artist['avatar_url']?.toString();
+    final cooperationStatus =
+        artist['cooperation_status']?.toString() ?? 'available';
+    final isCertified = _isCertifiedArtist(artist);
+    final subtitle = [
+      if (city != null && city.isNotEmpty) city,
+      if (fields.isNotEmpty) fields.take(2).join('/'),
+      if ((city == null || city.isEmpty) && fields.isEmpty) handle,
+    ].join(' · ');
+
+    return ArtseeSurface(
+      onTap: () => _openArtistProfile(context, artist),
+      padding: const EdgeInsets.all(12),
+      radius: 8,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '热门展馆推荐',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.4),
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 0,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ...museums.map(
-            (museum) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
+          Expanded(
+            child: Center(
               child: Row(
                 children: [
+                  _ArtistAvatar(name: name, avatarUrl: avatarUrl, size: 46),
+                  const SizedBox(width: 10),
                   Expanded(
-                    child: Text(
-                      museum,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        fontStyle: FontStyle.italic,
-                      ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: context.artC.ink,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                            if (isCertified) ...[
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.verified_rounded,
+                                color: kCobalt,
+                                size: 14,
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          subtitle.isEmpty ? handle : subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: context.artC.ink.withValues(alpha: 0.42),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  Icon(Icons.chevron_right,
-                      size: 18, color: Colors.white.withOpacity(0.5)),
                 ],
               ),
             ),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: _cooperationStatusColor(cooperationStatus)
+                        .withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    _cooperationStatusLabel(cooperationStatus),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: _cooperationStatusColor(cooperationStatus),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: context.artC.ink.withValues(alpha: 0.26),
+                size: 18,
+              ),
+            ],
           ),
         ],
       ),
@@ -1857,234 +3609,134 @@ class _ArtistCard extends StatelessWidget {
     final handle = _artistHandle(artist);
     final fields = _artistFields(artist);
     final city = artist['city']?.toString().trim();
-    final coverWorkUrl = artist['cover_work_url']?.toString() ??
-        artist['featured_work_url']?.toString() ??
-        artist['avatar_url']?.toString();
     final avatarUrl = artist['avatar_url']?.toString();
     final cooperationStatus =
         artist['cooperation_status']?.toString() ?? 'available';
     final portfolioCount = _artistInt(artist['portfolio_count']);
     final exhibitionCount = _artistInt(artist['exhibition_count']);
     final cooperationTypes = _artistCooperationTypes(artist);
+    final intent = artist['cooperation_intent']?.toString().trim();
+    final metricText = [
+      if (portfolioCount > 0) '$portfolioCount 件作品',
+      if (exhibitionCount > 0) '$exhibitionCount 次展览',
+      if (portfolioCount == 0 && exhibitionCount == 0) '作品待补充',
+    ].join(' · ');
 
     return ArtseeSurface(
-      onTap: () {
-        Navigator.of(context).push<void>(
-          MaterialPageRoute<void>(
-            builder: (_) => PublicUserProfileScreen(
-              userId: artist['user_id']?.toString(),
-              name: name,
-              handle: handle,
-              avatarUrl: avatarUrl,
-              roleLabel: _artistVerificationLabel(artist),
-              bio: artist['bio']?.toString(),
-              kind: PublicUserProfileKind.artist,
-              featuredActivity:
-                  '正在展示${fields.isEmpty ? '艺术创作' : fields.join(' / ')}方向的作品与合作意向。',
-              featuredAnswerContext: '艺术家观点',
-              featuredAnswer: artist['cooperation_intent']?.toString(),
-            ),
-          ),
-        );
-      },
-      padding: EdgeInsets.zero,
+      onTap: () => _openArtistProfile(context, artist),
+      padding: const EdgeInsets.all(14),
       radius: 8,
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            height: 132,
-            child: ClipRRect(
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(8)),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  coverWorkUrl != null && coverWorkUrl.isNotEmpty
-                      ? Image.network(
-                          coverWorkUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              _ArtistCoverFallback(name: name),
-                        )
-                      : _ArtistCoverFallback(name: name),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.black.withValues(alpha: 0.08),
-                          Colors.black.withValues(alpha: 0.48),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 9, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: _cooperationStatusColor(cooperationStatus)
-                            .withOpacity(0.95),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        _cooperationStatusLabel(cooperationStatus),
-                        style: const TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: 12,
-                    bottom: 12,
-                    right: 12,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        _ArtistAvatar(name: name, avatarUrl: avatarUrl),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      name,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 17,
-                                        fontWeight: FontWeight.w900,
-                                        fontFamily: 'Noto Serif SC',
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 5),
-                                  const Icon(Icons.verified_rounded,
-                                      color: Colors.white, size: 16),
-                                ],
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                handle,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.72),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(14),
+          _ArtistAvatar(name: name, avatarUrl: avatarUrl),
+          const SizedBox(width: 12),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Wrap(
-                  spacing: 7,
-                  runSpacing: 7,
+                Row(
                   children: [
-                    _MiniBadge(
-                        text: _artistVerificationLabel(artist), color: kCobalt),
-                    if (city != null && city.isNotEmpty)
-                      _MiniBadge(text: city, color: const Color(0xFF047857)),
-                    if (cooperationTypes.isNotEmpty)
-                      _MiniBadge(
-                        text: cooperationTypes.first,
-                        color: const Color(0xFF7A6A56),
+                    const _MiniBadge(
+                      text: '艺术家',
+                      color: Color(0xFF047857),
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: _MiniBadge(
+                        text: _cooperationStatusLabel(cooperationStatus),
+                        color: _cooperationStatusColor(cooperationStatus),
                       ),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 9),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: context.artC.ink,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    const Icon(
+                      Icons.verified_rounded,
+                      color: kCobalt,
+                      size: 16,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
                 Text(
-                  fields.isEmpty ? '艺术家' : fields.join(' / '),
+                  [
+                    handle,
+                    if (city != null && city.isNotEmpty) city,
+                    if (fields.isNotEmpty) fields.take(2).join('/'),
+                  ].join(' · '),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                    color: context.artC.ink,
+                    color: context.artC.ink.withValues(alpha: 0.44),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  intent == null || intent.isEmpty
+                      ? '开放作品交流、合作邀约和艺术项目沟通。'
+                      : intent,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: context.artC.ink.withValues(alpha: 0.58),
+                    fontSize: 12,
+                    height: 1.4,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 10),
                 Row(
                   children: [
                     Expanded(
-                      child: _ArtistWorkStrip(
-                        artist: artist,
-                        coverUrl: coverWorkUrl,
+                      child: Text(
+                        [
+                          metricText,
+                          if (cooperationTypes.isNotEmpty)
+                            cooperationTypes.take(2).join(' / '),
+                        ].join(' · '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: context.artC.ink.withValues(alpha: 0.36),
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          [
-                            if (portfolioCount > 0) '$portfolioCount 件作品',
-                            if (exhibitionCount > 0) '$exhibitionCount 次展览',
-                            if (portfolioCount == 0 && exhibitionCount == 0)
-                              '作品待补充',
-                          ].join(' · '),
-                          textAlign: TextAlign.right,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: context.artC.ink.withValues(alpha: 0.42),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          _cooperationStatusLabel(cooperationStatus),
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
-                            color: _cooperationStatusColor(cooperationStatus),
-                          ),
-                        ),
-                      ],
+                    const SizedBox(width: 8),
+                    Text(
+                      '看主页',
+                      style: TextStyle(
+                        color: kCobalt,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: kCobalt,
+                      size: 18,
                     ),
                   ],
                 ),
-                if (artist['cooperation_intent']
-                        ?.toString()
-                        .trim()
-                        .isNotEmpty ==
-                    true) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    artist['cooperation_intent'].toString().trim(),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.45,
-                      fontWeight: FontWeight.w700,
-                      color: context.artC.ink.withValues(alpha: 0.58),
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
@@ -2094,42 +3746,23 @@ class _ArtistCard extends StatelessWidget {
   }
 }
 
-class _ArtistCoverFallback extends StatelessWidget {
-  final String name;
-
-  const _ArtistCoverFallback({required this.name});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: context.artC.silver.withValues(alpha: 0.28),
-      child: Center(
-        child: Text(
-          name.isEmpty ? '艺' : name.characters.first,
-          style: TextStyle(
-            color: kCobalt.withValues(alpha: 0.52),
-            fontSize: 42,
-            fontWeight: FontWeight.w900,
-            fontFamily: 'Noto Serif SC',
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _ArtistAvatar extends StatelessWidget {
   final String name;
   final String? avatarUrl;
+  final double size;
 
-  const _ArtistAvatar({required this.name, required this.avatarUrl});
+  const _ArtistAvatar({
+    required this.name,
+    required this.avatarUrl,
+    this.size = 48,
+  });
 
   @override
   Widget build(BuildContext context) {
     final url = avatarUrl?.trim();
     return Container(
-      width: 48,
-      height: 48,
+      width: size,
+      height: size,
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.92),
@@ -2171,62 +3804,29 @@ class _ArtistAvatarFallback extends StatelessWidget {
   }
 }
 
-class _ArtistWorkStrip extends StatelessWidget {
-  final Map<String, dynamic> artist;
-  final String? coverUrl;
+void _openArtistProfile(BuildContext context, Map<String, dynamic> artist) {
+  final name = artist['display_name']?.toString() ?? '未命名艺术家';
+  final handle = _artistHandle(artist);
+  final fields = _artistFields(artist);
+  final avatarUrl = artist['avatar_url']?.toString();
 
-  const _ArtistWorkStrip({required this.artist, required this.coverUrl});
-
-  @override
-  Widget build(BuildContext context) {
-    final urls = _artistWorkUrls(artist, coverUrl).take(3).toList();
-    return Row(
-      children: List.generate(3, (index) {
-        final url = index < urls.length ? urls[index] : null;
-        return Padding(
-          padding: EdgeInsets.only(right: index == 2 ? 0 : 6),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: SizedBox(
-              width: 42,
-              height: 42,
-              child: url != null && url.isNotEmpty
-                  ? Image.network(
-                      url,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          _ArtistWorkFallback(index: index),
-                    )
-                  : _ArtistWorkFallback(index: index),
-            ),
-          ),
-        );
-      }),
-    );
-  }
-}
-
-class _ArtistWorkFallback extends StatelessWidget {
-  final int index;
-
-  const _ArtistWorkFallback({required this.index});
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = [
-      const Color(0xFFE7EEF8),
-      const Color(0xFFE8F3EE),
-      const Color(0xFFF4E8EA),
-    ];
-    return Container(
-      color: colors[index % colors.length],
-      child: Icon(
-        Icons.image_outlined,
-        size: 16,
-        color: kCobalt.withValues(alpha: 0.35),
+  Navigator.of(context).push<void>(
+    MaterialPageRoute<void>(
+      builder: (_) => PublicUserProfileScreen(
+        userId: artist['user_id']?.toString(),
+        name: name,
+        handle: handle,
+        avatarUrl: avatarUrl,
+        roleLabel: _artistVerificationLabel(artist),
+        bio: artist['bio']?.toString(),
+        kind: PublicUserProfileKind.artist,
+        featuredActivity:
+            '正在展示${fields.isEmpty ? '艺术创作' : fields.join(' / ')}方向的作品与合作意向。',
+        featuredAnswerContext: '艺术家观点',
+        featuredAnswer: artist['cooperation_intent']?.toString(),
       ),
-    );
-  }
+    ),
+  );
 }
 
 class _ArtistSearchField extends StatelessWidget {
@@ -2541,9 +4141,8 @@ class _ArtistOnboardingPanel extends StatelessWidget {
 class _SectionHeader extends StatelessWidget {
   final String title;
   final String action;
-  final IconData? icon;
 
-  const _SectionHeader({required this.title, required this.action, this.icon});
+  const _SectionHeader({required this.title, required this.action});
 
   @override
   Widget build(BuildContext context) {
@@ -2560,8 +4159,6 @@ class _SectionHeader extends StatelessWidget {
             ),
           ),
         ),
-        if (icon != null) Icon(icon, size: 13, color: kCobalt),
-        if (icon != null) const SizedBox(width: 4),
         Text(
           action,
           style: const TextStyle(
@@ -2887,6 +4484,19 @@ bool _matchesExhibitionQuickFilter(Map<String, dynamic> item, String filter) {
       ? item['fee_amount'] as int
       : int.tryParse(item['fee_amount']?.toString() ?? '');
   return switch (filter) {
+    '展览' =>
+      raw.contains('展览') || raw.contains('exhibition') || raw.contains('show'),
+    '沙龙' => raw.contains('沙龙') || raw.contains('salon'),
+    '讲座' =>
+      raw.contains('讲座') || raw.contains('lecture') || raw.contains('talk'),
+    '工作坊' =>
+      raw.contains('工作坊') || raw.contains('workshop') || raw.contains('studio'),
+    '开放日' => raw.contains('开放日') ||
+        raw.contains('open day') ||
+        raw.contains('open_day'),
+    '说明会' => raw.contains('说明会') ||
+        raw.contains('info session') ||
+        raw.contains('application'),
     '本周' => date != null && date.difference(DateTime.now()).inDays <= 7,
     '同城' => raw.contains('上海') ||
         raw.contains('北京') ||
@@ -2900,6 +4510,125 @@ bool _matchesExhibitionQuickFilter(Map<String, dynamic> item, String filter) {
         raw.contains('vr'),
     _ => true,
   };
+}
+
+List<Map<String, dynamic>> _mergeEventLists(
+  Iterable<List<Map<String, dynamic>>> groups,
+) {
+  final seen = <String>{};
+  final merged = <Map<String, dynamic>>[];
+  for (final item in groups.expand((items) => items)) {
+    final id = item['id']?.toString();
+    final key = id != null && id.isNotEmpty
+        ? id
+        : '${item['type'] ?? ''}|${item['title'] ?? ''}|${item['start_time'] ?? ''}';
+    if (seen.add(key)) merged.add(item);
+  }
+  return merged;
+}
+
+String _eventTypeLabel(Map<String, dynamic> item) {
+  final raw = item.entries
+      .map((entry) => '${entry.key} ${entry.value}')
+      .join(' ')
+      .toLowerCase();
+  if (raw.contains('salon') || raw.contains('沙龙')) return '沙龙';
+  if (raw.contains('lecture') || raw.contains('talk') || raw.contains('讲座')) {
+    return '讲座';
+  }
+  if (raw.contains('workshop') || raw.contains('工作坊')) return '工作坊';
+  if (raw.contains('open day') ||
+      raw.contains('open_day') ||
+      raw.contains('开放日')) {
+    return '开放日';
+  }
+  if (raw.contains('info session') ||
+      raw.contains('application') ||
+      raw.contains('说明会')) {
+    return '说明会';
+  }
+  if (raw.contains('exhibition') ||
+      raw.contains('展览') ||
+      raw.contains('gallery')) {
+    return '展览';
+  }
+  return '活动';
+}
+
+DateTime? _eventStartDate(Map<String, dynamic> item) {
+  final raw = item['start_time'] ??
+      item['startTime'] ??
+      item['event_start_at'] ??
+      item['scheduled_at'] ??
+      item['date'];
+  if (raw is DateTime) return raw;
+  return DateTime.tryParse(raw?.toString() ?? '');
+}
+
+int _compareEventsByStart(Map<String, dynamic> a, Map<String, dynamic> b) {
+  final aStart = _eventStartDate(a);
+  final bStart = _eventStartDate(b);
+  if (aStart == null && bStart == null) {
+    return (a['title']?.toString() ?? '').compareTo(
+      b['title']?.toString() ?? '',
+    );
+  }
+  if (aStart == null) return 1;
+  if (bStart == null) return -1;
+  return aStart.compareTo(bStart);
+}
+
+bool _isSameDay(DateTime a, DateTime b) {
+  return a.year == b.year && a.month == b.month && a.day == b.day;
+}
+
+bool _isInNextDays(Map<String, dynamic> event, int days) {
+  final start = _eventStartDate(event);
+  if (start == null) return false;
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final end = today.add(Duration(days: days));
+  return !start.isBefore(today) && start.isBefore(end);
+}
+
+bool _eventIsMine(
+  Map<String, dynamic> event,
+  List<Map<String, dynamic>> myEvents,
+) {
+  final id = event['id']?.toString();
+  final title = event['title']?.toString();
+  final start = event['start_time']?.toString();
+  return myEvents.any((item) {
+    final itemId = item['id']?.toString();
+    if (id != null && id.isNotEmpty && itemId == id) return true;
+    return item['title']?.toString() == title &&
+        item['start_time']?.toString() == start;
+  });
+}
+
+String _calendarFullDate(DateTime date) {
+  return '${date.year}年${date.month}月${date.day}日 ${_weekdayCn(date.weekday)}';
+}
+
+String _calendarChipTitle(DateTime day) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  if (_isSameDay(day, today)) return '今天';
+  if (_isSameDay(day, today.add(const Duration(days: 1)))) return '明天';
+  return _weekdayCn(day.weekday);
+}
+
+String _weekdayCn(int weekday) {
+  const labels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+  final index = weekday.clamp(1, 7) - 1;
+  return labels[index];
+}
+
+String _calendarTime(DateTime? date) {
+  if (date == null) return '时间待定';
+  final hour = date.hour.toString().padLeft(2, '0');
+  final minute = date.minute.toString().padLeft(2, '0');
+  return '$hour:$minute';
 }
 
 class _ApplyTextField extends StatelessWidget {
@@ -2967,45 +4696,6 @@ class _ApplyTextField extends StatelessWidget {
             ),
           ),
         ],
-      ],
-    );
-  }
-}
-
-class _OpportunityDecisionLine extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _OpportunityDecisionLine({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 42,
-          child: Text(
-            label,
-            style: TextStyle(
-              color: context.artC.ink.withOpacity(0.34),
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: context.artC.ink.withOpacity(0.62),
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -4316,25 +6006,6 @@ int _artistInt(Object? value) {
   return int.tryParse(value?.toString() ?? '') ?? 0;
 }
 
-List<String> _artistWorkUrls(Map<String, dynamic> artist, String? coverUrl) {
-  final metadata = _artistMetadata(artist);
-  final raw = metadata['portfolio_images'] ??
-      metadata['work_urls'] ??
-      artist['portfolio_images'] ??
-      artist['work_urls'];
-  final urls = <String>[
-    if (coverUrl != null && coverUrl.trim().isNotEmpty) coverUrl.trim(),
-  ];
-  if (raw is List) {
-    urls.addAll(
-      raw
-          .map((item) => item.toString().trim())
-          .where((item) => item.isNotEmpty),
-    );
-  }
-  return urls.toSet().toList();
-}
-
 class _ArtistLibraryHeader extends StatelessWidget {
   final int totalCount;
   final int availableCount;
@@ -4412,39 +6083,6 @@ class _ArtistLibraryHeader extends StatelessWidget {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _StatChip({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 11, color: Colors.white),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
             ),
           ),
         ],

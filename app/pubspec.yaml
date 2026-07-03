@@ -25,6 +25,7 @@ dependencies:
   speech_to_text: ^7.0.0
   permission_handler: ^11.3.0
   fl_chart: ^0.69.0
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:

@@ -27,6 +27,7 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
       .maybeSingle();
     const user = await getUserFromBearer(_req);
     let likedByMe = false;
+    let savedByMe = false;
     if (user) {
       const { data: like } = await supabase
         .from("community_post_likes")
@@ -35,10 +36,22 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
         .eq("user_id", user.id)
         .maybeSingle();
       likedByMe = Boolean(like);
+      const { data: save } = await supabase
+        .from("community_post_saves")
+        .select("id")
+        .eq("post_id", id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      savedByMe = Boolean(save);
     }
     return NextResponse.json({
       success: true,
-      data: { ...row, user_profiles: prof ?? null, liked_by_me: likedByMe },
+      data: {
+        ...row,
+        user_profiles: prof ?? null,
+        liked_by_me: likedByMe,
+        saved_by_me: savedByMe,
+      },
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
