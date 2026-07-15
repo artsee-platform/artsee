@@ -5,7 +5,7 @@ import { errorResponse, notFoundResponse } from "@/lib/api/route-helpers";
 import { createServiceClient } from "@/lib/api/supabase-service";
 
 type Ctx = { params: Promise<{ type: string; id: string }> };
-type ContentType = "events" | "opportunities" | "artworks" | "artists";
+type ContentType = "events" | "opportunities" | "artworks" | "artists" | "marketplace";
 type ContentRow = Record<string, unknown>;
 
 const TYPE_CONFIG: Record<
@@ -15,6 +15,7 @@ const TYPE_CONFIG: Record<
     titleField: string;
     ownerField: string;
     rejectedStatus: "rejected" | "archived";
+    kind?: string;
   }
 > = {
   events: {
@@ -40,6 +41,13 @@ const TYPE_CONFIG: Record<
     titleField: "display_name",
     ownerField: "user_id",
     rejectedStatus: "rejected",
+  },
+  marketplace: {
+    table: "community_posts",
+    titleField: "title",
+    ownerField: "author_id",
+    rejectedStatus: "rejected",
+    kind: "market",
   },
 };
 
@@ -78,11 +86,12 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     }
 
     const supabase = createServiceClient();
-    const { data: current, error: readError } = await supabase
+    let readQuery = supabase
       .from(config.table)
       .select("*")
-      .eq("id", id)
-      .maybeSingle();
+      .eq("id", id);
+    if (config.kind) readQuery = readQuery.eq("metadata->>kind", config.kind);
+    const { data: current, error: readError } = await readQuery.maybeSingle();
     if (readError) return errorResponse(readError);
     if (!current) return notFoundResponse();
 
@@ -95,18 +104,31 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       review_note: cleanText(body.review_note) || null,
     };
 
-    const { data, error } = await supabase
+    const updatePatch: ContentRow = {
+      status: nextStatus,
+      metadata: {
+        ...objectValue((current as ContentRow).metadata),
+        review,
+      },
+    };
+    if (type === "marketplace") {
+      updatePatch.audit_status = decision === "approved" ? "approved" : "rejected";
+      updatePatch.audit_provider = "admin";
+      updatePatch.audit_reason = cleanText(body.review_note) || null;
+      updatePatch.audit_metadata = {
+        source: "admin_content_review",
+        reviewed_by_user_id: admin.user.id,
+        decision,
+      };
+      updatePatch.audited_at = now;
+    }
+
+    let updateQuery = supabase
       .from(config.table)
-      .update({
-        status: nextStatus,
-        metadata: {
-          ...objectValue((current as ContentRow).metadata),
-          review,
-        },
-      })
-      .eq("id", id)
-      .select("*")
-      .single();
+      .update(updatePatch)
+      .eq("id", id);
+    if (config.kind) updateQuery = updateQuery.eq("metadata->>kind", config.kind);
+    const { data, error } = await updateQuery.select("*").single();
     if (error) return errorResponse(error);
 
     const ownerUserId = stringValue((data as ContentRow)[config.ownerField]);

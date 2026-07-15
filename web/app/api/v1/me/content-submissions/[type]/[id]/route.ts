@@ -9,7 +9,7 @@ import {
 } from "@/lib/api/submission-materials";
 
 type Ctx = { params: Promise<{ type: string; id: string }> };
-type ContentType = "events" | "opportunities" | "artworks" | "artists";
+type ContentType = "events" | "opportunities" | "artworks" | "artists" | "marketplace";
 type FieldType = "text" | "number" | "datetime";
 type Row = Record<string, unknown>;
 
@@ -18,6 +18,7 @@ const TYPE_CONFIG: Record<
   {
     table: string;
     ownerField: string;
+    kind?: string;
     fields: Record<string, { type: FieldType; required?: boolean }>;
   }
 > = {
@@ -68,6 +69,15 @@ const TYPE_CONFIG: Record<
       display_name: { type: "text", required: true },
       experience: { type: "text" },
       cooperation_intent: { type: "text" },
+    },
+  },
+  marketplace: {
+    table: "community_posts",
+    ownerField: "author_id",
+    kind: "market",
+    fields: {
+      title: { type: "text", required: true },
+      body: { type: "text" },
     },
   },
 };
@@ -146,12 +156,13 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     const submittedFields = objectValue(body.fields);
     const submitForReview = body.submit !== false;
     const supabase = createServiceClient();
-    const { data: current, error: readError } = await supabase
+    let readQuery = supabase
       .from(config.table)
       .select("*")
       .eq("id", id)
-      .eq(config.ownerField, auth.user.id)
-      .maybeSingle();
+      .eq(config.ownerField, auth.user.id);
+    if (config.kind) readQuery = readQuery.eq("metadata->>kind", config.kind);
+    const { data: current, error: readError } = await readQuery.maybeSingle();
 
     if (readError) return errorResponse(readError);
     if (!current) return notFoundResponse();
@@ -208,29 +219,42 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       ? textArrayValue(body.supplemental_materials)
       : previousSupplementalMaterials;
 
-    const { data, error } = await supabase
-      .from(config.table)
-      .update({
-        ...patch,
-        status: nextStatus,
-        updated_at: now,
-        metadata: {
-          ...metadata,
+    const updatePatch: Row = {
+      ...patch,
+      status: nextStatus,
+      updated_at: now,
+      metadata: {
+        ...metadata,
+        supplemental_materials: supplementalMaterials,
+        review_history: reviewHistory,
+        review: {
+          decision: submitForReview ? "edited_resubmitted" : "edited_draft",
+          edited_by_user_id: auth.user.id,
+          edited_at: now,
+          resubmission_note: reviewNote || null,
           supplemental_materials: supplementalMaterials,
-          review_history: reviewHistory,
-          review: {
-            decision: submitForReview ? "edited_resubmitted" : "edited_draft",
-            edited_by_user_id: auth.user.id,
-            edited_at: now,
-            resubmission_note: reviewNote || null,
-            supplemental_materials: supplementalMaterials,
-          },
         },
-      })
+      },
+    };
+    if (type === "marketplace") {
+      updatePatch.audit_status = submitForReview ? "reviewing" : "pending";
+      updatePatch.audit_provider = "admin";
+      updatePatch.audit_reason = null;
+      updatePatch.audit_metadata = {
+        source: "user_content_edit",
+        edited_by_user_id: auth.user.id,
+        submit_for_review: submitForReview,
+      };
+      updatePatch.audited_at = now;
+    }
+
+    let updateQuery = supabase
+      .from(config.table)
+      .update(updatePatch)
       .eq("id", id)
-      .eq(config.ownerField, auth.user.id)
-      .select("*")
-      .single();
+      .eq(config.ownerField, auth.user.id);
+    if (config.kind) updateQuery = updateQuery.eq("metadata->>kind", config.kind);
+    const { data, error } = await updateQuery.select("*").single();
     if (error) return errorResponse(error);
 
     if (hasSupplementalMaterials) {

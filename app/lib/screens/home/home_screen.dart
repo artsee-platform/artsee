@@ -1325,6 +1325,7 @@ class _InstaAvatar extends StatelessWidget {
 }
 
 class _DebateTopic {
+  final AppCommunityPost? leadPost;
   final String channel;
   final String track;
   final String category;
@@ -1349,6 +1350,7 @@ class _DebateTopic {
   final Color accent;
 
   const _DebateTopic({
+    this.leadPost,
     required this.channel,
     required this.track,
     required this.category,
@@ -1375,6 +1377,7 @@ class _DebateTopic {
 }
 
 class _PlazaRatingItem {
+  final AppCommunityPost? leadPost;
   final String collection;
   final String title;
   final String subtitle;
@@ -1390,6 +1393,7 @@ class _PlazaRatingItem {
   final List<_PlazaRatingReply> replies;
 
   const _PlazaRatingItem({
+    this.leadPost,
     required this.collection,
     required this.title,
     required this.subtitle,
@@ -1819,6 +1823,8 @@ typedef _AskQuestionLauncher = Future<void> Function({
   String? initialCategory,
 });
 
+typedef _LeadPostAction = Future<bool> Function(AppCommunityPost post);
+
 enum _DebateSide { pro, con, watch }
 
 enum _DebateCommentFilter { all, pro, con, agent, mine }
@@ -1951,6 +1957,7 @@ _DebateTopic? _debateTopicFromPlazaPost(AppCommunityPost post) {
   if (legacyType != 'debate_topic' && kind != 'debate') return null;
 
   return _DebateTopic(
+    leadPost: post,
     channel: _legacyMetaString(metadata, 'channel', '广场'),
     track: _legacyMetaString(metadata, 'track', '文化向'),
     category: _legacyMetaString(metadata, 'category', '艺术讨论'),
@@ -2008,6 +2015,7 @@ _PlazaRatingItem? _ratingItemFromPlazaPost(AppCommunityPost post) {
   }
 
   return _PlazaRatingItem(
+    leadPost: post,
     collection: _legacyMetaString(metadata, 'collection', '广场口碑'),
     title: post.title.trim().isEmpty ? '广场评分' : post.title,
     subtitle: _legacyMetaString(metadata, 'subtitle', post.body?.trim() ?? ''),
@@ -2376,6 +2384,12 @@ class _HomeDopamineFeedState extends State<_HomeDopamineFeed> {
           topic: topic,
           onAskQuestion: widget.onAskQuestion,
           initialSubmission: initialSubmission,
+          leadPost: widget.institutionLeadMode ? topic.leadPost : null,
+          onToggleLeadSave: _togglePlazaLeadSave,
+          onConvertLead: (post) => _openPlazaLeadReply(
+            post,
+            consultIntent: true,
+          ),
         ),
       ),
     );
@@ -2384,48 +2398,32 @@ class _HomeDopamineFeedState extends State<_HomeDopamineFeed> {
   Future<void> _openRatingDetail(_PlazaRatingItem item) async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (_) => _PlazaRatingDetailScreen(item: item),
+        builder: (_) => _PlazaRatingDetailScreen(
+          item: item,
+          leadPost: widget.institutionLeadMode ? item.leadPost : null,
+          onToggleLeadSave: _togglePlazaLeadSave,
+          onConvertLead: (post) => _openPlazaLeadReply(
+            post,
+            consultIntent: true,
+          ),
+        ),
       ),
     );
   }
 
-  Widget _plazaCardWithLeadActions({
-    required AppCommunityPost post,
+  Widget _plazaFeedCardSpacing({
     required Widget child,
   }) {
-    if (!widget.institutionLeadMode) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 9),
-        child: child,
-      );
-    }
-    final busy = _leadActionBusyPostIds.contains(post.id);
     return Padding(
       padding: const EdgeInsets.only(bottom: 9),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          child,
-          const SizedBox(height: 7),
-          _PlazaLeadActionBar(
-            saved: post.savedByMe,
-            busy: busy,
-            onSave: () => _togglePlazaLeadSave(post),
-            onReply: () => _openPlazaLeadReply(post),
-            onConvert: () => _openPlazaLeadReply(
-              post,
-              consultIntent: true,
-            ),
-          ),
-        ],
-      ),
+      child: child,
     );
   }
 
-  Future<void> _togglePlazaLeadSave(AppCommunityPost post) async {
+  Future<bool> _togglePlazaLeadSave(AppCommunityPost post) async {
     final loggedIn = await ensureLoggedIn(context, message: '请先登录后收藏线索');
     if (!mounted || !loggedIn || _leadActionBusyPostIds.contains(post.id)) {
-      return;
+      return false;
     }
     setState(() => _leadActionBusyPostIds.add(post.id));
     try {
@@ -2434,18 +2432,20 @@ class _HomeDopamineFeedState extends State<_HomeDopamineFeed> {
       } else {
         await BackendApiService.saveCommunityPost(post.id);
       }
-      if (!mounted) return;
+      if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(post.savedByMe ? '已取消收藏线索' : '已收藏为潜在线索'),
         ),
       );
       await _loadLegacyPlazaPosts();
+      return true;
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('操作失败：$e')),
       );
+      return false;
     } finally {
       if (mounted) {
         setState(() => _leadActionBusyPostIds.remove(post.id));
@@ -2453,13 +2453,16 @@ class _HomeDopamineFeedState extends State<_HomeDopamineFeed> {
     }
   }
 
-  Future<void> _openPlazaLeadReply(
+  Future<bool> _openPlazaLeadReply(
     AppCommunityPost post, {
     bool consultIntent = false,
   }) async {
-    final loggedIn = await ensureLoggedIn(context, message: '请先登录后回应学生');
+    final loggedIn = await ensureLoggedIn(
+      context,
+      message: consultIntent ? '请先登录后转咨询' : '请先登录后回应学生',
+    );
     if (!mounted || !loggedIn || _leadActionBusyPostIds.contains(post.id)) {
-      return;
+      return false;
     }
     final body = await showModalBottomSheet<String>(
       context: context,
@@ -2470,7 +2473,7 @@ class _HomeDopamineFeedState extends State<_HomeDopamineFeed> {
         consultIntent: consultIntent,
       ),
     );
-    if (!mounted || body == null) return;
+    if (!mounted || body == null) return false;
     setState(() => _leadActionBusyPostIds.add(post.id));
     try {
       await BackendApiService.createPlazaComment(
@@ -2484,18 +2487,20 @@ class _HomeDopamineFeedState extends State<_HomeDopamineFeed> {
       if (consultIntent && !post.savedByMe) {
         await BackendApiService.saveCommunityPost(post.id);
       }
-      if (!mounted) return;
+      if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(consultIntent ? '已公开回应并收藏线索' : '已发布回应'),
         ),
       );
       await _loadLegacyPlazaPosts();
+      return true;
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('回应失败：$e')),
       );
+      return false;
     } finally {
       if (mounted) {
         setState(() => _leadActionBusyPostIds.remove(post.id));
@@ -2509,8 +2514,7 @@ class _HomeDopamineFeedState extends State<_HomeDopamineFeed> {
       final topic = _debateTopicFromPlazaPost(post);
       if (topic != null) {
         cards.add(
-          _plazaCardWithLeadActions(
-            post: post,
+          _plazaFeedCardSpacing(
             child: _DebateTopicCard(
               topic: topic,
               onTap: () => _openTopicDetail(topic),
@@ -2523,8 +2527,7 @@ class _HomeDopamineFeedState extends State<_HomeDopamineFeed> {
       final rating = _ratingItemFromPlazaPost(post);
       if (rating != null) {
         cards.add(
-          _plazaCardWithLeadActions(
-            post: post,
+          _plazaFeedCardSpacing(
             child: _PlazaRatingCard(
               item: rating,
               onTap: () => _openRatingDetail(rating),
@@ -5448,62 +5451,16 @@ class _PlazaStateAction extends StatelessWidget {
   }
 }
 
-class _PlazaLeadActionBar extends StatelessWidget {
-  final bool saved;
-  final bool busy;
-  final VoidCallback onSave;
-  final VoidCallback onReply;
-  final VoidCallback onConvert;
-
-  const _PlazaLeadActionBar({
-    required this.saved,
-    required this.busy,
-    required this.onSave,
-    required this.onReply,
-    required this.onConvert,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      alignment: WrapAlignment.end,
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        _PlazaLeadActionButton(
-          icon: saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-          label: saved ? '已收藏' : '收藏线索',
-          active: saved,
-          busy: busy,
-          onTap: onSave,
-        ),
-        _PlazaLeadActionButton(
-          icon: Icons.mode_comment_outlined,
-          label: '回应',
-          busy: busy,
-          onTap: onReply,
-        ),
-        _PlazaLeadActionButton(
-          icon: Icons.arrow_forward_rounded,
-          label: '转咨询',
-          busy: busy,
-          onTap: onConvert,
-        ),
-      ],
-    );
-  }
-}
-
-class _PlazaLeadActionButton extends StatelessWidget {
+class _PlazaLeadHeaderIcon extends StatelessWidget {
   final IconData icon;
-  final String label;
+  final String tooltip;
   final bool active;
   final bool busy;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
-  const _PlazaLeadActionButton({
+  const _PlazaLeadHeaderIcon({
     required this.icon,
-    required this.label,
+    required this.tooltip,
     required this.onTap,
     this.active = false,
     this.busy = false,
@@ -5512,49 +5469,75 @@ class _PlazaLeadActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ink = active ? _plazaInk : _plazaText;
-    return Opacity(
-      opacity: busy ? 0.58 : 1,
-      child: InkWell(
-        onTap: busy ? null : onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          height: 32,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            color: active ? _plazaInk.withValues(alpha: 0.055) : Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: _plazaInk.withValues(alpha: active ? 0.16 : 0.09),
-            ),
-          ),
+    return IconButton(
+      onPressed: busy ? null : onTap,
+      tooltip: tooltip,
+      color: ink,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 38, height: 38),
+      visualDensity: VisualDensity.compact,
+      icon: busy
+          ? SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(ink),
+              ),
+            )
+          : Icon(icon, size: 20),
+    );
+  }
+}
+
+class _PlazaLeadMoreButton extends StatelessWidget {
+  final bool busy;
+  final VoidCallback onConvertLead;
+
+  const _PlazaLeadMoreButton({
+    required this.busy,
+    required this.onConvertLead,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (busy) {
+      return const _PlazaLeadHeaderIcon(
+        icon: Icons.more_horiz_rounded,
+        tooltip: '更多',
+        busy: true,
+        onTap: null,
+      );
+    }
+    return PopupMenuButton<String>(
+      tooltip: '更多',
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 128),
+      icon: const Icon(Icons.more_horiz_rounded, size: 22),
+      color: Colors.white,
+      elevation: 10,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      onSelected: (_) => onConvertLead(),
+      itemBuilder: (context) => [
+        const PopupMenuItem<String>(
+          value: 'convert',
+          height: 40,
           child: Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              if (busy)
-                SizedBox(
-                  width: 13,
-                  height: 13,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 1.8,
-                    valueColor: AlwaysStoppedAnimation<Color>(ink),
-                  ),
-                )
-              else
-                Icon(icon, size: 15, color: ink),
-              const SizedBox(width: 5),
+              Icon(Icons.arrow_forward_rounded, size: 18),
+              SizedBox(width: 8),
               Text(
-                label,
+                '转咨询',
                 style: TextStyle(
-                  color: ink,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
                   letterSpacing: 0,
                 ),
               ),
             ],
           ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -6802,31 +6785,6 @@ class _DebateTopicCard extends StatelessWidget {
   }
 }
 
-class _PlazaMetaLine extends StatelessWidget {
-  final String source;
-  final String time;
-  final String activity;
-
-  const _PlazaMetaLine({
-    required this.source,
-    required this.time,
-    required this.activity,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(child: _PlazaMetaText(source, strong: true)),
-        const SizedBox(width: 12),
-        _PlazaMetaText(time),
-        const SizedBox(width: 12),
-        _PlazaMetaText(activity),
-      ],
-    );
-  }
-}
-
 class _PlazaMetaText extends StatelessWidget {
   final String text;
   final bool strong;
@@ -7153,8 +7111,16 @@ String _plazaRatingCountLabel(_PlazaRatingItem item) {
 
 class _PlazaRatingDetailScreen extends StatefulWidget {
   final _PlazaRatingItem item;
+  final AppCommunityPost? leadPost;
+  final _LeadPostAction? onToggleLeadSave;
+  final _LeadPostAction? onConvertLead;
 
-  const _PlazaRatingDetailScreen({required this.item});
+  const _PlazaRatingDetailScreen({
+    required this.item,
+    this.leadPost,
+    this.onToggleLeadSave,
+    this.onConvertLead,
+  });
 
   @override
   State<_PlazaRatingDetailScreen> createState() =>
@@ -7163,13 +7129,48 @@ class _PlazaRatingDetailScreen extends StatefulWidget {
 
 class _PlazaRatingDetailScreenState extends State<_PlazaRatingDetailScreen> {
   int _myRating = 0;
+  bool _leadSaved = false;
+  bool _leadBusy = false;
   final Set<int> _litReplyIndexes = {};
   late final List<_PlazaRatingReply> _replies;
 
   @override
   void initState() {
     super.initState();
+    _leadSaved = widget.leadPost?.savedByMe ?? false;
     _replies = List<_PlazaRatingReply>.of(widget.item.replies);
+  }
+
+  bool get _hasLeadActions {
+    return widget.leadPost != null &&
+        widget.onToggleLeadSave != null &&
+        widget.onConvertLead != null;
+  }
+
+  Future<void> _toggleLeadSave() async {
+    final post = widget.leadPost;
+    final action = widget.onToggleLeadSave;
+    if (post == null || action == null || _leadBusy) return;
+    setState(() => _leadBusy = true);
+    final success = await action(post);
+    if (!mounted) return;
+    setState(() {
+      if (success) _leadSaved = !_leadSaved;
+      _leadBusy = false;
+    });
+  }
+
+  Future<void> _convertLead() async {
+    final post = widget.leadPost;
+    final action = widget.onConvertLead;
+    if (post == null || action == null || _leadBusy) return;
+    setState(() => _leadBusy = true);
+    final success = await action(post);
+    if (!mounted) return;
+    setState(() {
+      if (success) _leadSaved = true;
+      _leadBusy = false;
+    });
   }
 
   void _shareRating() {
@@ -7229,7 +7230,14 @@ class _PlazaRatingDetailScreenState extends State<_PlazaRatingDetailScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            _PlazaRatingDetailHeader(item: item, onShare: _shareRating),
+            _PlazaRatingDetailHeader(
+              item: item,
+              onShare: _shareRating,
+              leadSaved: _leadSaved,
+              leadBusy: _leadBusy,
+              onSaveLead: _hasLeadActions ? _toggleLeadSave : null,
+              onConvertLead: _hasLeadActions ? _convertLead : null,
+            ),
             Expanded(
               child: SingleChildScrollView(
                 padding: EdgeInsets.fromLTRB(16, 18, 16, 22 + bottomInset),
@@ -7280,10 +7288,18 @@ class _PlazaRatingDetailScreenState extends State<_PlazaRatingDetailScreen> {
 class _PlazaRatingDetailHeader extends StatelessWidget {
   final _PlazaRatingItem item;
   final VoidCallback onShare;
+  final bool leadSaved;
+  final bool leadBusy;
+  final VoidCallback? onSaveLead;
+  final VoidCallback? onConvertLead;
 
   const _PlazaRatingDetailHeader({
     required this.item,
     required this.onShare,
+    this.leadSaved = false,
+    this.leadBusy = false,
+    this.onSaveLead,
+    this.onConvertLead,
   });
 
   @override
@@ -7299,15 +7315,11 @@ class _PlazaRatingDetailHeader extends StatelessWidget {
           ),
         ),
       ),
-      child: Row(
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-            color: context.artC.ink,
-            tooltip: '返回',
-          ),
-          Expanded(
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 116),
             child: Text(
               item.collection,
               maxLines: 1,
@@ -7321,11 +7333,43 @@ class _PlazaRatingDetailHeader extends StatelessWidget {
               ),
             ),
           ),
-          IconButton(
-            onPressed: onShare,
-            icon: const Icon(Icons.ios_share_rounded, size: 20),
-            color: context.artC.ink,
-            tooltip: '分享',
+          Align(
+            alignment: Alignment.centerLeft,
+            child: IconButton(
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+              color: context.artC.ink,
+              tooltip: '返回',
+            ),
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (onSaveLead != null)
+                  _PlazaLeadHeaderIcon(
+                    icon: leadSaved
+                        ? Icons.bookmark_rounded
+                        : Icons.bookmark_border_rounded,
+                    tooltip: leadSaved ? '取消收藏线索' : '收藏线索',
+                    active: leadSaved,
+                    busy: leadBusy,
+                    onTap: onSaveLead,
+                  ),
+                IconButton(
+                  onPressed: onShare,
+                  icon: const Icon(Icons.ios_share_rounded, size: 20),
+                  color: context.artC.ink,
+                  tooltip: '分享',
+                ),
+                if (onConvertLead != null)
+                  _PlazaLeadMoreButton(
+                    busy: leadBusy,
+                    onConvertLead: onConvertLead!,
+                  ),
+              ],
+            ),
           ),
         ],
       ),
@@ -8115,11 +8159,17 @@ class _DebateTopicDetailScreen extends StatefulWidget {
   final _DebateTopic topic;
   final _AskQuestionLauncher onAskQuestion;
   final _StanceSubmission? initialSubmission;
+  final AppCommunityPost? leadPost;
+  final _LeadPostAction? onToggleLeadSave;
+  final _LeadPostAction? onConvertLead;
 
   const _DebateTopicDetailScreen({
     required this.topic,
     required this.onAskQuestion,
     this.initialSubmission,
+    this.leadPost,
+    this.onToggleLeadSave,
+    this.onConvertLead,
   });
 
   @override
@@ -8133,6 +8183,8 @@ class _DebateTopicDetailScreenState extends State<_DebateTopicDetailScreen> {
   _DebateCommentFilter _filter = _DebateCommentFilter.all;
   bool _postLiked = false;
   bool _postSaved = false;
+  bool _leadSaved = false;
+  bool _leadBusy = false;
   int _commentSeed = 0;
 
   _DebateTopic get topic => widget.topic;
@@ -8140,6 +8192,7 @@ class _DebateTopicDetailScreenState extends State<_DebateTopicDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _leadSaved = widget.leadPost?.savedByMe ?? false;
     final comments = [
       _DebateThreadComment(
         id: 'seed-pro',
@@ -8206,6 +8259,38 @@ class _DebateTopicDetailScreenState extends State<_DebateTopicDetailScreen> {
       }
     }
     _comments = comments;
+  }
+
+  bool get _hasLeadActions {
+    return widget.leadPost != null &&
+        widget.onToggleLeadSave != null &&
+        widget.onConvertLead != null;
+  }
+
+  Future<void> _toggleLeadSave() async {
+    final post = widget.leadPost;
+    final action = widget.onToggleLeadSave;
+    if (post == null || action == null || _leadBusy) return;
+    setState(() => _leadBusy = true);
+    final success = await action(post);
+    if (!mounted) return;
+    setState(() {
+      if (success) _leadSaved = !_leadSaved;
+      _leadBusy = false;
+    });
+  }
+
+  Future<void> _convertLead() async {
+    final post = widget.leadPost;
+    final action = widget.onConvertLead;
+    if (post == null || action == null || _leadBusy) return;
+    setState(() => _leadBusy = true);
+    final success = await action(post);
+    if (!mounted) return;
+    setState(() {
+      if (success) _leadSaved = true;
+      _leadBusy = false;
+    });
   }
 
   List<_DebateThreadComment> get _visibleComments {
@@ -8339,7 +8424,13 @@ class _DebateTopicDetailScreenState extends State<_DebateTopicDetailScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            _DebateDetailHeader(onShare: _openShareSheet),
+            _DebateDetailHeader(
+              onShare: _openShareSheet,
+              leadSaved: _leadSaved,
+              leadBusy: _leadBusy,
+              onSaveLead: _hasLeadActions ? _toggleLeadSave : null,
+              onConvertLead: _hasLeadActions ? _convertLead : null,
+            ),
             Expanded(
               child: SingleChildScrollView(
                 padding: EdgeInsets.fromLTRB(16, 24, 16, 18 + bottomInset),
@@ -8617,8 +8708,18 @@ class _LinkedRatingActionButton extends StatelessWidget {
 
 class _DebateDetailHeader extends StatelessWidget {
   final VoidCallback onShare;
+  final bool leadSaved;
+  final bool leadBusy;
+  final VoidCallback? onSaveLead;
+  final VoidCallback? onConvertLead;
 
-  const _DebateDetailHeader({required this.onShare});
+  const _DebateDetailHeader({
+    required this.onShare,
+    this.leadSaved = false,
+    this.leadBusy = false,
+    this.onSaveLead,
+    this.onConvertLead,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -8633,15 +8734,11 @@ class _DebateDetailHeader extends StatelessWidget {
           ),
         ),
       ),
-      child: Row(
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-            color: context.artC.ink,
-            tooltip: '返回',
-          ),
-          Expanded(
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 116),
             child: Text(
               '帖子详情',
               maxLines: 1,
@@ -8655,11 +8752,43 @@ class _DebateDetailHeader extends StatelessWidget {
               ),
             ),
           ),
-          IconButton(
-            onPressed: onShare,
-            icon: const Icon(Icons.ios_share_rounded, size: 20),
-            color: context.artC.ink,
-            tooltip: '分享',
+          Align(
+            alignment: Alignment.centerLeft,
+            child: IconButton(
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+              color: context.artC.ink,
+              tooltip: '返回',
+            ),
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (onSaveLead != null)
+                  _PlazaLeadHeaderIcon(
+                    icon: leadSaved
+                        ? Icons.bookmark_rounded
+                        : Icons.bookmark_border_rounded,
+                    tooltip: leadSaved ? '取消收藏线索' : '收藏线索',
+                    active: leadSaved,
+                    busy: leadBusy,
+                    onTap: onSaveLead,
+                  ),
+                IconButton(
+                  onPressed: onShare,
+                  icon: const Icon(Icons.ios_share_rounded, size: 20),
+                  color: context.artC.ink,
+                  tooltip: '分享',
+                ),
+                if (onConvertLead != null)
+                  _PlazaLeadMoreButton(
+                    busy: leadBusy,
+                    onConvertLead: onConvertLead!,
+                  ),
+              ],
+            ),
           ),
         ],
       ),
@@ -8689,32 +8818,32 @@ class _DebateDetailHero extends StatelessWidget {
             style: TextStyle(
               color: context.artC.ink,
               fontSize: 27,
-              height: 1.14,
+              height: 1.38,
               fontWeight: FontWeight.w900,
               letterSpacing: 0,
             ),
           ),
-          const SizedBox(height: 10),
-          _DebateDetailMetaLine(topic: topic),
-          const SizedBox(height: 18),
-          _PlazaDetailImage(topic: topic),
           const SizedBox(height: 14),
+          _DebateDetailAuthorBlock(topic: topic),
+          const SizedBox(height: 20),
+          _PlazaDetailImage(topic: topic),
+          const SizedBox(height: 16),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 20),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(6),
+              color: const Color(0xFFFCFCFD),
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: context.artC.silver.withValues(alpha: 0.36),
+                color: context.artC.silver.withValues(alpha: 0.28),
               ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _PlazaArticleBody(topic: topic),
-                const SizedBox(height: 16),
-                _DebateTagWrap(tags: topic.tags),
+                const SizedBox(height: 18),
+                _DebateTagWrap(tags: topic.tags, accent: topic.accent),
               ],
             ),
           ),
@@ -8724,44 +8853,108 @@ class _DebateDetailHero extends StatelessWidget {
   }
 }
 
-class _DebateDetailMetaLine extends StatelessWidget {
+class _DebateDetailAuthorBlock extends StatelessWidget {
   final _DebateTopic topic;
 
-  const _DebateDetailMetaLine({required this.topic});
+  const _DebateDetailAuthorBlock({required this.topic});
 
   @override
   Widget build(BuildContext context) {
-    return _PlazaMetaLine(
-      source: _plazaSourceText('${topic.channel}圈子'),
-      time: _plazaTopicTime(topic),
-      activity: '${topic.heat} 喜欢 · ${topic.comments} 评论',
+    final source = _plazaSourceText('${topic.channel}圈子');
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: topic.accent.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: Icon(topic.icon, color: topic.accent, size: 18),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: topic.accent.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        source,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: topic.accent,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 5),
+              Text(
+                '${_plazaTopicTime(topic)} · ${topic.heat} 喜欢 · ${topic.comments} 评论',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF8E8E93),
+                  fontSize: 12,
+                  height: 1.2,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
 
 class _DebateTagWrap extends StatelessWidget {
   final List<String> tags;
+  final Color accent;
 
-  const _DebateTagWrap({required this.tags});
+  const _DebateTagWrap({
+    required this.tags,
+    required this.accent,
+  });
 
   @override
   Widget build(BuildContext context) {
+    if (tags.isEmpty) return const SizedBox.shrink();
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
         for (final tag in tags)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFFF6F6F6),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: const Color(0xFFEDEDED)),
+              color: accent.withValues(alpha: 0.075),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: accent.withValues(alpha: 0.1)),
             ),
             child: Text(
               '#$tag',
-              style: const TextStyle(
-                color: Color(0xFF8A8A8A),
+              style: TextStyle(
+                color: accent.withValues(alpha: 0.86),
                 fontSize: 12,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 0,
@@ -8780,17 +8973,29 @@ class _PlazaDetailImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(6),
-      child: AspectRatio(
-        aspectRatio: 16 / 9,
-        child: Image.network(
-          _plazaTopicImageUrl(topic),
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(
-            color: topic.accent.withValues(alpha: 0.12),
-            alignment: Alignment.center,
-            child: Icon(topic.icon, color: topic.accent, size: 34),
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.07),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: Image.network(
+            _plazaTopicImageUrl(topic),
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Container(
+              color: topic.accent.withValues(alpha: 0.12),
+              alignment: Alignment.center,
+              child: Icon(topic.icon, color: topic.accent, size: 34),
+            ),
           ),
         ),
       ),
@@ -8809,7 +9014,7 @@ class _PlazaArticleBody extends StatelessWidget {
       topic.lead,
       '我想把这个问题拆开看：一边是“${topic.pro}”，另一边是“${topic.con}”。这两个判断都不算轻飘，所以才值得放到广场里讨论。',
       '如果你也在做类似选择，或者刚好经历过这个阶段，可以说说你会怎么判断。真正想问的是：${topic.askSeed}',
-    ];
+    ].where((text) => text.trim().isNotEmpty).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -8818,15 +9023,16 @@ class _PlazaArticleBody extends StatelessWidget {
             paragraphs[index],
             style: TextStyle(
               color: index == 0
-                  ? const Color(0xFF555555)
-                  : const Color(0xFF6F6F6F),
+                  ? const Color(0xFF3F3F3F)
+                  : const Color(0xFF646464),
               fontSize: 16,
-              height: 1.62,
-              fontWeight: index == 0 ? FontWeight.w900 : FontWeight.w800,
+              height: index == 0 ? 1.62 : 1.72,
+              fontWeight: index == 0 ? FontWeight.w900 : FontWeight.w700,
               letterSpacing: 0,
             ),
           ),
-          if (index != paragraphs.length - 1) const SizedBox(height: 12),
+          if (index != paragraphs.length - 1)
+            SizedBox(height: index == 0 ? 18 : 16),
         ],
       ],
     );
@@ -8857,12 +9063,12 @@ class _PlazaTopicReplyActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(0, 8, 0, 14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: context.artC.silver.withValues(alpha: 0.38),
-          ),
+        color: const Color(0xFFFAFBFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: context.artC.silver.withValues(alpha: 0.28),
         ),
       ),
       child: Column(
@@ -8904,13 +9110,25 @@ class _PlazaTopicReplyActions extends StatelessWidget {
               const Spacer(),
               GestureDetector(
                 onTap: onOnlyHost,
-                child: Text(
-                  onlyMine ? '看全部' : '只看楼主',
-                  style: const TextStyle(
-                    color: Color(0xFF2478B8),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0,
+                child: Container(
+                  height: 34,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: const Color(0xFF2478B8).withValues(alpha: 0.14),
+                    ),
+                  ),
+                  child: Text(
+                    onlyMine ? '看全部' : '只看楼主',
+                    style: const TextStyle(
+                      color: Color(0xFF2478B8),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0,
+                    ),
                   ),
                 ),
               ),
@@ -8943,9 +9161,9 @@ class _PlazaDetailAction extends StatelessWidget {
   Widget build(BuildContext context) {
     final foreground = filled ? Colors.white : color;
     final child = Container(
-      constraints: const BoxConstraints(minHeight: 38),
+      constraints: const BoxConstraints(minHeight: 34),
       padding: EdgeInsets.symmetric(
-        horizontal: filled ? 11 : 8,
+        horizontal: filled ? 12 : 10,
         vertical: 7,
       ),
       decoration: BoxDecoration(
@@ -8953,24 +9171,24 @@ class _PlazaDetailAction extends StatelessWidget {
             ? color
             : active
                 ? color.withValues(alpha: 0.1)
-                : Colors.transparent,
-        borderRadius: BorderRadius.circular(6),
+                : Colors.white,
+        borderRadius: BorderRadius.circular(999),
         border: filled || active
             ? null
-            : Border.all(color: color.withValues(alpha: 0.12)),
+            : Border.all(color: color.withValues(alpha: 0.1)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
             Icon(icon, color: foreground, size: 15),
-            const SizedBox(width: 4),
+            const SizedBox(width: 5),
           ],
           Text(
             label,
             style: TextStyle(
               color: foreground,
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: FontWeight.w900,
               letterSpacing: 0,
             ),
@@ -8985,7 +9203,7 @@ class _PlazaDetailAction extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(999),
           child: child,
         ),
       ),

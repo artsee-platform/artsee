@@ -10,6 +10,14 @@ import 'package:artsee_app/theme/artsee_ui_colors.dart';
 import 'workbench_consultation_detail_screen.dart';
 import 'workbench_team_screen.dart';
 
+enum _InstitutionWorkbenchSection {
+  overview,
+  leads,
+  bookings,
+  orders,
+  management,
+}
+
 class InstitutionWorkspaceScreen extends StatefulWidget {
   final Map<String, dynamic>? profile;
 
@@ -35,6 +43,8 @@ class _InstitutionWorkspaceScreenState
   String? _bookingError;
   String? _orgError;
   int _selectedWorkspaceTab = 0;
+  _InstitutionWorkbenchSection _selectedWorkbenchSection =
+      _InstitutionWorkbenchSection.overview;
   String? _actingLeadId;
 
   @override
@@ -331,6 +341,33 @@ class _InstitutionWorkspaceScreenState
     );
   }
 
+  void _handleServiceBookingUpdated(Map<String, dynamic> booking) {
+    final id = booking['id']?.toString();
+    if (id == null || id.isEmpty) return;
+    setState(() {
+      final index =
+          _serviceBookings.indexWhere((item) => item['id']?.toString() == id);
+      if (index < 0) {
+        _serviceBookings.insert(0, booking);
+      } else {
+        _serviceBookings[index] = booking;
+      }
+    });
+  }
+
+  Future<void> _openServiceBooking(Map<String, dynamic> booking) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ServiceBookingDetailSheet(
+        booking: booking,
+        onChanged: _handleServiceBookingUpdated,
+        onOpenConsultation: _openLead,
+      ),
+    );
+  }
+
   String _conversionSubtitle(String type, String fallback) {
     if (type == 'service_booking') {
       if (_bookingLoading) return '同步预约记录';
@@ -369,11 +406,14 @@ class _InstitutionWorkspaceScreenState
   Widget _buildWorkbenchView(BuildContext context) {
     final verified = widget.profile?['is_verified'] == true;
     final primaryOrganization = _primaryOrganization;
+    final completeness = primaryOrganization == null
+        ? null
+        : _organizationCompleteness(primaryOrganization.organization);
     final analytics = _WorkbenchAnalyticsSnapshot.from(
       leads: _leads,
       serviceBookings: _serviceBookings,
     );
-    final todoItems = [
+    final leadTodoItems = [
       _WorkbenchTodoItem(
         label: '新线索',
         count: _countStatus('new'),
@@ -393,17 +433,21 @@ class _InstitutionWorkspaceScreenState
         onTap: () => _openLeadList(_WorkbenchListMode.leads),
       ),
       _WorkbenchTodoItem(
-        label: '待确认预约',
-        count: _requestedBookingCount,
-        caption: '短咨询',
-        onTap: () => _openLeadList(_WorkbenchListMode.bookings),
-      ),
-      _WorkbenchTodoItem(
         label: '待出方案',
         count: _activePlanningCount,
         caption: '需求确认后',
         onTap: () => _openLeadList(_WorkbenchListMode.leads),
       ),
+    ];
+    final bookingTodoItems = [
+      _WorkbenchTodoItem(
+        label: '待确认预约',
+        count: _requestedBookingCount,
+        caption: '短咨询',
+        onTap: () => _openLeadList(_WorkbenchListMode.bookings),
+      ),
+    ];
+    final orderTodoItems = [
       _WorkbenchTodoItem(
         label: '待支付订单',
         count: _quotedOrderCount,
@@ -411,129 +455,348 @@ class _InstitutionWorkspaceScreenState
         onTap: () => _openLeadList(_WorkbenchListMode.orders),
       ),
     ];
-    return CustomScrollView(
-      slivers: [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 2, 18, 0),
-            child: _WorkspaceIdentityPanel(
-              profile: widget.profile,
-              organization: primaryOrganization,
-              organizationCount: _organizations.length,
-              loading: _orgLoading,
-              error: _orgError,
-              onManage: _openOrganizationProfile,
-              onPreview: _openPublicOrganizationPreview,
-              onRetry: _loadOrganizations,
+    final todoItems = [
+      ...leadTodoItems,
+      ...bookingTodoItems,
+      ...orderTodoItems,
+    ];
+    final orderLeads =
+        _leads.where((lead) => _conversionType(lead) == 'order').toList();
+    final managementBadge = primaryOrganization == null
+        ? 1
+        : completeness == null || completeness.complete
+            ? 0
+            : completeness.missingLabels.length;
+    final leadBadge =
+        _leadUnreadCount > 0 ? _leadUnreadCount : _countStatus('new');
+    final totalTodoCount =
+        todoItems.fold<int>(0, (sum, item) => sum + item.count);
+    final allActions = _buildWorkbenchActions();
+    final leadActions = [
+      allActions[1],
+      allActions[6],
+      allActions[5],
+    ];
+    final bookingActions = [
+      allActions[4],
+      allActions[6],
+      allActions[5],
+    ];
+    final orderActions = [
+      allActions[2],
+      allActions[1],
+      allActions[6],
+    ];
+    final managementActions = [
+      allActions[0],
+      allActions[3],
+      allActions[5],
+    ];
+    final sectionItems = [
+      _WorkbenchSectionItem(
+        section: _InstitutionWorkbenchSection.overview,
+        label: '总览',
+        badgeCount: totalTodoCount,
+      ),
+      _WorkbenchSectionItem(
+        section: _InstitutionWorkbenchSection.leads,
+        label: '线索',
+        badgeCount: leadBadge,
+      ),
+      _WorkbenchSectionItem(
+        section: _InstitutionWorkbenchSection.bookings,
+        label: '预约',
+        badgeCount: _requestedBookingCount,
+      ),
+      _WorkbenchSectionItem(
+        section: _InstitutionWorkbenchSection.orders,
+        label: '订单',
+        badgeCount: _quotedOrderCount,
+      ),
+      _WorkbenchSectionItem(
+        section: _InstitutionWorkbenchSection.management,
+        label: '管理',
+        badgeCount: managementBadge,
+      ),
+    ];
+
+    List<Widget> sectionSlivers() {
+      switch (_selectedWorkbenchSection) {
+        case _InstitutionWorkbenchSection.overview:
+          return [
+            _workbenchBlock(
+              _WorkspaceIdentityPanel(
+                profile: widget.profile,
+                organization: primaryOrganization,
+                organizationCount: _organizations.length,
+                loading: _orgLoading,
+                error: _orgError,
+                onManage: _openOrganizationProfile,
+                onPreview: _openPublicOrganizationPreview,
+                onRetry: _loadOrganizations,
+              ),
+              top: 8,
             ),
+            _workbenchBlock(
+              _WorkbenchTodayPanel(
+                items: todoItems,
+                loading: _loading || _bookingLoading,
+                onEmptyAction: _openOrganizationProfile,
+              ),
+            ),
+            _workbenchBlock(
+              _WorkbenchAnalyticsPanel(
+                snapshot: analytics,
+                loading: _loading || _bookingLoading,
+                onOpenLeads: () => _openLeadList(_WorkbenchListMode.leads),
+                onOpenBookings: () =>
+                    _openLeadList(_WorkbenchListMode.bookings),
+              ),
+              top: 14,
+            ),
+            _workbenchBlock(
+              _LeadInboxPreview(
+                verified: verified,
+                leads: _leads,
+                loading: _loading,
+                error: _error,
+                onRetry: _loadLeads,
+                onViewAll: () => _openLeadList(_WorkbenchListMode.leads),
+                onOpen: _openLead,
+                onAssign: _assignLead,
+                onPlan: _openLead,
+                onClose: _closeLead,
+                actingLeadId: _actingLeadId,
+              ),
+            ),
+            _workbenchBlock(
+              _WorkspaceActionGrid(items: allActions),
+              top: 14,
+            ),
+          ];
+        case _InstitutionWorkbenchSection.leads:
+          return [
+            _workbenchBlock(
+              _WorkbenchTodayPanel(
+                items: leadTodoItems,
+                loading: _loading,
+                onEmptyAction: () => _openLeadList(_WorkbenchListMode.leads),
+              ),
+              top: 14,
+            ),
+            _workbenchBlock(
+              _LeadInboxPreview(
+                title: '线索队列',
+                subtitle: '分配、回复与方案推进',
+                emptyText:
+                    verified ? '暂无咨询线索。学生发起咨询后会进入这里。' : '完成机构认证后，平台线索会进入这里。',
+                emptyActionLabel: verified ? '刷新线索 →' : '完善机构主页 →',
+                onEmptyAction: verified ? _loadLeads : _openOrganizationProfile,
+                verified: verified,
+                leads: _leads,
+                loading: _loading,
+                error: _error,
+                onRetry: _loadLeads,
+                onViewAll: () => _openLeadList(_WorkbenchListMode.leads),
+                onOpen: _openLead,
+                onAssign: _assignLead,
+                onPlan: _openLead,
+                onClose: _closeLead,
+                actingLeadId: _actingLeadId,
+              ),
+            ),
+            _workbenchBlock(
+              _WorkspaceActionGrid(
+                title: '线索操作',
+                subtitle: '计划 · 分配 · 协作',
+                items: leadActions,
+              ),
+              top: 14,
+            ),
+          ];
+        case _InstitutionWorkbenchSection.bookings:
+          return [
+            _workbenchBlock(
+              _WorkbenchTodayPanel(
+                items: bookingTodoItems,
+                loading: _bookingLoading,
+                onEmptyAction: () => _openLeadList(_WorkbenchListMode.bookings),
+              ),
+              top: 14,
+            ),
+            _workbenchBlock(
+              _ServiceBookingPreview(
+                bookings: _serviceBookings,
+                loading: _bookingLoading,
+                error: _bookingError,
+                onRetry: _loadServiceBookings,
+                onViewAll: () => _openLeadList(_WorkbenchListMode.bookings),
+                onEmptyAction: () => _openLeadList(_WorkbenchListMode.leads),
+                onOpen: _openServiceBooking,
+              ),
+            ),
+            _workbenchBlock(
+              _WorkspaceActionGrid(
+                title: '预约操作',
+                subtitle: '确认 · 排期 · 协作',
+                items: bookingActions,
+              ),
+              top: 14,
+            ),
+          ];
+        case _InstitutionWorkbenchSection.orders:
+          return [
+            _workbenchBlock(
+              _WorkbenchTodayPanel(
+                items: orderTodoItems,
+                loading: _loading,
+                onEmptyAction: () => _openLeadList(_WorkbenchListMode.orders),
+              ),
+              top: 14,
+            ),
+            _workbenchBlock(
+              _LeadInboxPreview(
+                title: '订单转化',
+                subtitle: '已报价与转订单咨询',
+                idleStatusLabel: '待成交',
+                emptyText: '暂无转订单记录。顾问在咨询详情里点击“转订单”后会出现在这里。',
+                emptyActionLabel: '查看咨询线索 →',
+                onEmptyAction: () => _openLeadList(_WorkbenchListMode.leads),
+                verified: verified,
+                leads: orderLeads,
+                loading: _loading,
+                error: _error,
+                onRetry: _loadLeads,
+                onViewAll: () => _openLeadList(_WorkbenchListMode.orders),
+                onOpen: _openLead,
+                onAssign: _assignLead,
+                onPlan: _openLead,
+                onClose: _closeLead,
+                actingLeadId: _actingLeadId,
+              ),
+            ),
+            _workbenchBlock(
+              _WorkspaceActionGrid(
+                title: '成交操作',
+                subtitle: '方案 · 报价 · 跟进',
+                items: orderActions,
+              ),
+              top: 14,
+            ),
+          ];
+        case _InstitutionWorkbenchSection.management:
+          return [
+            _workbenchBlock(
+              _WorkspaceIdentityPanel(
+                profile: widget.profile,
+                organization: primaryOrganization,
+                organizationCount: _organizations.length,
+                loading: _orgLoading,
+                error: _orgError,
+                onManage: _openOrganizationProfile,
+                onPreview: _openPublicOrganizationPreview,
+                onRetry: _loadOrganizations,
+              ),
+              top: 8,
+            ),
+            _workbenchBlock(
+              _WorkspaceActionGrid(
+                title: '经营管理',
+                subtitle: '资料 · 展示 · 团队',
+                items: managementActions,
+              ),
+              top: 14,
+            ),
+          ];
+      }
+    }
+
+    return ColoredBox(
+      color: const Color(0xFFF7F8FA),
+      child: Column(
+        children: [
+          _WorkbenchSectionStrip(
+            items: sectionItems,
+            selected: _selectedWorkbenchSection,
+            onChanged: (section) =>
+                setState(() => _selectedWorkbenchSection = section),
           ),
-        ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
-            child: _WorkbenchTodayPanel(
-              items: todoItems,
-              loading: _loading || _bookingLoading,
-              onEmptyAction: _openOrganizationProfile,
-            ),
-          ),
-        ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
-            child: _WorkbenchAnalyticsPanel(
-              snapshot: analytics,
-              loading: _loading || _bookingLoading,
-              onOpenLeads: () => _openLeadList(_WorkbenchListMode.leads),
-              onOpenBookings: () => _openLeadList(_WorkbenchListMode.bookings),
-            ),
-          ),
-        ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
-            child: _LeadInboxPreview(
-              verified: verified,
-              leads: _leads,
-              loading: _loading,
-              error: _error,
-              onRetry: _loadLeads,
-              onViewAll: () => _openLeadList(_WorkbenchListMode.leads),
-              onOpen: _openLead,
-              onAssign: _assignLead,
-              onPlan: _openLead,
-              onClose: _closeLead,
-              actingLeadId: _actingLeadId,
-            ),
-          ),
-        ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              18,
-              14,
-              18,
-              mainTabBottomInset(context) + 18,
-            ),
-            child: _WorkspaceActionGrid(
-              items: [
-                _WorkbenchAction(
-                  icon: Icons.edit_note_rounded,
-                  title: '信息输入',
-                  subtitle: _organizationActionSubtitle(
-                    _organizations,
-                    _orgLoading,
-                  ),
-                  onTap: _openOrganizationProfile,
-                ),
-                _WorkbenchAction(
-                  icon: Icons.auto_awesome_outlined,
-                  title: '做计划',
-                  subtitle: _leads.isEmpty
-                      ? '基于用户画像生成申请节奏'
-                      : '${_leads.length} 个用户可跟进计划',
-                  badgeCount: _leadUnreadCount,
-                  onTap: () => _openLeadList(_WorkbenchListMode.leads),
-                ),
-                _WorkbenchAction(
-                  icon: Icons.map_outlined,
-                  title: '留学方案',
-                  subtitle: _conversionSubtitle('order', '方案/订单'),
-                  onTap: () => _openLeadList(_WorkbenchListMode.orders),
-                ),
-                _WorkbenchAction(
-                  icon: Icons.storefront_outlined,
-                  title: '机构显示',
-                  subtitle: _organizations.isEmpty ? '先创建公开机构页' : '预览并优化机构主页',
-                  onTap: _openPublicOrganizationPreview,
-                ),
-                _WorkbenchAction(
-                  icon: Icons.schedule_outlined,
-                  title: '免费咨询',
-                  subtitle: _conversionSubtitle('service_booking', '短咨询'),
-                  onTap: () => _openLeadList(_WorkbenchListMode.bookings),
-                ),
-                _WorkbenchAction(
-                  icon: Icons.groups_2_outlined,
-                  title: '团队协作',
-                  subtitle: '成员角色、邀请与工作量',
-                  onTap: _openTeamManagement,
-                ),
-                _WorkbenchAction(
-                  icon: Icons.support_agent_outlined,
-                  title: '线索管理',
-                  subtitle: _leadUnreadCount > 0
-                      ? '$_leadUnreadCount 条未读 · 可分配团队'
-                      : '咨询分配与协作记录',
-                  badgeCount: _leadUnreadCount,
-                  onTap: () => _openLeadList(_WorkbenchListMode.leads),
+          Expanded(
+            child: CustomScrollView(
+              slivers: [
+                ...sectionSlivers(),
+                SliverToBoxAdapter(
+                  child: SizedBox(height: mainTabBottomInset(context) + 96),
                 ),
               ],
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
+  }
+
+  SliverToBoxAdapter _workbenchBlock(Widget child, {double top = 12}) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(18, top, 18, 0),
+        child: _WorkbenchSurfaceCard(child: child),
+      ),
+    );
+  }
+
+  List<_WorkbenchAction> _buildWorkbenchActions() {
+    return [
+      _WorkbenchAction(
+        icon: Icons.edit_note_rounded,
+        title: '信息输入',
+        subtitle: _organizationActionSubtitle(
+          _organizations,
+          _orgLoading,
+        ),
+        onTap: _openOrganizationProfile,
+      ),
+      _WorkbenchAction(
+        icon: Icons.auto_awesome_outlined,
+        title: '做计划',
+        subtitle: _leads.isEmpty ? '基于用户画像生成申请节奏' : '${_leads.length} 个用户可跟进计划',
+        badgeCount: _leadUnreadCount,
+        onTap: () => _openLeadList(_WorkbenchListMode.leads),
+      ),
+      _WorkbenchAction(
+        icon: Icons.map_outlined,
+        title: '留学方案',
+        subtitle: _conversionSubtitle('order', '方案/订单'),
+        onTap: () => _openLeadList(_WorkbenchListMode.orders),
+      ),
+      _WorkbenchAction(
+        icon: Icons.storefront_outlined,
+        title: '机构显示',
+        subtitle: _organizations.isEmpty ? '先创建公开机构页' : '预览并优化机构主页',
+        onTap: _openPublicOrganizationPreview,
+      ),
+      _WorkbenchAction(
+        icon: Icons.schedule_outlined,
+        title: '免费咨询',
+        subtitle: _conversionSubtitle('service_booking', '短咨询'),
+        onTap: () => _openLeadList(_WorkbenchListMode.bookings),
+      ),
+      _WorkbenchAction(
+        icon: Icons.groups_2_outlined,
+        title: '团队协作',
+        subtitle: '成员角色、邀请与工作量',
+        onTap: _openTeamManagement,
+      ),
+      _WorkbenchAction(
+        icon: Icons.support_agent_outlined,
+        title: '线索管理',
+        subtitle: _leadUnreadCount > 0
+            ? '$_leadUnreadCount 条未读 · 可分配团队'
+            : '咨询分配与协作记录',
+        badgeCount: _leadUnreadCount,
+        onTap: () => _openLeadList(_WorkbenchListMode.leads),
+      ),
+    ];
   }
 }
 
@@ -558,7 +821,7 @@ class _InstitutionWorkspaceTabs extends StatelessWidget {
         ),
       ),
       child: SizedBox(
-        height: 62,
+        height: 68,
         child: Center(
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -601,11 +864,11 @@ class _InstitutionWorkspaceTab extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       child: SizedBox(
         width: label.length > 2 ? 74 : 58,
-        height: 62,
+        height: 68,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Text(
               label,
               maxLines: 1,
@@ -630,6 +893,149 @@ class _InstitutionWorkspaceTab extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WorkbenchSurfaceCard extends StatelessWidget {
+  final Widget child;
+
+  const _WorkbenchSurfaceCard({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: context.artC.ink.withValues(alpha: 0.06)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.035),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
+class _WorkbenchSectionStrip extends StatelessWidget {
+  final List<_WorkbenchSectionItem> items;
+  final _InstitutionWorkbenchSection selected;
+  final ValueChanged<_InstitutionWorkbenchSection> onChanged;
+
+  const _WorkbenchSectionStrip({
+    required this.items,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 68,
+      color: const Color(0xFFF7F8FA),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 10),
+        child: Row(
+          children: [
+            for (var i = 0; i < items.length; i++) ...[
+              _WorkbenchSectionChip(
+                item: items[i],
+                selected: selected == items[i].section,
+                onTap: () => onChanged(items[i].section),
+              ),
+              if (i != items.length - 1) const SizedBox(width: 8),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WorkbenchSectionChip extends StatelessWidget {
+  final _WorkbenchSectionItem item;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _WorkbenchSectionChip({
+    required this.item,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final badgeCount = item.badgeCount;
+    final badgeLabel = badgeCount > 99 ? '99+' : '$badgeCount';
+    final foreground =
+        selected ? Colors.white : context.artC.ink.withValues(alpha: 0.76);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 170),
+          curve: Curves.easeOutCubic,
+          height: 38,
+          padding: EdgeInsets.fromLTRB(16, 0, badgeCount > 0 ? 10 : 16, 0),
+          decoration: BoxDecoration(
+            color: selected ? kCobalt : const Color(0xFFF0F2F5),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                item.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: foreground,
+                  fontSize: 14,
+                  height: 1,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0,
+                ),
+              ),
+              if (badgeCount > 0) ...[
+                const SizedBox(width: 7),
+                Container(
+                  constraints: const BoxConstraints(minWidth: 22),
+                  height: 22,
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? Colors.white.withValues(alpha: 0.18)
+                        : kCobalt.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    badgeLabel,
+                    maxLines: 1,
+                    style: TextStyle(
+                      color: selected ? Colors.white : kCobalt,
+                      fontSize: 10,
+                      height: 1,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -852,84 +1258,45 @@ class _WorkbenchAnalyticsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const cellHeight = 82.0;
-    final lineColor = context.artC.ink.withValues(alpha: 0.055);
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final halfWidth = constraints.maxWidth / 2;
-        return SizedBox(
-          height: cellHeight * 2,
-          child: Stack(
-            children: [
-              Positioned(
-                left: halfWidth,
-                top: 0,
-                bottom: 0,
-                child: IgnorePointer(
-                  child: Container(width: 0.6, color: lineColor),
-                ),
-              ),
-              Positioned(
-                left: 0,
-                right: 0,
-                top: cellHeight,
-                child: IgnorePointer(
-                  child: Container(height: 0.6, color: lineColor),
-                ),
-              ),
-              Column(
-                children: [
-                  Row(
-                    children: [
-                      _WorkbenchAnalyticsGridCell(
-                        metric: metrics[0],
-                        padding: const EdgeInsets.fromLTRB(0, 14, 18, 0),
-                      ),
-                      _WorkbenchAnalyticsGridCell(
-                        metric: metrics[1],
-                        padding: const EdgeInsets.fromLTRB(22, 14, 0, 0),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      _WorkbenchAnalyticsGridCell(
-                        metric: metrics[2],
-                        padding: const EdgeInsets.fromLTRB(0, 16, 18, 0),
-                      ),
-                      _WorkbenchAnalyticsGridCell(
-                        metric: metrics[3],
-                        padding: const EdgeInsets.fromLTRB(22, 16, 0, 0),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
+    return Column(
+      children: [
+        Row(
+          children: [
+            _WorkbenchAnalyticsGridCell(metric: metrics[0]),
+            const SizedBox(width: 10),
+            _WorkbenchAnalyticsGridCell(metric: metrics[1]),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            _WorkbenchAnalyticsGridCell(metric: metrics[2]),
+            const SizedBox(width: 10),
+            _WorkbenchAnalyticsGridCell(metric: metrics[3]),
+          ],
+        ),
+      ],
     );
   }
 }
 
 class _WorkbenchAnalyticsGridCell extends StatelessWidget {
   final _WorkbenchAnalyticsMetric metric;
-  final EdgeInsets padding;
 
-  const _WorkbenchAnalyticsGridCell({
-    required this.metric,
-    required this.padding,
-  });
+  const _WorkbenchAnalyticsGridCell({required this.metric});
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: SizedBox(
-        height: 82,
+      child: Container(
+        height: 86,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF7F8FA),
+          borderRadius: BorderRadius.circular(14),
+        ),
         child: _WorkbenchAnalyticsMetricTile(
           metric: metric,
-          padding: padding,
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
         ),
       ),
     );
@@ -951,7 +1318,7 @@ class _WorkbenchAnalyticsMetricTile extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: metric.onTap,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(14),
         child: Padding(
           padding: padding,
           child: Column(
@@ -966,7 +1333,7 @@ class _WorkbenchAnalyticsMetricTile extends StatelessWidget {
                     metric.value,
                     maxLines: 1,
                     style: TextStyle(
-                      fontSize: 28,
+                      fontSize: 26,
                       height: 1,
                       fontWeight: FontWeight.w900,
                       color: context.artC.ink,
@@ -974,16 +1341,16 @@ class _WorkbenchAnalyticsMetricTile extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
+              const Spacer(),
               Text(
                 metric.label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 12.5,
+                  fontSize: 12,
                   height: 1.12,
                   fontWeight: FontWeight.w800,
-                  color: context.artC.ink,
+                  color: context.artC.ink.withValues(alpha: 0.68),
                 ),
               ),
             ],
@@ -1067,22 +1434,65 @@ class _WorkbenchQuietEmpty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 16, 14, 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F8FA),
+        borderRadius: BorderRadius.circular(14),
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border:
+                  Border.all(color: context.artC.ink.withValues(alpha: 0.06)),
+            ),
+            child: const Icon(
+              Icons.fact_check_outlined,
+              color: kCobalt,
+              size: 20,
+            ),
+          ),
+          const SizedBox(height: 10),
           Text(
             text,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 12.5,
-              height: 1.45,
-              fontWeight: FontWeight.w500,
+              fontSize: 12,
+              height: 1.35,
+              fontWeight: FontWeight.w700,
               color: context.artC.ink.withValues(alpha: 0.52),
             ),
           ),
-          const SizedBox(height: 8),
-          _QuietTextAction(label: actionLabel, onTap: onAction),
+          const SizedBox(height: 12),
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.white,
+              backgroundColor: kCobalt,
+              minimumSize: const Size(0, 36),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            onPressed: onAction,
+            child: Text(
+              actionLabel.replaceAll(' →', ''),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -1091,15 +1501,26 @@ class _WorkbenchQuietEmpty extends StatelessWidget {
 
 class _OrganizationCompletenessInline extends StatelessWidget {
   final _OrganizationCompleteness completeness;
+  final bool hasOrganization;
+  final bool verified;
+  final bool subscribed;
   final VoidCallback onManage;
 
   const _OrganizationCompletenessInline({
     required this.completeness,
+    required this.hasOrganization,
+    required this.verified,
+    required this.subscribed,
     required this.onManage,
   });
 
   @override
   Widget build(BuildContext context) {
+    final stages = [
+      (label: '建档', done: hasOrganization),
+      (label: '认证', done: verified),
+      (label: '入驻曝光', done: subscribed),
+    ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1109,30 +1530,80 @@ class _OrganizationCompletenessInline extends StatelessWidget {
               child: Text(
                 '主页完成度 ${completeness.completed}/${completeness.total}',
                 style: TextStyle(
-                  fontSize: 11.5,
+                  fontSize: 13,
                   height: 1.2,
-                  fontWeight: FontWeight.w700,
-                  color: context.artC.ink.withValues(alpha: 0.56),
+                  fontWeight: FontWeight.w900,
+                  color: context.artC.ink,
                 ),
               ),
             ),
             if (!completeness.complete)
-              _QuietTextAction(label: '补资料 →', onTap: onManage),
+              TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: kCobalt,
+                  backgroundColor: kCobalt.withValues(alpha: 0.08),
+                  minimumSize: const Size(0, 32),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                onPressed: onManage,
+                child: const Text(
+                  '补资料',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
           ],
         ),
-        const SizedBox(height: 7),
-        _QuietProgressLine(value: completeness.ratio),
+        const SizedBox(height: 10),
+        _QuietProgressLine(
+          value: completeness.ratio,
+          height: 6,
+          foregroundColor: kCobalt,
+          backgroundColor: const Color(0xFFE8ECF2),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            for (var index = 0; index < stages.length; index++) ...[
+              Expanded(
+                child: Text(
+                  stages[index].label,
+                  textAlign: index == 0
+                      ? TextAlign.left
+                      : index == stages.length - 1
+                          ? TextAlign.right
+                          : TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight:
+                        stages[index].done ? FontWeight.w900 : FontWeight.w700,
+                    color: context.artC.ink
+                        .withValues(alpha: stages[index].done ? 0.68 : 0.34),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
         if (!completeness.complete) ...[
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Text(
             '待补：${completeness.missingLabels.take(3).join('、')}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 10.5,
+              fontSize: 11,
               height: 1.2,
-              fontWeight: FontWeight.w500,
-              color: context.artC.ink.withValues(alpha: 0.38),
+              fontWeight: FontWeight.w700,
+              color: context.artC.ink.withValues(alpha: 0.44),
             ),
           ),
         ],
@@ -1216,8 +1687,16 @@ class _OrganizationCompletenessCard extends StatelessWidget {
 
 class _QuietProgressLine extends StatelessWidget {
   final double value;
+  final double height;
+  final Color? foregroundColor;
+  final Color? backgroundColor;
 
-  const _QuietProgressLine({required this.value});
+  const _QuietProgressLine({
+    required this.value,
+    this.height = 2,
+    this.foregroundColor,
+    this.backgroundColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1227,14 +1706,22 @@ class _QuietProgressLine extends StatelessWidget {
         return Stack(
           children: [
             Container(
-              height: 2,
+              height: height,
               width: double.infinity,
-              color: context.artC.silver.withValues(alpha: 0.28),
+              decoration: BoxDecoration(
+                color: backgroundColor ??
+                    context.artC.silver.withValues(alpha: 0.28),
+                borderRadius: BorderRadius.circular(999),
+              ),
             ),
             Container(
-              height: 2,
+              height: height,
               width: constraints.maxWidth * clamped,
-              color: context.artC.ink.withValues(alpha: 0.82),
+              decoration: BoxDecoration(
+                color:
+                    foregroundColor ?? context.artC.ink.withValues(alpha: 0.82),
+                borderRadius: BorderRadius.circular(999),
+              ),
             ),
           ],
         );
@@ -1294,112 +1781,105 @@ class _WorkspaceIdentityPanel extends StatelessWidget {
         ),
     ];
 
-    return Padding(
-      padding: const EdgeInsets.only(top: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '机构工作台',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: context.artC.ink.withValues(alpha: 0.42),
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 30,
-                        height: 1.04,
-                        fontWeight: FontWeight.w900,
-                        color: context.artC.ink,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              if (loading)
-                const Padding(
-                  padding: EdgeInsets.only(top: 7),
-                  child: SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      color: kCobalt,
-                      strokeWidth: 1.8,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '机构工作台',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: context.artC.ink.withValues(alpha: 0.42),
                     ),
                   ),
-                )
-              else if (error != null)
-                _QuietTextAction(label: '重试', onTap: onRetry)
-              else
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: _StatusPill(
-                    label: organization == null ? '待创建' : role,
-                    strong: organization != null,
+                  const SizedBox(height: 5),
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 26,
+                      height: 1.04,
+                      fontWeight: FontWeight.w900,
+                      color: context.artC.ink,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            if (loading)
+              const Padding(
+                padding: EdgeInsets.only(top: 7),
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    color: kCobalt,
+                    strokeWidth: 1.8,
                   ),
                 ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          _IdentitySegmentStrip(
-            personalLabel: profileName,
-            organizationLabel: name,
-            organizationCount: organizationCount,
-          ),
-          const SizedBox(height: 14),
-          if (error != null)
-            _LeadInlineError(error: error!, onRetry: onRetry)
-          else ...[
-            if (visibleStatusTags.isNotEmpty) ...[
-              Wrap(
-                spacing: 12,
-                runSpacing: 7,
-                children: visibleStatusTags,
+              )
+            else if (error != null)
+              _QuietTextAction(label: '重试', onTap: onRetry)
+            else
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: _StatusPill(
+                  label: organization == null ? '待创建' : role,
+                  strong: organization != null,
+                ),
               ),
-              const SizedBox(height: 15),
-            ],
-            if (completeness != null) ...[
-              _OrganizationCompletenessInline(
-                completeness: completeness,
-                onManage: onManage,
-              ),
-              const SizedBox(height: 15),
-            ],
-            _OrganizationExposureSteps(
+          ],
+        ),
+        const SizedBox(height: 10),
+        _IdentitySegmentStrip(
+          personalLabel: profileName,
+          organizationLabel: name,
+          organizationCount: organizationCount,
+        ),
+        const SizedBox(height: 14),
+        if (error != null)
+          _LeadInlineError(error: error!, onRetry: onRetry)
+        else ...[
+          if (visibleStatusTags.isNotEmpty) ...[
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: visibleStatusTags,
+            ),
+            const SizedBox(height: 15),
+          ],
+          if (completeness != null) ...[
+            _OrganizationCompletenessInline(
+              completeness: completeness,
               hasOrganization: organization != null,
               verified: verification == 'verified',
               subscribed: subscription == 'active',
+              onManage: onManage,
             ),
           ],
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 16,
-            runSpacing: 4,
-            children: [
-              _QuietTextAction(
-                label: canPreview ? '管理资料 →' : '创建机构 →',
-                onTap: onManage,
-              ),
-              if (canPreview)
-                _QuietTextAction(label: '预览主页 →', onTap: onPreview),
-            ],
-          ),
         ],
-      ),
+        const SizedBox(height: 14),
+        Wrap(
+          spacing: 16,
+          runSpacing: 4,
+          children: [
+            _QuietTextAction(
+              label: canPreview ? '管理资料 →' : '创建机构 →',
+              onTap: onManage,
+            ),
+            if (canPreview) _QuietTextAction(label: '预览主页 →', onTap: onPreview),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -1508,109 +1988,13 @@ class _IdentitySegment extends StatelessWidget {
   }
 }
 
-class _OrganizationExposureSteps extends StatelessWidget {
-  final bool hasOrganization;
-  final bool verified;
-  final bool subscribed;
-
-  const _OrganizationExposureSteps({
-    required this.hasOrganization,
-    required this.verified,
-    required this.subscribed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _ExposureStep(
-            label: '建档',
-            done: hasOrganization,
-          ),
-        ),
-        _ExposureConnector(active: hasOrganization),
-        Expanded(
-          child: _ExposureStep(
-            label: '认证',
-            done: verified,
-          ),
-        ),
-        _ExposureConnector(active: verified),
-        Expanded(
-          child: _ExposureStep(
-            label: '入驻曝光',
-            done: subscribed,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ExposureStep extends StatelessWidget {
-  final String label;
-  final bool done;
-
-  const _ExposureStep({
-    required this.label,
-    required this.done,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          width: 14,
-          height: 14,
-          decoration: BoxDecoration(
-            color: done ? context.artC.ink : Colors.transparent,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: done
-                  ? context.artC.ink
-                  : context.artC.silver.withValues(alpha: 0.56),
-              width: 1.1,
-            ),
-          ),
-        ),
-        const SizedBox(height: 7),
-        Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: done ? FontWeight.w700 : FontWeight.w500,
-            color: context.artC.ink.withValues(alpha: done ? 0.72 : 0.38),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ExposureConnector extends StatelessWidget {
-  final bool active;
-
-  const _ExposureConnector({required this.active});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 28,
-      height: 1,
-      margin: const EdgeInsets.only(bottom: 21),
-      color: active
-          ? context.artC.ink.withValues(alpha: 0.42)
-          : context.artC.silver.withValues(alpha: 0.34),
-    );
-  }
-}
-
 class _LeadInboxPreview extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final String? idleStatusLabel;
+  final String emptyText;
+  final String emptyActionLabel;
+  final VoidCallback? onEmptyAction;
   final bool verified;
   final List<Map<String, dynamic>> leads;
   final bool loading;
@@ -1624,6 +2008,12 @@ class _LeadInboxPreview extends StatelessWidget {
   final String? actingLeadId;
 
   const _LeadInboxPreview({
+    this.title = '咨询线索',
+    this.subtitle = '最近分配与未读消息',
+    this.idleStatusLabel,
+    this.emptyText = '暂无可处理咨询线索。平台分配或学生发起咨询后会出现在这里。',
+    this.emptyActionLabel = '查看全部 →',
+    this.onEmptyAction,
     required this.verified,
     required this.leads,
     required this.loading,
@@ -1647,7 +2037,7 @@ class _LeadInboxPreview extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                '咨询线索',
+                title,
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w800,
@@ -1661,16 +2051,14 @@ class _LeadInboxPreview extends StatelessWidget {
               _StatusPill(
                 label: loading
                     ? '同步中'
-                    : verified
-                        ? '等待分配'
-                        : '先完成认证',
+                    : idleStatusLabel ?? (verified ? '等待分配' : '先完成认证'),
                 strong: verified,
               ),
           ],
         ),
         const SizedBox(height: 3),
         Text(
-          '最近分配与未读消息',
+          subtitle,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
@@ -1713,7 +2101,111 @@ class _LeadInboxPreview extends StatelessWidget {
                 ],
               ],
             ),
+        ] else ...[
+          const SizedBox(height: 12),
+          _WorkbenchQuietEmpty(
+            text: emptyText,
+            actionLabel: emptyActionLabel,
+            onAction: onEmptyAction ?? onViewAll,
+          ),
         ],
+      ],
+    );
+  }
+}
+
+class _ServiceBookingPreview extends StatelessWidget {
+  final List<Map<String, dynamic>> bookings;
+  final bool loading;
+  final String? error;
+  final VoidCallback onRetry;
+  final VoidCallback onViewAll;
+  final VoidCallback onEmptyAction;
+  final ValueChanged<Map<String, dynamic>> onOpen;
+
+  const _ServiceBookingPreview({
+    required this.bookings,
+    required this.loading,
+    required this.error,
+    required this.onRetry,
+    required this.onViewAll,
+    required this.onEmptyAction,
+    required this.onOpen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleBookings = bookings.take(5).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                '预约服务',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: context.artC.ink,
+                ),
+              ),
+            ),
+            if (!loading && bookings.isNotEmpty)
+              _QuietTextAction(label: '查看全部 →', onTap: onViewAll)
+            else
+              _StatusPill(
+                label: loading ? '同步中' : '待转预约',
+                strong: bookings.isNotEmpty,
+              ),
+          ],
+        ),
+        const SizedBox(height: 3),
+        Text(
+          '短咨询确认、排期与完成状态',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: context.artC.ink.withValues(alpha: 0.38),
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (loading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 18),
+            child: Center(
+              child: CircularProgressIndicator(
+                color: kCobalt,
+                strokeWidth: 2.2,
+              ),
+            ),
+          )
+        else if (error != null)
+          _LeadInlineError(error: error!, onRetry: onRetry)
+        else if (visibleBookings.isEmpty)
+          _WorkbenchQuietEmpty(
+            text: '暂无转预约记录。顾问在咨询详情里点击“转预约”后会出现在这里。',
+            actionLabel: '查看咨询线索 →',
+            onAction: onEmptyAction,
+          )
+        else
+          Column(
+            children: [
+              for (var i = 0; i < visibleBookings.length; i++) ...[
+                _ServiceBookingRow(
+                  booking: visibleBookings[i],
+                  onTap: () => onOpen(visibleBookings[i]),
+                ),
+                if (i != visibleBookings.length - 1)
+                  Divider(
+                    height: 1,
+                    color: context.artC.silver.withValues(alpha: 0.22),
+                  ),
+              ],
+            ],
+          ),
       ],
     );
   }
@@ -2043,22 +2535,18 @@ class _MiniLeadTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: strong
-              ? context.artC.ink.withValues(alpha: 0.2)
-              : context.artC.silver.withValues(alpha: 0.34),
-          width: 0.8,
-        ),
+        color:
+            strong ? kCobalt.withValues(alpha: 0.08) : const Color(0xFFF1F3F6),
       ),
       child: Text(
         label,
         style: TextStyle(
-          fontSize: 10,
-          fontWeight: strong ? FontWeight.w700 : FontWeight.w500,
-          color: context.artC.ink.withValues(alpha: strong ? 0.7 : 0.46),
+          fontSize: 10.5,
+          fontWeight: FontWeight.w800,
+          color: strong ? kCobalt : context.artC.ink.withValues(alpha: 0.54),
         ),
       ),
     );
@@ -2093,9 +2581,15 @@ class _LeadUnreadBadge extends StatelessWidget {
 }
 
 class _WorkspaceActionGrid extends StatelessWidget {
+  final String title;
+  final String subtitle;
   final List<_WorkbenchAction> items;
 
-  const _WorkspaceActionGrid({required this.items});
+  const _WorkspaceActionGrid({
+    this.title = '工作入口',
+    this.subtitle = '输入 · 计划 · 咨询',
+    required this.items,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -2108,7 +2602,7 @@ class _WorkspaceActionGrid extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '工作入口',
+                  title,
                   style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w800,
@@ -2117,7 +2611,7 @@ class _WorkspaceActionGrid extends StatelessWidget {
                 ),
               ),
               Text(
-                '输入 · 计划 · 咨询',
+                subtitle,
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
@@ -4951,17 +5445,15 @@ class _StatusPill extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: context.artC.silver.withValues(alpha: strong ? 0.44 : 0.28),
-          width: 0.8,
-        ),
+        color:
+            strong ? kCobalt.withValues(alpha: 0.08) : const Color(0xFFF1F3F6),
       ),
       child: Text(
         label,
         style: TextStyle(
           fontSize: 10.5,
-          fontWeight: strong ? FontWeight.w700 : FontWeight.w500,
-          color: context.artC.ink.withValues(alpha: strong ? 0.68 : 0.46),
+          fontWeight: FontWeight.w800,
+          color: strong ? kCobalt : context.artC.ink.withValues(alpha: 0.54),
         ),
       ),
     );
@@ -5095,6 +5587,18 @@ class _WorkbenchAction {
     required this.subtitle,
     this.onTap,
     this.badgeCount,
+  });
+}
+
+class _WorkbenchSectionItem {
+  final _InstitutionWorkbenchSection section;
+  final String label;
+  final int badgeCount;
+
+  const _WorkbenchSectionItem({
+    required this.section,
+    required this.label,
+    required this.badgeCount,
   });
 }
 

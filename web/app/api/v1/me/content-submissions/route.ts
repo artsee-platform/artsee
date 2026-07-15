@@ -3,10 +3,16 @@ import { requireUser } from "@/lib/api/authz";
 import { errorResponse, parsePagination } from "@/lib/api/route-helpers";
 import { createServiceClient } from "@/lib/api/supabase-service";
 
-type ContentType = "events" | "opportunities" | "artworks" | "artists";
+type ContentType = "events" | "opportunities" | "artworks" | "artists" | "marketplace";
 type Row = Record<string, unknown>;
 
-const CONTENT_TYPES = new Set<ContentType>(["events", "opportunities", "artworks", "artists"]);
+const CONTENT_TYPES = new Set<ContentType>([
+  "events",
+  "opportunities",
+  "artworks",
+  "artists",
+  "marketplace",
+]);
 const TYPE_CONFIG: Record<
   ContentType,
   {
@@ -14,6 +20,7 @@ const TYPE_CONFIG: Record<
     titleField: string;
     ownerField: string;
     summaryFields: string[];
+    kind?: string;
     editableFields: Array<{
       key: string;
       label: string;
@@ -77,6 +84,17 @@ const TYPE_CONFIG: Record<
       { key: "display_name", label: "展示名称", required: true },
       { key: "experience", label: "经历介绍", type: "multiline" },
       { key: "cooperation_intent", label: "合作意向", type: "multiline" },
+    ],
+  },
+  marketplace: {
+    table: "community_posts",
+    titleField: "title",
+    ownerField: "author_id",
+    summaryFields: ["body", "audit_reason"],
+    kind: "market",
+    editableFields: [
+      { key: "title", label: "商品标题", required: true },
+      { key: "body", label: "商品说明", type: "multiline" },
     ],
   },
 };
@@ -154,6 +172,7 @@ async function listByType(
     .order("updated_at", { ascending: false })
     .range(merged ? 0 : offset, merged ? offset + limit - 1 : offset + limit - 1);
   if (status && status !== "all") query = query.eq("status", status);
+  if (config.kind) query = query.eq("metadata->>kind", config.kind);
   const { data, error, count } = await query;
   if (error) throw new Error(error.message ?? JSON.stringify(error));
   const rows = (data ?? []) as unknown as Row[];

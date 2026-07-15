@@ -3,10 +3,16 @@ import { requireAdmin } from "@/lib/api/require-admin";
 import { errorResponse, parsePagination } from "@/lib/api/route-helpers";
 import { createServiceClient } from "@/lib/api/supabase-service";
 
-type ContentType = "events" | "opportunities" | "artworks" | "artists";
+type ContentType = "events" | "opportunities" | "artworks" | "artists" | "marketplace";
 type ContentRow = Record<string, unknown>;
 
-const CONTENT_TYPES = new Set<ContentType>(["events", "opportunities", "artworks", "artists"]);
+const CONTENT_TYPES = new Set<ContentType>([
+  "events",
+  "opportunities",
+  "artworks",
+  "artists",
+  "marketplace",
+]);
 const TYPE_CONFIG: Record<
   ContentType,
   {
@@ -15,6 +21,7 @@ const TYPE_CONFIG: Record<
     ownerField: string;
     orderField: string;
     summaryFields: string[];
+    kind?: string;
   }
 > = {
   events: {
@@ -44,6 +51,14 @@ const TYPE_CONFIG: Record<
     ownerField: "user_id",
     orderField: "updated_at",
     summaryFields: ["experience", "cooperation_intent"],
+  },
+  marketplace: {
+    table: "community_posts",
+    titleField: "title",
+    ownerField: "author_id",
+    orderField: "updated_at",
+    summaryFields: ["body", "audit_reason"],
+    kind: "market",
   },
 };
 
@@ -108,6 +123,7 @@ async function listByType(
     .order(config.orderField, { ascending: false })
     .range(rangeForMergedList ? 0 : offset, rangeForMergedList ? offset + limit - 1 : offset + limit - 1);
   if (status && status !== "all") query = query.eq("status", status);
+  if (config.kind) query = query.eq("metadata->>kind", config.kind);
   const { data, error, count } = await query;
   if (error) throw new Error(error.message ?? JSON.stringify(error));
   return {

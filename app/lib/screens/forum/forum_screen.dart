@@ -2012,7 +2012,7 @@ class MarketplaceSurfaceState extends State<MarketplaceSurface> {
                 await refresh();
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('商品已发布到市集')),
+                  const SnackBar(content: Text('商品已提交审核，通过后会展示到市集')),
                 );
               } catch (e) {
                 if (!mounted) return;
@@ -3322,6 +3322,15 @@ class _MarketListingDetailScreenState
                       color: context.artC.ink.withValues(alpha: 0.54),
                     ),
                   ),
+                  IconButton(
+                    tooltip: '咨询商品',
+                    onPressed: _consulting ? null : _consult,
+                    icon: Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      size: 22,
+                      color: context.artC.ink.withValues(alpha: 0.54),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -3429,61 +3438,38 @@ class _MarketListingDetailScreenState
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 10, 24, 18),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: SizedBox(
-                      height: 46,
-                      child: TextButton(
-                        onPressed: _inBag
-                            ? (_checkingOut ? null : _checkout)
-                            : (_adding ? null : _addToBag),
-                        style: TextButton.styleFrom(
-                          foregroundColor: context.artC.ink,
-                          backgroundColor:
-                              context.artC.silver.withValues(alpha: 0.16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                        ),
-                        child: Text(
-                          _inBag
-                              ? (_checkingOut ? '生成中' : '生成订单')
-                              : (_adding ? '加入中' : '加入购物袋'),
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0,
-                          ),
-                        ),
-                      ),
+              child: SizedBox(
+                height: 48,
+                width: double.infinity,
+                child: TextButton.icon(
+                  onPressed: _checkingOut ? null : _checkout,
+                  icon: Icon(
+                    Icons.shopping_cart_checkout_rounded,
+                    size: 20,
+                    color: _checkingOut
+                        ? Colors.white.withValues(alpha: 0.62)
+                        : Colors.white,
+                  ),
+                  label: Text(
+                    _checkingOut ? '创建订单中' : '直接购买',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0,
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: SizedBox(
-                      height: 46,
-                      child: TextButton(
-                        onPressed: _consulting ? null : _consult,
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          backgroundColor: context.artC.ink,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                        ),
-                        child: Text(
-                          _consulting ? '发起中' : '咨询商品',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0,
-                          ),
-                        ),
-                      ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: context.artC.ink,
+                    disabledForegroundColor:
+                        Colors.white.withValues(alpha: 0.62),
+                    disabledBackgroundColor:
+                        context.artC.ink.withValues(alpha: 0.44),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
                     ),
                   ),
-                ],
+                ),
               ),
             ),
           ],

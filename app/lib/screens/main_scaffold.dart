@@ -209,8 +209,8 @@ class _MainScaffoldState extends State<MainScaffold> {
       ? const [
           _NavItem(
             tabIndex: 1,
-            icon: Icons.dashboard_customize_outlined,
-            activeIcon: Icons.dashboard_customize_rounded,
+            icon: Icons.grid_view_outlined,
+            activeIcon: Icons.grid_view_rounded,
             label: '工作台',
           ),
           _NavItem(
@@ -416,8 +416,11 @@ class _MainScaffoldState extends State<MainScaffold> {
               if (_currentIndex == 3) {
                 _forumKey.currentState?.refreshActiveTab();
               }
+              final successText = kind == _CommunityCreateKind.market
+                  ? '商品已提交审核，通过后会展示到市集'
+                  : '${labels.$1}成功';
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('${labels.$1}成功')),
+                SnackBar(content: Text(successText)),
               );
             } catch (e) {
               if (!mounted) return;
@@ -1737,16 +1740,16 @@ class _MainScaffoldState extends State<MainScaffold> {
 
     return Container(
       constraints: const BoxConstraints(maxWidth: 430),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: context.artC.cardIconBg.withValues(alpha: 0.94),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: context.artC.silver.withValues(alpha: 0.24)),
+        color: context.artC.cardIconBg.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.72)),
         boxShadow: [
           BoxShadow(
-            color: context.artC.ink.withValues(alpha: 0.045),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            color: context.artC.ink.withValues(alpha: 0.075),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -1754,7 +1757,7 @@ class _MainScaffoldState extends State<MainScaffold> {
         children: [
           ...leadingItems.map(_buildNavButtonSlot),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 2),
             child: _AiNavButton(onTap: _openDotChatRoute),
           ),
           ...trailingItems.map(_buildNavButtonSlot),
@@ -2524,16 +2527,16 @@ class _AiNavButtonState extends State<_AiNavButton> {
           duration: const Duration(milliseconds: 120),
           curve: Curves.easeOutCubic,
           child: Container(
-            width: 70,
-            height: 44,
+            width: 58,
+            height: 40,
             decoration: BoxDecoration(
-              color: aiColor,
-              borderRadius: BorderRadius.circular(15),
+              color: aiColor.withValues(alpha: 0.94),
+              borderRadius: BorderRadius.circular(14),
               boxShadow: [
                 BoxShadow(
-                  color: aiColor.withValues(alpha: 0.28),
-                  blurRadius: 14,
-                  offset: const Offset(0, 6),
+                  color: aiColor.withValues(alpha: 0.2),
+                  blurRadius: 12,
+                  offset: const Offset(0, 5),
                 ),
               ],
             ),
@@ -2542,7 +2545,7 @@ class _AiNavButtonState extends State<_AiNavButton> {
               children: [
                 Icon(
                   Icons.auto_awesome_rounded,
-                  size: 18,
+                  size: 17,
                   color: Colors.white,
                 ),
                 SizedBox(height: 1),
@@ -2550,7 +2553,7 @@ class _AiNavButtonState extends State<_AiNavButton> {
                   'AI',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 11,
+                    fontSize: 10.5,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0,
                     height: 1,

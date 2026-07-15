@@ -4,7 +4,7 @@ import { errorResponse, notFoundResponse } from "@/lib/api/route-helpers";
 import { createServiceClient } from "@/lib/api/supabase-service";
 
 type Ctx = { params: Promise<{ type: string; id: string }> };
-type ContentType = "events" | "opportunities" | "artworks" | "artists";
+type ContentType = "events" | "opportunities" | "artworks" | "artists" | "marketplace";
 type Row = Record<string, unknown>;
 
 const TYPE_CONFIG: Record<
@@ -12,6 +12,7 @@ const TYPE_CONFIG: Record<
   {
     table: string;
     ownerField: string;
+    kind?: string;
   }
 > = {
   events: {
@@ -29,6 +30,11 @@ const TYPE_CONFIG: Record<
   artists: {
     table: "artist_profiles",
     ownerField: "user_id",
+  },
+  marketplace: {
+    table: "community_posts",
+    ownerField: "author_id",
+    kind: "market",
   },
 };
 
@@ -59,12 +65,13 @@ export async function POST(req: NextRequest, ctx: Ctx) {
 
     const body = (await req.json().catch(() => ({}))) as Row;
     const supabase = createServiceClient();
-    const { data: current, error: readError } = await supabase
+    let readQuery = supabase
       .from(config.table)
       .select("*")
       .eq("id", id)
-      .eq(config.ownerField, auth.user.id)
-      .maybeSingle();
+      .eq(config.ownerField, auth.user.id);
+    if (config.kind) readQuery = readQuery.eq("metadata->>kind", config.kind);
+    const { data: current, error: readError } = await readQuery.maybeSingle();
 
     if (readError) return errorResponse(readError);
     if (!current) return notFoundResponse();
@@ -91,26 +98,38 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       ? [...arrayValue(metadata.review_history), previousReview]
       : arrayValue(metadata.review_history);
 
-    const { data, error } = await supabase
-      .from(config.table)
-      .update({
-        status: "reviewing",
-        updated_at: now,
-        metadata: {
-          ...metadata,
-          review_history: reviewHistory,
-          review: {
-            decision: "resubmitted",
-            resubmitted_by_user_id: auth.user.id,
-            resubmitted_at: now,
-            resubmission_note: cleanText(body.note) || null,
-          },
+    const updatePatch: Row = {
+      status: "reviewing",
+      updated_at: now,
+      metadata: {
+        ...metadata,
+        review_history: reviewHistory,
+        review: {
+          decision: "resubmitted",
+          resubmitted_by_user_id: auth.user.id,
+          resubmitted_at: now,
+          resubmission_note: cleanText(body.note) || null,
         },
-      })
+      },
+    };
+    if (type === "marketplace") {
+      updatePatch.audit_status = "reviewing";
+      updatePatch.audit_provider = "admin";
+      updatePatch.audit_reason = null;
+      updatePatch.audit_metadata = {
+        source: "user_content_resubmit",
+        resubmitted_by_user_id: auth.user.id,
+      };
+      updatePatch.audited_at = now;
+    }
+
+    let updateQuery = supabase
+      .from(config.table)
+      .update(updatePatch)
       .eq("id", id)
-      .eq(config.ownerField, auth.user.id)
-      .select("*")
-      .single();
+      .eq(config.ownerField, auth.user.id);
+    if (config.kind) updateQuery = updateQuery.eq("metadata->>kind", config.kind);
+    const { data, error } = await updateQuery.select("*").single();
     if (error) return errorResponse(error);
 
     return NextResponse.json({ success: true, data });

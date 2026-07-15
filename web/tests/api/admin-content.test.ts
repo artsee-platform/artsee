@@ -21,6 +21,7 @@ const db: Record<string, Row[]> = {
   opportunities: [],
   artworks: [],
   artist_profiles: [],
+  community_posts: [],
   notifications: [],
 };
 
@@ -73,6 +74,29 @@ function resetDb() {
     },
   ];
   db.artist_profiles = [];
+  db.community_posts = [
+    {
+      id: "market-1",
+      title: "作品集诊断名额",
+      status: "reviewing",
+      audit_status: "reviewing",
+      author_id: BUSINESS_ID,
+      body: "一对一作品集服务",
+      metadata: { kind: "market" },
+      created_at: "2026-06-12T12:00:00.000Z",
+      updated_at: "2026-06-12T12:30:00.000Z",
+    },
+    {
+      id: "post-1",
+      title: "普通广场帖",
+      status: "reviewing",
+      author_id: BUSINESS_ID,
+      body: "不应该出现在市集审核中",
+      metadata: { kind: "article" },
+      created_at: "2026-06-12T12:10:00.000Z",
+      updated_at: "2026-06-12T12:40:00.000Z",
+    },
+  ];
   db.notifications = [];
 }
 
@@ -157,8 +181,16 @@ class QueryStub {
   }
 
   private matches(row: Row) {
-    return this.filters.every(({ field, value }) => row[field] === value);
+    return this.filters.every(({ field, value }) => fieldValue(row, field) === value);
   }
+}
+
+function fieldValue(row: Row, field: string) {
+  const [base, jsonKey] = field.split("->>");
+  if (!jsonKey) return row[field];
+  const value = row[base];
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  return (value as Row)[jsonKey];
 }
 
 vi.mock("@/lib/api/auth-user", () => ({
@@ -202,13 +234,15 @@ describe("admin content moderation", () => {
     expect(body.data.map((item: Row) => item.type).sort()).toEqual([
       "artworks",
       "events",
+      "marketplace",
       "opportunities",
     ]);
-    expect(body.count).toBe(3);
+    expect(body.count).toBe(4);
     const event = body.data.find((item: Row) => item.id === "event-1");
     expect(event.supplemental_materials).toEqual([
       "https://example.supabase.co/storage/v1/object/public/submission-materials/business-user/submission-materials/events/event-1/proof.pdf",
     ]);
+    expect(body.data.some((item: Row) => item.id === "post-1")).toBe(false);
   });
 
   it("approves artwork content and notifies the owner", async () => {
@@ -224,6 +258,23 @@ describe("admin content moderation", () => {
     expect(body.data.status).toBe("published");
     expect(body.data.metadata.review.decision).toBe("approved");
     expect(db.notifications.at(-1)?.user_id).toBe(STUDENT_ID);
+  });
+
+  it("approves marketplace listings and keeps audit fields aligned", async () => {
+    const approved = await reviewAdminContent(
+      req("/api/v1/admin/content/marketplace/market-1/review", "admin", "POST", {
+        status: "approved",
+        review_note: "商品信息完整",
+      }),
+      ctx("marketplace", "market-1")
+    );
+    const body = await approved.json();
+    expect(approved.status).toBe(200);
+    expect(body.data.status).toBe("published");
+    expect(body.data.audit_status).toBe("approved");
+    expect(body.data.audit_provider).toBe("admin");
+    expect(body.data.metadata.review.decision).toBe("approved");
+    expect(db.notifications.at(-1)?.user_id).toBe(BUSINESS_ID);
   });
 
   it("rejects content with table-specific status semantics", async () => {

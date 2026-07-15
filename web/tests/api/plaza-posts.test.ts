@@ -171,4 +171,29 @@ describe("plaza rating target posts", () => {
     expect(metadata.rating_category).toBe("作品");
     expect(metadata.collection).toBe("作品口碑");
   });
+
+  it("keeps marketplace listings in manual review even when safety audit passes", async () => {
+    const res = await postPlaza(
+      postReq({
+        title: "作品集诊断名额",
+        body: "一对一作品集服务，含初稿反馈和申请策略。",
+        kind: "market",
+        metadata: {
+          product_type: "service",
+        },
+      })
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(201);
+    expect(body.success).toBe(true);
+    expect(mocks.insertedPosts).toHaveLength(1);
+    expect(mocks.insertedPosts[0].status).toBe("reviewing");
+    expect(mocks.insertedPosts[0].audit_status).toBe("reviewing");
+    expect(mocks.insertedPosts[0].audit_metadata).toMatchObject({
+      manual_review_required: true,
+    });
+    expect(mocks.recordCreatorContent).not.toHaveBeenCalled();
+    expect(mocks.createPlazaAiReplyIfEnabled).not.toHaveBeenCalled();
+  });
 });

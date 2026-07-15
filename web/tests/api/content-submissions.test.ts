@@ -20,6 +20,7 @@ const db: Record<string, Row[]> = {
   opportunities: [],
   artworks: [],
   artist_profiles: [],
+  community_posts: [],
 };
 const removedStoragePaths: string[][] = [];
 
@@ -81,6 +82,39 @@ function resetDb() {
     },
   ];
   db.artist_profiles = [];
+  db.community_posts = [
+    {
+      id: "market-1",
+      title: "作品集诊断名额",
+      status: "reviewing",
+      audit_status: "reviewing",
+      author_id: USER_ID,
+      body: "一对一作品集服务",
+      created_at: "2026-06-12T12:30:00.000Z",
+      updated_at: "2026-06-12T13:00:00.000Z",
+      metadata: { kind: "market" },
+    },
+    {
+      id: "post-1",
+      title: "普通广场帖",
+      status: "reviewing",
+      author_id: USER_ID,
+      body: "不是市集商品",
+      created_at: "2026-06-12T12:20:00.000Z",
+      updated_at: "2026-06-12T13:10:00.000Z",
+      metadata: { kind: "article" },
+    },
+    {
+      id: "market-other",
+      title: "别人的商品",
+      status: "reviewing",
+      author_id: OTHER_ID,
+      body: "不属于当前用户",
+      created_at: "2026-06-12T12:40:00.000Z",
+      updated_at: "2026-06-12T13:20:00.000Z",
+      metadata: { kind: "market" },
+    },
+  ];
 }
 
 class QueryStub {
@@ -126,7 +160,7 @@ class QueryStub {
     }
     const rows = db[this.table] ?? [];
     const index = rows.findIndex((row) => {
-      return this.filters.every(({ field, value }) => row[field] === value);
+      return this.filters.every(({ field, value }) => fieldValue(row, field) === value);
     });
     if (index < 0) return { data: null, error: { message: "not found" } };
     rows[index] = { ...rows[index], ...this.patch };
@@ -152,9 +186,17 @@ class QueryStub {
 
   private findRows() {
     return (db[this.table] ?? []).filter((row) => {
-      return this.filters.every(({ field, value }) => row[field] === value);
+      return this.filters.every(({ field, value }) => fieldValue(row, field) === value);
     });
   }
+}
+
+function fieldValue(row: Row, field: string) {
+  const [base, jsonKey] = field.split("->>");
+  if (!jsonKey) return row[field];
+  const value = row[base];
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  return (value as Row)[jsonKey];
 }
 
 vi.mock("@/lib/api/auth-user", () => ({
@@ -218,13 +260,16 @@ describe("my content submissions", () => {
     const body = await res.json();
     expect(res.status).toBe(200);
     expect(body.data.map((item: Row) => item.id)).toEqual([
+      "market-1",
       "opportunity-1",
       "event-1",
       "artwork-1",
     ]);
-    expect(body.count).toBe(3);
-    expect(body.data[0].review_decision).toBe("rejected");
-    expect(body.data[0].review_note).toBe("资料不完整");
+    expect(body.count).toBe(4);
+    expect(body.data.some((item: Row) => item.id === "post-1")).toBe(false);
+    expect(body.data[1].review_decision).toBe("rejected");
+    expect(body.data[1].review_note).toBe("资料不完整");
+    expect(body.data[0].type).toBe("marketplace");
     expect(body.data[0].editable_fields.some((field: Row) => field.key === "title")).toBe(true);
   });
 
@@ -237,6 +282,15 @@ describe("my content submissions", () => {
     expect(body.data).toHaveLength(1);
     expect(body.data[0].type).toBe("events");
     expect(body.data[0].title).toBe("我的展览");
+
+    const marketRes = await getMyContentSubmissions(
+      req("/api/v1/me/content-submissions?type=marketplace&status=reviewing", "user")
+    );
+    const marketBody = await marketRes.json();
+    expect(marketRes.status).toBe(200);
+    expect(marketBody.data).toHaveLength(1);
+    expect(marketBody.data[0].type).toBe("marketplace");
+    expect(marketBody.data[0].title).toBe("作品集诊断名额");
   });
 
   it("lets users resubmit their rejected content", async () => {
@@ -282,6 +336,41 @@ describe("my content submissions", () => {
       "https://example.com/portfolio.pdf",
     ]);
     expect(body.data.metadata.review_history[0].decision).toBe("rejected");
+  });
+
+  it("lets users edit rejected marketplace listings and submit them for manual review", async () => {
+    db.community_posts[0] = {
+      ...db.community_posts[0],
+      status: "rejected",
+      audit_status: "rejected",
+      metadata: {
+        kind: "market",
+        review: {
+          decision: "rejected",
+          review_note: "请补充商品说明",
+          reviewed_at: "2026-06-12T14:00:00.000Z",
+        },
+      },
+    };
+
+    const res = await updateContentSubmission(
+      patchReq("/api/v1/me/content-submissions/marketplace/market-1", "user", {
+        fields: {
+          title: "补充后的作品集诊断",
+          body: "补充服务内容与交付说明",
+        },
+        note: "已补充商品说明",
+      }),
+      resubmitCtx("marketplace", "market-1")
+    );
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body.data.title).toBe("补充后的作品集诊断");
+    expect(body.data.body).toBe("补充服务内容与交付说明");
+    expect(body.data.status).toBe("reviewing");
+    expect(body.data.audit_status).toBe("reviewing");
+    expect(body.data.metadata.kind).toBe("market");
+    expect(body.data.metadata.review.decision).toBe("edited_resubmitted");
   });
 
   it("removes old owned material objects when users remove material links", async () => {

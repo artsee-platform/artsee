@@ -52,6 +52,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int _walletPaidAmountCents = 0;
   int _walletPendingOrderCount = 0;
   int _walletPaidOrderCount = 0;
+  int _consultationRecordCount = 0;
+  int _marketSavedCount = 0;
+  int _marketPendingCount = 0;
+  int _marketConsultedCount = 0;
+  int _reviewingSubmissionCount = 0;
   List<AppCommunityPost> _profileShowcasePosts = const [];
   List<AppCommunityPost> _profileSavedPosts = const [];
   bool _loading = true;
@@ -74,6 +79,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     var walletPaidAmountCents = 0;
     var walletPendingOrderCount = 0;
     var walletPaidOrderCount = 0;
+    var consultationRecordCount = 0;
+    var marketSavedCount = 0;
+    var marketPendingCount = 0;
+    var marketConsultedCount = 0;
+    var reviewingSubmissionCount = 0;
     var profileShowcasePosts = <AppCommunityPost>[];
     var profileSavedPosts = <AppCommunityPost>[];
     try {
@@ -107,6 +117,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
       walletPaidOrderCount = 0;
     }
     try {
+      final consultations =
+          await BackendApiService.fetchConsultations(limit: 1);
+      consultationRecordCount +=
+          consultations.count ?? consultations.data.length;
+    } catch (_) {}
+    try {
+      final bookings = await BackendApiService.fetchMyServiceBookings(limit: 1);
+      consultationRecordCount += bookings.count ?? bookings.data.length;
+    } catch (_) {}
+    try {
+      final bag = await BackendApiService.fetchMarketplaceBag(limit: 80);
+      for (final item in bag.data) {
+        final status = item['status']?.toString() ?? 'pending';
+        if (item['saved'] == true) marketSavedCount += 1;
+        if (status == 'pending') marketPendingCount += 1;
+        if (status == 'consulted' || status == 'ordered') {
+          marketConsultedCount += 1;
+        }
+      }
+    } catch (_) {
+      marketSavedCount = 0;
+      marketPendingCount = 0;
+      marketConsultedCount = 0;
+    }
+    try {
+      final submissions = await BackendApiService.fetchMyContentSubmissions(
+        limit: 1,
+        status: 'reviewing',
+      );
+      reviewingSubmissionCount = submissions.count ?? submissions.data.length;
+    } catch (_) {
+      reviewingSubmissionCount = 0;
+    }
+    try {
       final posts = await BackendApiService.fetchCommunityPosts(limit: 50);
       final nonQaPosts = posts
           .where((post) => post.metadata['kind']?.toString() != 'qa')
@@ -135,6 +179,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _walletPaidAmountCents = walletPaidAmountCents;
         _walletPendingOrderCount = walletPendingOrderCount;
         _walletPaidOrderCount = walletPaidOrderCount;
+        _consultationRecordCount = consultationRecordCount;
+        _marketSavedCount = marketSavedCount;
+        _marketPendingCount = marketPendingCount;
+        _marketConsultedCount = marketConsultedCount;
+        _reviewingSubmissionCount = reviewingSubmissionCount;
         _profileShowcasePosts = profileShowcasePosts;
         _profileSavedPosts = profileSavedPosts;
         _loading = false;
@@ -563,6 +612,160 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Widget _buildProfileActionOverview() {
+    return Padding(
+      key: const ValueKey('tasks'),
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(2, 0, 2, 10),
+            child: Row(
+              children: [
+                const Text(
+                  '我的事项',
+                  style: TextStyle(
+                    color: _profileInk,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '需要跟进的内容',
+                  style: TextStyle(
+                    color: _profileMuted.withValues(alpha: 0.82),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    height: 1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final wide = constraints.maxWidth >= 520;
+              return GridView.count(
+                crossAxisCount: wide ? 3 : 2,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: EdgeInsets.zero,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+                childAspectRatio: wide ? 2.55 : 2.35,
+                children: [
+                  _ProfileActionTile(
+                    icon: Icons.chat_bubble_outline_rounded,
+                    title: '咨询记录',
+                    value: '$_consultationRecordCount',
+                    subtitle: '机构 / 预约',
+                    onTap: () => _openApplicationWorkspace(
+                      ApplicationWorkspaceKind.consultations,
+                    ),
+                  ),
+                  _ProfileActionTile(
+                    icon: Icons.shopping_bag_outlined,
+                    title: '待咨询商品',
+                    value: '$_marketPendingCount',
+                    subtitle: _marketConsultedCount > 0
+                        ? '已咨询 $_marketConsultedCount'
+                        : '市集清单',
+                    onTap: () =>
+                        _openMarketplaceBag(_ProfileMarketBagTab.pending),
+                  ),
+                  _ProfileActionTile(
+                    icon: Icons.rate_review_outlined,
+                    title: '发布审核',
+                    value: '$_reviewingSubmissionCount',
+                    subtitle: '审核中',
+                    onTap: _openContentSubmissions,
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileFavoritesOverview() {
+    final communitySavedCount = _profileSavedPosts.length;
+    return Column(
+      key: const ValueKey('saved'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(2, 0, 2, 10),
+          child: Row(
+            children: [
+              const Text(
+                '收藏汇总',
+                style: TextStyle(
+                  color: _profileInk,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  height: 1,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '商品和社区内容',
+                style: TextStyle(
+                  color: _profileMuted.withValues(alpha: 0.82),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  height: 1,
+                ),
+              ),
+            ],
+          ),
+        ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final wide = constraints.maxWidth >= 520;
+            return GridView.count(
+              crossAxisCount: wide ? 3 : 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: EdgeInsets.zero,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: wide ? 2.55 : 2.35,
+              children: [
+                _ProfileActionTile(
+                  icon: Icons.bookmark_border_rounded,
+                  title: '商品收藏',
+                  value: '$_marketSavedCount',
+                  subtitle: '市集商品',
+                  onTap: () => _openMarketplaceBag(_ProfileMarketBagTab.saved),
+                ),
+                _ProfileActionTile(
+                  icon: Icons.collections_bookmark_outlined,
+                  title: '社区收藏',
+                  value: '$communitySavedCount',
+                  subtitle: '图文 / 经验',
+                  onTap: _openSavedShelf,
+                ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 18),
+        _ProfileWorksPreview(
+          posts: _profileSavedPosts,
+          emptyTitle: '还没有社区收藏',
+          emptySubtitle: '去发现页收藏喜欢的作品、经验和灵感记录。',
+          onPostTap: _openCommunityPost,
+          onEmptyTap: _openExploreTab,
+        ),
+      ],
+    );
+  }
+
   Widget _buildProfileDrawer() {
     final drawerWidth = (MediaQuery.of(context).size.width * 0.82)
         .clamp(300.0, 348.0)
@@ -678,8 +881,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       () => _openPlaceholder('我的草稿')),
                   _MenuAction(
                       '发布记录', Icons.layers_outlined, _openContentSubmissions),
-                  _MenuAction('我的收藏', Icons.bookmark_border_rounded,
-                      () => _openPlaceholder('我的收藏')),
+                  _MenuAction(
+                      '我的收藏', Icons.bookmark_border_rounded, _openSavedShelf),
                   _MenuAction('浏览记录', Icons.history_rounded,
                       () => _openPlaceholder('浏览记录')),
                 ], run),
@@ -965,7 +1168,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildProfileShowcaseSection() {
-    const tabs = ['动态', '收藏', '钱包'];
+    const tabs = ['动态', '收藏', '事项', '钱包'];
     final selectedTab = _profileShowcaseTab.clamp(0, tabs.length - 1).toInt();
     return Padding(
       padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
@@ -997,14 +1200,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           onPostTap: _openCommunityPost,
           onEmptyTap: _openCreatePost,
         ),
-      1 => _ProfileWorksPreview(
-          key: const ValueKey('saved'),
-          posts: _profileSavedPosts,
-          emptyTitle: '还没有收藏',
-          emptySubtitle: '去发现页收藏喜欢的作品、经验和灵感记录。',
-          onPostTap: _openCommunityPost,
-          onEmptyTap: _openExploreTab,
-        ),
+      1 => _buildProfileFavoritesOverview(),
+      2 => _buildProfileActionOverview(),
       _ => _ProfileWalletPreview(
           paidAmountCents: _walletPaidAmountCents,
           pendingOrderCount: _walletPendingOrderCount,
@@ -1043,6 +1240,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
     _openPlaceholder('发现');
+  }
+
+  void _openSavedShelf() {
+    setState(() => _profileShowcaseTab = 1);
+  }
+
+  Future<void> _openMarketplaceBag(_ProfileMarketBagTab tab) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => _ProfileMarketplaceBagScreen(initialTab: tab),
+      ),
+    );
+    _load();
   }
 
   void _openOrders() {
@@ -1120,6 +1330,100 @@ class _MenuBadge extends StatelessWidget {
           color: Colors.white,
           fontSize: 10,
           fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileActionTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String value;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _ProfileActionTile({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: context.artC.cardIconBg,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: _profileLine),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: kCobalt.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: kCobalt, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: context.artC.ink,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                            height: 1,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        value,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: kCobalt,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          height: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: context.artC.ink.withValues(alpha: 0.44),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      height: 1,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -2216,6 +2520,482 @@ class _InstagramAvatar extends StatelessWidget {
       ),
     );
   }
+}
+
+enum _ProfileMarketBagTab { pending, consulted, saved }
+
+class _ProfileMarketplaceBagScreen extends StatefulWidget {
+  final _ProfileMarketBagTab initialTab;
+
+  const _ProfileMarketplaceBagScreen({required this.initialTab});
+
+  @override
+  State<_ProfileMarketplaceBagScreen> createState() =>
+      _ProfileMarketplaceBagScreenState();
+}
+
+class _ProfileMarketplaceBagScreenState
+    extends State<_ProfileMarketplaceBagScreen> {
+  List<Map<String, dynamic>> _rows = const [];
+  late _ProfileMarketBagTab _tab;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _tab = widget.initialTab;
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final result = await BackendApiService.fetchMarketplaceBag(limit: 80);
+      if (!mounted) return;
+      setState(() {
+        _rows = result.data;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  List<Map<String, dynamic>> _rowsFor(_ProfileMarketBagTab tab) {
+    return _rows.where((row) {
+      final status = row['status']?.toString() ?? 'pending';
+      return switch (tab) {
+        _ProfileMarketBagTab.pending => status == 'pending',
+        _ProfileMarketBagTab.consulted =>
+          status == 'consulted' || status == 'ordered',
+        _ProfileMarketBagTab.saved => row['saved'] == true,
+      };
+    }).toList(growable: false);
+  }
+
+  String _labelFor(_ProfileMarketBagTab tab) {
+    return switch (tab) {
+      _ProfileMarketBagTab.pending => '待咨询',
+      _ProfileMarketBagTab.consulted => '已咨询',
+      _ProfileMarketBagTab.saved => '已收藏',
+    };
+  }
+
+  void _openListing(Map<String, dynamic> row) {
+    final post = _marketPostFromRow(row);
+    if (post == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('商品详情暂不可用')),
+      );
+      return;
+    }
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => CommunityPostDetailScreen(
+          postId: post.id,
+          initialPost: post,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = _rowsFor(_tab);
+    return Scaffold(
+      backgroundColor: context.artC.porcelain,
+      appBar: AppBar(
+        backgroundColor: context.artC.porcelain,
+        elevation: 0,
+        title: const Text(
+          '市集记录',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+        ),
+        actions: [
+          IconButton(
+            tooltip: '刷新',
+            onPressed: _load,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        color: kCobalt,
+        onRefresh: _load,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
+          children: [
+            Row(
+              children: _ProfileMarketBagTab.values
+                  .map(
+                    (tab) => Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: _ProfileMarketTabButton(
+                        label: _labelFor(tab),
+                        count: _rowsFor(tab).length,
+                        selected: _tab == tab,
+                        onTap: () => setState(() => _tab = tab),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+            const SizedBox(height: 16),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.only(top: 108),
+                child: Center(child: CircularProgressIndicator(color: kCobalt)),
+              )
+            else if (_error != null)
+              _ProfileMarketEmptyState(
+                icon: Icons.error_outline,
+                title: '市集记录加载失败',
+                body: _error!,
+                actionLabel: '重试',
+                onAction: _load,
+              )
+            else if (visible.isEmpty)
+              _ProfileMarketEmptyState(
+                icon: _tab == _ProfileMarketBagTab.saved
+                    ? Icons.bookmark_border_rounded
+                    : Icons.shopping_bag_outlined,
+                title: '${_labelFor(_tab)}暂无记录',
+                body: _tab == _ProfileMarketBagTab.pending
+                    ? '在商品详情点购物袋图标后，会进入待咨询清单。'
+                    : _tab == _ProfileMarketBagTab.consulted
+                        ? '咨询商品后，记录会沉淀在这里。'
+                        : '收藏过的市集商品会显示在这里。',
+              )
+            else
+              ...visible.map(
+                (row) => _ProfileMarketBagRow(
+                  row: row,
+                  tabLabel: _labelFor(_tab),
+                  onTap: () => _openListing(row),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileMarketTabButton extends StatelessWidget {
+  final String label;
+  final int count;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ProfileMarketTabButton({
+    required this.label,
+    required this.count,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: selected ? context.artC.ink : context.artC.cardIconBg,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected
+                ? context.artC.ink
+                : context.artC.silver.withValues(alpha: 0.24),
+          ),
+        ),
+        child: Text(
+          '$label $count',
+          style: TextStyle(
+            color: selected ? Colors.white : context.artC.ink,
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileMarketBagRow extends StatelessWidget {
+  final Map<String, dynamic> row;
+  final String tabLabel;
+  final VoidCallback onTap;
+
+  const _ProfileMarketBagRow({
+    required this.row,
+    required this.tabLabel,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final post = _marketPostFromRow(row);
+    final title =
+        post?.title.trim().isNotEmpty == true ? post!.title.trim() : '未命名商品';
+    final category = _marketPostMeta(post, const ['category', 'group'], '市集商品');
+    final price = _marketPostMeta(
+      post,
+      const ['price', 'budget', 'amount', 'exchange'],
+      '可沟通',
+    );
+    final city =
+        _marketPostMeta(post, const ['city', 'location', 'mode'], '线上');
+    final message = row['message']?.toString().trim() ?? '';
+    final updatedAt = _marketDateText(row['updated_at']?.toString() ?? '');
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: context.artC.cardIconBg,
+          borderRadius: BorderRadius.circular(8),
+          border:
+              Border.all(color: context.artC.silver.withValues(alpha: 0.24)),
+        ),
+        child: Row(
+          children: [
+            _ProfileMarketThumb(post: post),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: context.artC.ink,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: kCobalt.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          tabLabel,
+                          style: const TextStyle(
+                            color: kCobalt,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '$category · $price · $city',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: context.artC.ink.withValues(alpha: 0.48),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  if (message.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      message,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: context.artC.ink.withValues(alpha: 0.42),
+                        fontSize: 11,
+                        height: 1.35,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Text(
+                        updatedAt,
+                        style: TextStyle(
+                          color: context.artC.ink.withValues(alpha: 0.32),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const Spacer(),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 19,
+                        color: context.artC.ink.withValues(alpha: 0.22),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileMarketThumb extends StatelessWidget {
+  final AppCommunityPost? post;
+
+  const _ProfileMarketThumb({required this.post});
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = post?.imageUrls.isNotEmpty == true
+        ? post!.imageUrls.first
+        : _marketPostMeta(post, const ['image_url'], '');
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: SizedBox(
+        width: 66,
+        height: 66,
+        child: imageUrl.isNotEmpty
+            ? Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _marketThumbFallback(context),
+              )
+            : _marketThumbFallback(context),
+      ),
+    );
+  }
+
+  Widget _marketThumbFallback(BuildContext context) {
+    return Container(
+      color: kCobalt.withValues(alpha: 0.08),
+      child: const Icon(
+        Icons.storefront_outlined,
+        color: kCobalt,
+        size: 24,
+      ),
+    );
+  }
+}
+
+class _ProfileMarketEmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String body;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  const _ProfileMarketEmptyState({
+    required this.icon,
+    required this.title,
+    required this.body,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 42, 18, 42),
+      decoration: BoxDecoration(
+        color: context.artC.cardIconBg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: context.artC.silver.withValues(alpha: 0.24)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 34, color: context.artC.ink.withValues(alpha: 0.22)),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: context.artC.ink,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            body,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: context.artC.ink.withValues(alpha: 0.46),
+              fontSize: 12,
+              height: 1.45,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: onAction,
+              child: Text(actionLabel!),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+AppCommunityPost? _marketPostFromRow(Map<String, dynamic> row) {
+  final listing = row['listing'];
+  if (listing is Map<String, dynamic>) {
+    try {
+      return AppCommunityPost.fromJson(listing);
+    } catch (_) {
+      return null;
+    }
+  }
+  return null;
+}
+
+String _marketPostMeta(
+  AppCommunityPost? post,
+  List<String> keys,
+  String fallback,
+) {
+  final metadata = post?.metadata ?? const <String, dynamic>{};
+  for (final key in keys) {
+    final value = metadata[key]?.toString().trim();
+    if (value != null && value.isNotEmpty) return value;
+  }
+  return fallback;
+}
+
+String _marketDateText(String raw) {
+  final dt = DateTime.tryParse(raw);
+  if (dt == null) return '刚刚更新';
+  return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
 }
 
 class _SettingsScreen extends StatelessWidget {

@@ -29,6 +29,7 @@ class _ContentSubmissionsScreenState extends State<ContentSubmissionsScreen> {
     ('opportunities', '机会'),
     ('artworks', '作品'),
     ('artists', '艺术家'),
+    ('marketplace', '商品'),
   ];
 
   static const _statuses = [
@@ -1193,6 +1194,8 @@ String _typeLabel(dynamic type) {
       return '作品';
     case 'artists':
       return '艺术家档案';
+    case 'marketplace':
+      return '市集商品';
     default:
       return '内容';
   }
@@ -1208,6 +1211,8 @@ IconData _typeIcon(dynamic type) {
       return Icons.image_outlined;
     case 'artists':
       return Icons.person_pin_circle_outlined;
+    case 'marketplace':
+      return Icons.storefront_outlined;
     default:
       return Icons.assignment_outlined;
   }

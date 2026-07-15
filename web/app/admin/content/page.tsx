@@ -15,7 +15,7 @@ import {
   XCircle,
 } from "lucide-react";
 
-type ContentType = "events" | "opportunities" | "artworks" | "artists";
+type ContentType = "events" | "opportunities" | "artworks" | "artists" | "marketplace";
 type ReviewStatus = "draft" | "reviewing" | "published" | "rejected" | "archived" | "closed" | "hidden";
 
 type ReviewItem = {
@@ -49,6 +49,7 @@ const TYPE_OPTIONS: Array<{ value: "all" | ContentType; label: string }> = [
   { value: "opportunities", label: "机会" },
   { value: "artworks", label: "作品" },
   { value: "artists", label: "艺术家" },
+  { value: "marketplace", label: "市集商品" },
 ];
 
 const STATUS_OPTIONS: Array<{ value: "all" | ReviewStatus; label: string }> = [
@@ -64,6 +65,7 @@ const TYPE_LABELS: Record<ContentType, string> = {
   opportunities: "机会",
   artworks: "作品",
   artists: "艺术家",
+  marketplace: "市集商品",
 };
 
 const STATUS_META: Record<ReviewStatus, { label: string; className: string }> = {
@@ -167,7 +169,14 @@ export default function AdminContentPage() {
         acc[row.type] = (acc[row.type] ?? 0) + 1;
         return acc;
       },
-      { total: 0, events: 0, opportunities: 0, artworks: 0, artists: 0 } as Record<
+      {
+        total: 0,
+        events: 0,
+        opportunities: 0,
+        artworks: 0,
+        artists: 0,
+        marketplace: 0,
+      } as Record<
         ContentType | "total",
         number
       >
@@ -252,7 +261,7 @@ export default function AdminContentPage() {
               <div>
                 <h1 className="text-2xl font-black tracking-normal">内容审核</h1>
                 <p className="mt-1 text-sm font-medium text-black/52">
-                  集中处理活动、合作机会、艺术家档案和作品展示。审核通过后内容进入公开区。
+                  集中处理活动、合作机会、艺术家档案、作品展示和市集商品。审核通过后内容进入公开区。
                 </p>
               </div>
             </div>
@@ -274,12 +283,13 @@ export default function AdminContentPage() {
           </div>
         ) : null}
 
-        <section className="grid gap-3 md:grid-cols-5">
+        <section className="grid gap-3 md:grid-cols-6">
           <Metric label="当前列表" value={`${metrics.total}`} />
           <Metric label="活动" value={`${metrics.events}`} />
           <Metric label="机会" value={`${metrics.opportunities}`} />
           <Metric label="作品" value={`${metrics.artworks}`} />
           <Metric label="艺术家" value={`${metrics.artists}`} />
+          <Metric label="市集商品" value={`${metrics.marketplace}`} />
         </section>
 
         <section className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">

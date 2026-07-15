@@ -286,7 +286,11 @@ export async function POST(req: NextRequest) {
       imageUrls,
       scene: "plaza_post",
     });
-    const status = postStatusForAudit(audit.audit_status);
+    const auditStatus =
+      kind === "market" && audit.audit_status !== "rejected"
+        ? "reviewing"
+        : audit.audit_status;
+    const status = postStatusForAudit(auditStatus);
     const supabase = createServiceClient();
     const { data: row, error } = await supabase
       .from("community_posts")
@@ -296,10 +300,10 @@ export async function POST(req: NextRequest) {
         body: text || null,
         image_urls: imageUrls,
         status,
-        audit_status: audit.audit_status,
+        audit_status: auditStatus,
         audit_provider: audit.provider,
         audit_reason: auditReasonFromItems(audit.items) || null,
-        audit_metadata: audit,
+        audit_metadata: kind === "market" ? { ...audit, manual_review_required: true } : audit,
         audited_at: new Date().toISOString(),
         metadata,
       })
