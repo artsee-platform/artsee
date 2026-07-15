@@ -92,8 +92,11 @@ export async function GET(req: NextRequest) {
     }
 
     const hasProfile = Boolean(profile?.has_completed_onboarding);
-    const hasSchools = (savedSchoolCount ?? 0) > 0;
-    const state = plan ? "generated" : !hasProfile ? "no_profile" : !hasSchools ? "no_schools" : "ready_to_generate";
+    const state = plan
+      ? "generated"
+      : !hasProfile
+        ? "no_profile"
+        : "ready_to_generate";
 
     return NextResponse.json({
       success: true,

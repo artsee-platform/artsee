@@ -22,10 +22,12 @@ class OrderDetailScreen extends StatefulWidget {
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
   late Map<String, dynamic> _order;
   List<Map<String, dynamic>> _refunds = [];
+  Map<String, dynamic>? _paymentProviders;
   bool _loading = false;
   bool _checkingOut = false;
   bool _requestingRefund = false;
   String? _error;
+  String? _paymentProviderError;
 
   @override
   void initState() {
@@ -44,10 +46,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     try {
       final data = await BackendApiService.fetchMyOrder(id);
       final refunds = await BackendApiService.fetchOrderRefunds(id);
+      Map<String, dynamic>? paymentProviders;
+      String? paymentProviderError;
+      try {
+        paymentProviders = await BackendApiService.fetchPaymentProviders();
+      } catch (e) {
+        paymentProviderError = e.toString();
+      }
       if (!mounted) return;
       setState(() {
         _order = data;
         _refunds = refunds;
+        _paymentProviders = paymentProviders;
+        _paymentProviderError = paymentProviderError;
         _loading = false;
       });
     } catch (e) {
@@ -375,6 +386,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ),
             if (_isCheckoutable(status)) ...[
               const SizedBox(height: 16),
+              _PaymentProvidersCard(
+                data: _paymentProviders,
+                error: _paymentProviderError,
+              ),
+              const SizedBox(height: 12),
               FilledButton.icon(
                 style: FilledButton.styleFrom(
                   backgroundColor: kCobalt,
@@ -396,7 +412,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       )
                     : const Icon(Icons.payments_outlined, size: 18),
                 label: Text(
-                  status == 'checkout_created' ? '继续支付' : '去支付',
+                  _checkoutButtonLabel(
+                    status,
+                    _paymentProviders,
+                  ),
                   style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
               ),
@@ -616,6 +635,124 @@ class _InfoLine extends StatelessWidget {
   }
 }
 
+class _PaymentProvidersCard extends StatelessWidget {
+  final Map<String, dynamic>? data;
+  final String? error;
+
+  const _PaymentProvidersCard({
+    required this.data,
+    required this.error,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = _enabledPaymentProviders(data);
+    final hasError = error != null && error!.isNotEmpty;
+    final isInternalOnly =
+        enabled.isNotEmpty && enabled.every((item) => item['id'] == 'internal');
+    return ArtseeSurface(
+      padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+      radius: 16,
+      elevated: false,
+      color: Colors.white.withValues(alpha: 0.78),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isInternalOnly
+                    ? Icons.science_outlined
+                    : Icons.account_balance_wallet_outlined,
+                size: 18,
+                color: kCobalt,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '支付方式',
+                  style: TextStyle(
+                    color: context.artC.ink,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (enabled.isEmpty)
+            Text(
+              hasError ? '支付渠道暂时无法读取，仍可尝试创建支付单。' : '正在确认可用支付渠道。',
+              style: TextStyle(
+                color: context.artC.ink.withValues(alpha: 0.46),
+                fontSize: 11.5,
+                height: 1.4,
+                fontWeight: FontWeight.w700,
+              ),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: enabled
+                  .map(
+                    (item) => _PaymentProviderChip(
+                      label: item['label']?.toString() ?? '支付方式',
+                      test: item['test'] == true,
+                    ),
+                  )
+                  .toList(),
+            ),
+          if (isInternalOnly) ...[
+            const SizedBox(height: 9),
+            Text(
+              '当前为内部测试支付，会直接确认订单状态；正式环境需配置微信、支付宝或银行卡支付服务商。',
+              style: TextStyle(
+                color: context.artC.ink.withValues(alpha: 0.42),
+                fontSize: 10.5,
+                height: 1.42,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PaymentProviderChip extends StatelessWidget {
+  final String label;
+  final bool test;
+
+  const _PaymentProviderChip({
+    required this.label,
+    required this.test,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: test
+            ? context.artC.silver.withValues(alpha: 0.18)
+            : kCobalt.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        test ? '$label · 测试' : label,
+        style: TextStyle(
+          color: test ? context.artC.ink.withValues(alpha: 0.58) : kCobalt,
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
 class _StatusPill extends StatelessWidget {
   final ({String label, Color color}) meta;
 
@@ -743,6 +880,25 @@ bool _isCheckoutable(String status) {
       status == 'checkout_created' ||
       status == 'failed' ||
       status == 'expired';
+}
+
+List<Map<String, dynamic>> _enabledPaymentProviders(
+    Map<String, dynamic>? data) {
+  final raw = data?['providers'];
+  if (raw is! List) return const [];
+  return raw
+      .whereType<Map>()
+      .map((item) => Map<String, dynamic>.from(item))
+      .where((item) => item['enabled'] == true)
+      .toList();
+}
+
+String _checkoutButtonLabel(String status, Map<String, dynamic>? providers) {
+  final enabled = _enabledPaymentProviders(providers);
+  final internalOnly =
+      enabled.isNotEmpty && enabled.every((item) => item['id'] == 'internal');
+  if (internalOnly) return status == 'checkout_created' ? '确认测试支付' : '创建测试支付';
+  return status == 'checkout_created' ? '继续支付' : '去支付';
 }
 
 String _formatOrderAmount(Map<String, dynamic> order) {

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../services/backend_api_service.dart';
 import '../../utils/auth_gate.dart';
-import '../../widgets/artsee_ui.dart';
 import '../../widgets/common.dart';
 import 'package:artsee_app/theme/artsee_ui_colors.dart';
 
@@ -11,6 +10,7 @@ class AskQuestionScreen extends StatefulWidget {
   final String? initialCategory;
   final String? searchKeyword;
   final String? initialSchool;
+  final String? initialSchoolId;
   final String? initialProgram;
   final String? sourceCircle;
 
@@ -20,6 +20,7 @@ class AskQuestionScreen extends StatefulWidget {
     this.initialCategory,
     this.searchKeyword,
     this.initialSchool,
+    this.initialSchoolId,
     this.initialProgram,
     this.sourceCircle,
   });
@@ -71,7 +72,8 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
   }
 
   Future<void> _submit() async {
-    if (!await ensureLoggedIn(context, message: '请先登录后发布问题')) return;
+    final loggedIn = await ensureLoggedIn(context, message: '请先登录后发布问题');
+    if (!mounted || !loggedIn) return;
     final title = _titleCtrl.text.trim();
     if (title.length < 8) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -108,14 +110,27 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
     if (_submitting) return;
     setState(() => _submitting = true);
     try {
-      await BackendApiService.createCommunityPost(
+      await BackendApiService.createPlazaPost(
         title: title,
         body: _bodyCtrl.text.trim(),
+        kind: 'qa',
+        group: widget.sourceCircle?.trim().isNotEmpty == true
+            ? widget.sourceCircle!.trim()
+            : _category,
+        tags: [
+          _category,
+          if (_schoolCtrl.text.trim().isNotEmpty) _schoolCtrl.text.trim(),
+          if (_programCtrl.text.trim().isNotEmpty) _programCtrl.text.trim(),
+        ],
         metadata: {
           'kind': 'qa',
           'category': _category,
+          'source': 'plaza_question',
+          'promote_to_plaza': true,
           if (_schoolCtrl.text.trim().isNotEmpty)
             'school': _schoolCtrl.text.trim(),
+          if (widget.initialSchoolId?.trim().isNotEmpty == true)
+            'school_id': widget.initialSchoolId!.trim(),
           if (_programCtrl.text.trim().isNotEmpty)
             'program': _programCtrl.text.trim(),
           if (widget.sourceCircle?.trim().isNotEmpty == true)
@@ -137,9 +152,9 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: context.artC.porcelain,
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: context.artC.porcelain,
+        backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
@@ -158,180 +173,151 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
         actions: [
           TextButton(
             onPressed: _submitting ? null : _submit,
+            style: TextButton.styleFrom(
+              foregroundColor: kCobalt,
+              textStyle: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0,
+              ),
+            ),
             child: Text(_submitting ? '发布中' : '发布'),
           ),
         ],
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 34),
           children: [
-            _QuestionFieldCard(
+            _QuestionSection(
               title: '问题标题',
               child: TextField(
                 controller: _titleCtrl,
                 autofocus: _titleCtrl.text.isEmpty,
                 maxLength: 60,
-                maxLines: 2,
+                minLines: 2,
+                maxLines: 3,
+                cursorColor: kCobalt,
                 decoration: const InputDecoration(
                   hintText: '例如：RCA 作品集一般需要几个完整项目？',
+                  filled: false,
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  contentPadding: EdgeInsets.zero,
                   counterText: '',
                 ),
                 style: TextStyle(
                   color: context.artC.ink,
-                  fontSize: 22,
-                  height: 1.25,
+                  fontSize: 23,
+                  height: 1.22,
                   fontWeight: FontWeight.w900,
+                  letterSpacing: 0,
                 ),
               ),
             ),
-            const SizedBox(height: 14),
-            _QuestionFieldCard(
+            const SizedBox(height: 34),
+            _QuestionSection(
               title: '问题方向',
               child: Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: _categories
                     .map(
-                      (item) => GestureDetector(
+                      (item) => _QuestionCategoryChip(
+                        label: item,
+                        selected: _category == item,
                         onTap: () => setState(() => _category = item),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 13,
-                            vertical: 9,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _category == item
-                                ? kCobalt.withOpacity(0.08)
-                                : context.artC.cardIconBg,
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: _category == item
-                                  ? kCobalt.withOpacity(0.28)
-                                  : context.artC.silver.withOpacity(0.65),
-                            ),
-                          ),
-                          child: Text(
-                            item,
-                            style: TextStyle(
-                              color: _category == item
-                                  ? kCobalt
-                                  : context.artC.ink.withOpacity(0.64),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
                       ),
                     )
                     .toList(),
               ),
             ),
-            const SizedBox(height: 14),
-            _QuestionFieldCard(
+            const SizedBox(height: 38),
+            _QuestionSection(
               title: '补充说明',
-              subtitle: '补充背景、目标学校、作品集进度和你卡住的地方。',
               child: TextField(
                 controller: _bodyCtrl,
-                minLines: 5,
-                maxLines: 10,
+                minLines: 7,
+                maxLines: 12,
+                cursorColor: kCobalt,
                 decoration: InputDecoration(
-                  hintText: '例如：\n- 你申请哪个学校 / 专业？\n- 目前作品集有几个项目？\n- 你希望得到什么建议？',
+                  hintText: '分享你的申请背景、作品集进度和目前最卡住的地方...',
+                  filled: false,
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  contentPadding: EdgeInsets.zero,
                   hintStyle: TextStyle(
-                    color: context.artC.ink.withOpacity(0.32),
-                    fontSize: 13,
-                    height: 1.55,
+                    color: context.artC.ink.withValues(alpha: 0.30),
+                    fontSize: 15,
+                    height: 1.6,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0,
                   ),
                 ),
                 style: TextStyle(
                   color: context.artC.ink,
-                  fontSize: 14,
+                  fontSize: 15,
                   height: 1.65,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0,
                 ),
               ),
             ),
-            const SizedBox(height: 14),
-            _QuestionFieldCard(
+            const SizedBox(height: 38),
+            _QuestionSection(
               title: '相关学校 / 项目',
-              subtitle: '可选。关联后，后续可以沉淀到学校详情页的相关问答。',
               child: Column(
                 children: [
-                  _CompactInput(
+                  _QuietInputLine(
                     controller: _schoolCtrl,
                     hint: '相关学校，如 Royal College of Art',
-                    icon: Icons.school_outlined,
                   ),
-                  const SizedBox(height: 10),
-                  _CompactInput(
+                  const SizedBox(height: 16),
+                  _QuietInputLine(
                     controller: _programCtrl,
                     hint: '相关专业 / 项目，如 MA Design Products',
-                    icon: Icons.article_outlined,
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 14),
-            ArtseeSurface(
-              padding: const EdgeInsets.all(16),
-              radius: 18,
-              child: Row(
-                children: [
-                  Icon(Icons.visibility_off_outlined,
-                      color: context.artC.ink.withOpacity(0.54)),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '匿名提问',
-                          style: TextStyle(
-                            color: context.artC.ink,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                          ),
+            const SizedBox(height: 34),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '匿名提问',
+                        style: TextStyle(
+                          color: context.artC.ink,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0,
                         ),
-                        const SizedBox(height: 3),
-                        Text(
-                          '匿名后，其他用户不会看到你的昵称和头像。',
-                          style: TextStyle(
-                            color: context.artC.ink.withOpacity(0.42),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '其他用户不会看到你的昵称和头像。',
+                        style: TextStyle(
+                          color: context.artC.ink.withValues(alpha: 0.42),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0,
                         ),
-                      ],
-                    ),
-                  ),
-                  Switch(
-                    value: _anonymous,
-                    activeColor: kCobalt,
-                    onChanged: (value) => setState(() => _anonymous = value),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            GestureDetector(
-              onTap: _submitting ? null : _submit,
-              child: Container(
-                height: 52,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: context.artC.ink,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  _submitting ? '发布中...' : '发布问题',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
+                      ),
+                    ],
                   ),
                 ),
-              ),
+                Switch(
+                  value: _anonymous,
+                  activeThumbColor: kCobalt,
+                  activeTrackColor: kCobalt.withValues(alpha: 0.18),
+                  onChanged: (value) => setState(() => _anonymous = value),
+                ),
+              ],
             ),
           ],
         ),
@@ -340,95 +326,120 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
   }
 }
 
-class _QuestionFieldCard extends StatelessWidget {
+class _QuestionSection extends StatelessWidget {
   final String title;
-  final String? subtitle;
   final Widget child;
 
-  const _QuestionFieldCard({
+  const _QuestionSection({
     required this.title,
-    this.subtitle,
     required this.child,
   });
 
   @override
   Widget build(BuildContext context) {
-    return ArtseeSurface(
-      padding: const EdgeInsets.all(16),
-      radius: 18,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              color: context.artC.ink,
-              fontSize: 13,
-              fontWeight: FontWeight.w900,
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            color: context.artC.ink,
+            fontSize: 17,
+            fontWeight: FontWeight.w900,
+            height: 1.1,
+            letterSpacing: 0,
           ),
-          if (subtitle != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              subtitle!,
-              style: TextStyle(
-                color: context.artC.ink.withOpacity(0.38),
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-          const SizedBox(height: 10),
-          child,
-        ],
+        ),
+        const SizedBox(height: 15),
+        child,
+      ],
+    );
+  }
+}
+
+class _QuestionCategoryChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _QuestionCategoryChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: selected
+              ? context.artC.ink.withValues(alpha: 0.055)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected
+                ? context.artC.ink
+                : context.artC.ink.withValues(alpha: 0.28),
+            fontSize: 13,
+            fontWeight: selected ? FontWeight.w900 : FontWeight.w600,
+            letterSpacing: 0,
+          ),
+        ),
       ),
     );
   }
 }
 
-class _CompactInput extends StatelessWidget {
+class _QuietInputLine extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
-  final IconData icon;
 
-  const _CompactInput({
+  const _QuietInputLine({
     required this.controller,
     required this.hint,
-    required this.icon,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: context.artC.silver.withOpacity(0.18),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: context.artC.silver.withOpacity(0.32)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 17, color: kCobalt.withOpacity(0.72)),
-          const SizedBox(width: 8),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              decoration: InputDecoration(
-                hintText: hint,
-                border: InputBorder.none,
-                hintStyle: TextStyle(
-                  color: context.artC.ink.withOpacity(0.32),
-                  fontSize: 12,
-                ),
-              ),
-              style: TextStyle(
-                color: context.artC.ink,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+    return TextField(
+      controller: controller,
+      cursorColor: kCobalt,
+      decoration: InputDecoration(
+        hintText: hint,
+        filled: false,
+        isDense: true,
+        contentPadding: const EdgeInsets.fromLTRB(0, 8, 0, 11),
+        enabledBorder: UnderlineInputBorder(
+          borderSide: BorderSide(
+            color: context.artC.ink.withValues(alpha: 0.10),
+            width: 1,
           ),
-        ],
+        ),
+        focusedBorder: UnderlineInputBorder(
+          borderSide: BorderSide(
+            color: context.artC.ink.withValues(alpha: 0.22),
+            width: 1,
+          ),
+        ),
+        hintStyle: TextStyle(
+          color: context.artC.ink.withValues(alpha: 0.30),
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0,
+        ),
+      ),
+      style: TextStyle(
+        color: context.artC.ink,
+        fontSize: 14,
+        height: 1.3,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0,
       ),
     );
   }

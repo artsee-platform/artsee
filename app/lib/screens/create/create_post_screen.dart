@@ -71,18 +71,22 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         imageUrls.add(url);
       }
 
-      final created = await BackendApiService.createCommunityPost(
+      final tags = _tagCtrl.text
+          .split(RegExp(r'[,，、\s]+'))
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+      final created = await BackendApiService.createPlazaPost(
         title: _titleCtrl.text.trim(),
         body: _contentCtrl.text.trim(),
         imageUrls: imageUrls,
+        kind: 'post',
+        group: _postType,
+        tags: tags,
         metadata: {
           'kind': 'post',
           'post_type': _postType,
-          'tags': _tagCtrl.text
-              .split(RegExp(r'[,，、\s]+'))
-              .map((e) => e.trim())
-              .where((e) => e.isNotEmpty)
-              .toList(),
+          'tags': tags,
           'visibility': _visibility,
           'sync_to_portfolio': _syncToPortfolio,
         },

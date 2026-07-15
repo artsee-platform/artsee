@@ -111,14 +111,14 @@ class ApplicationStatusOverview extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF7ED),
+                color: const Color(0xFFF6F8FC),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Row(
                 children: [
                   Icon(
                     Icons.lightbulb_outline,
-                    color: const Color(0xFFEA580C),
+                    color: kCobalt,
                     size: 18,
                   ),
                   const SizedBox(width: 10),
@@ -126,7 +126,7 @@ class ApplicationStatusOverview extends StatelessWidget {
                     child: Text(
                       '先添加 2-5 所目标院校，系统会帮你生成时间线、材料清单和作品集任务。',
                       style: TextStyle(
-                        color: const Color(0xFFEA580C),
+                        color: kCobalt,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         height: 1.4,

@@ -1,16 +1,27 @@
 import 'package:flutter/material.dart';
+import '../../models/models.dart';
 import '../../services/backend_api_service.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/common.dart';
 import '../auth/login_screen.dart';
+import '../community/community_post_detail_screen.dart';
 import '../consultation/organization_list_screen.dart';
-import '../profile/application_workspace_screen.dart';
+import '../forum/ask_question_screen.dart';
 import 'package:artsee_app/theme/artsee_ui_colors.dart';
 
 class SchoolDetailScreen extends StatefulWidget {
   final String id;
+  final VoidCallback? onOpenCompare;
+  final VoidCallback? onOpenCompareTab;
 
-  const SchoolDetailScreen({super.key, required this.id});
+  const SchoolDetailScreen({
+    super.key,
+    required this.id,
+    this.onOpenCompare,
+    @Deprecated('Use onOpenCompare instead') this.onOpenCompareTab,
+  });
+
+  VoidCallback? get resolvedOpenCompare => onOpenCompare ?? onOpenCompareTab;
 
   @override
   State<SchoolDetailScreen> createState() => _SchoolDetailScreenState();
@@ -21,6 +32,8 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
   bool _loading = true;
   bool _saved = false;
   bool _saving = false;
+  bool _questionsLoading = false;
+  List<AppCommunityPost> _schoolQuestions = const [];
   String? _error;
 
   bool get _isAuxiliarySchool =>
@@ -48,6 +61,7 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
           _loading = false;
         });
       }
+      _loadSchoolQuestions(r);
       final actionId = _schoolActionId;
       if (actionId != null) await _loadSavedState(actionId);
     } catch (e) {
@@ -117,19 +131,23 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
     }
   }
 
-  Future<void> _openCompareWorkspace() async {
+  Future<void> _openCompare() async {
     if (!_saved) {
       final saved = await _toggleSaved();
       if (!saved) return;
     }
     if (!mounted) return;
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const ApplicationWorkspaceScreen(
-          kind: ApplicationWorkspaceKind.programCompare,
-        ),
-      ),
-    );
+    final openCompare = widget.resolvedOpenCompare;
+    if (openCompare == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已加入目标池，可从院校页进入对比')),
+      );
+      return;
+    }
+    Navigator.of(context).pop();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      openCompare();
+    });
   }
 
   Future<void> _openOrganizationConsultation(String targetName) async {
@@ -144,6 +162,100 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _openSchoolQuestion() async {
+    final data = _data;
+    if (data == null) return;
+    if (!await _ensureLoggedIn()) return;
+    if (!mounted) return;
+    final schoolName = _schoolDisplayName(data);
+    final createdTitle = await Navigator.of(context).push<String?>(
+      MaterialPageRoute(
+        builder: (_) => AskQuestionScreen(
+          initialTitle: '关于$schoolName，我想问：',
+          initialCategory: '艺术留学',
+          initialSchool: schoolName,
+          initialSchoolId: _schoolActionId ?? widget.id,
+        ),
+      ),
+    );
+    if (!mounted || createdTitle == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('问题已进入院校广场')),
+    );
+    _loadSchoolQuestions(data);
+  }
+
+  Future<void> _loadSchoolQuestions(Map<String, dynamic> school) async {
+    if (_questionsLoading) return;
+    setState(() => _questionsLoading = true);
+    try {
+      final posts = await BackendApiService.fetchPlazaPosts(
+        limit: 50,
+        kind: 'qa',
+        sort: 'latest',
+      );
+      final matched = posts.where((post) {
+        return _schoolQuestionMatches(
+          post,
+          school: school,
+          fallbackSchoolId: _schoolActionId ?? widget.id,
+        );
+      }).toList();
+      if (!mounted) return;
+      setState(() {
+        _schoolQuestions = matched;
+        _questionsLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _schoolQuestions = const [];
+        _questionsLoading = false;
+      });
+    }
+  }
+
+  String _schoolDisplayName(Map<String, dynamic> school) {
+    final nameZh = school['name_zh']?.toString().trim();
+    if (nameZh != null && nameZh.isNotEmpty && nameZh != '—') return nameZh;
+    final nameEn = school['name_en']?.toString().trim();
+    if (nameEn != null && nameEn.isNotEmpty) return nameEn;
+    return '这所学校';
+  }
+
+  bool _schoolQuestionMatches(
+    AppCommunityPost post, {
+    required Map<String, dynamic> school,
+    required String fallbackSchoolId,
+  }) {
+    final schoolIds = <String>{
+      fallbackSchoolId.trim(),
+      widget.id.trim(),
+      school['id']?.toString().trim() ?? '',
+      school['remote_school_id']?.toString().trim() ?? '',
+    }..removeWhere((value) => value.isEmpty);
+    final schoolId = post.metadata['school_id']?.toString().trim();
+    if (schoolId != null && schoolIds.contains(schoolId)) return true;
+
+    final names = [
+      school['name_zh']?.toString(),
+      school['name_en']?.toString(),
+      school['short_name']?.toString(),
+      school['name']?.toString(),
+    ]
+        .map((value) => value?.trim())
+        .whereType<String>()
+        .where((value) => value.isNotEmpty && value != '—')
+        .toSet();
+    final metadataSchool = post.metadata['school']?.toString() ?? '';
+    final haystack = [
+      metadataSchool,
+      post.title,
+      post.body ?? '',
+    ].join(' ').toLowerCase();
+    return names.any((name) => haystack.contains(name.toLowerCase()));
   }
 
   @override
@@ -210,22 +322,18 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
             child: Row(
               children: [
-                GestureDetector(
+                _buildHeaderIconButton(
+                  icon: Icons.arrow_back_ios_new_rounded,
+                  tooltip: '返回',
                   onTap: () => Navigator.pop(context),
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: context.artC.silver.withOpacity(0.35),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.arrow_back_ios,
-                      size: 18,
-                      color: context.artC.ink.withOpacity(0.6),
-                    ),
-                  ),
                 ),
+                const SizedBox(width: 8),
+                _buildHeaderIconButton(
+                  icon: Icons.add_comment_outlined,
+                  tooltip: '问这所学校',
+                  onTap: _openSchoolQuestion,
+                ),
+                const Spacer(),
               ],
             ),
           ),
@@ -363,7 +471,7 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
                           icon: Icons.compare_arrows_rounded,
                           label: '加入对比',
                           outlined: true,
-                          onTap: _openCompareWorkspace,
+                          onTap: _openCompare,
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -418,6 +526,11 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
                       ),
                     ],
                   ),
+                ),
+                const SizedBox(height: 16),
+                _buildSchoolQuestionsCard(
+                  nameZh: nameZh,
+                  nameEn: nameEn,
                 ),
                 const SizedBox(height: 16),
                 _buildCard(
@@ -604,6 +717,206 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildHeaderIconButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 40,
+          height: 40,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: context.artC.silver.withOpacity(0.35),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            icon,
+            size: 18,
+            color: context.artC.ink.withOpacity(0.62),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSchoolQuestionsCard({
+    required String nameZh,
+    required String? nameEn,
+  }) {
+    final name = nameZh == '—' ? (nameEn ?? '这所学校') : nameZh;
+    final suggestions = [
+      '$name 作品集通常需要几个完整项目？',
+      '$name 更看重概念推导还是最终视觉完成度？',
+      '申请 $name 前需要提前准备哪些背景？',
+    ];
+
+    return _buildCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: _buildSectionTitle('关于这所学校，大家在问')),
+              TextButton.icon(
+                onPressed: _openSchoolQuestion,
+                icon: const Icon(Icons.add_comment_outlined, size: 16),
+                label: const Text('提问'),
+                style: TextButton.styleFrom(
+                  foregroundColor: kCobalt,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          if (_questionsLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: LinearProgressIndicator(
+                minHeight: 2,
+                color: kCobalt,
+              ),
+            )
+          else if (_schoolQuestions.isEmpty) ...[
+            Text(
+              '还没有沉淀到这所学校的问答。可以先把具体问题发到院校广场。',
+              style: TextStyle(
+                color: context.artC.ink.withOpacity(0.48),
+                fontSize: 12,
+                height: 1.45,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            for (final item in suggestions) _buildSuggestedQuestionRow(item),
+          ] else
+            ..._schoolQuestions.take(3).map(_buildQuestionTile),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSuggestedQuestionRow(String text) {
+    return InkWell(
+      onTap: _openSchoolQuestion,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            const Icon(Icons.help_outline_rounded, size: 17, color: kCobalt),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Text(
+                text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: context.artC.ink.withOpacity(0.74),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: context.artC.ink.withOpacity(0.28),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuestionTile(AppCommunityPost post) {
+    final subtitle = post.body?.trim().isNotEmpty == true
+        ? post.body!.trim()
+        : post.commentCount > 0
+            ? '${post.commentCount} 个回答正在讨论'
+            : '还在等第一条有用回答';
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => CommunityPostDetailScreen(
+              postId: post.id,
+              initialPost: post,
+            ),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 24,
+              height: 24,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: kCobalt.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                '问',
+                style: TextStyle(
+                  color: kCobalt,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    post.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: context.artC.ink,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: context.artC.ink.withOpacity(0.44),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '${post.commentCount} 回答',
+              style: TextStyle(
+                color: context.artC.ink.withOpacity(0.36),
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

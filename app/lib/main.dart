@@ -37,7 +37,7 @@ void _applySystemUi(bool isDark) {
     SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
-      systemNavigationBarColor: isDark ? const Color(0xFF07080C) : kPorcelain,
+      systemNavigationBarColor: isDark ? kInkDark : kPorcelain,
       systemNavigationBarIconBrightness:
           isDark ? Brightness.light : Brightness.dark,
     ),
@@ -148,10 +148,25 @@ class _AuthWrapperState extends State<AuthWrapper> {
     if (mounted) {
       setState(() {
         _onboardingDoneThisSession = true;
+        _loadingProfile = true;
+      });
+    }
+
+    Map<String, dynamic>? refreshedProfile;
+    try {
+      refreshedProfile = await SupabaseService.fetchProfile();
+    } catch (error) {
+      debugPrint('Reload profile after onboarding failed: $error');
+    }
+
+    if (mounted) {
+      setState(() {
         _profile = {
           ...?_profile,
+          ...?refreshedProfile,
           'has_completed_onboarding': true,
         };
+        _loadingProfile = false;
       });
     }
   }

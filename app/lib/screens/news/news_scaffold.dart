@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../widgets/common.dart';
+import '../consultation/organization_list_screen.dart';
+import '../create/create_post_screen.dart';
+import '../forum/ask_question_screen.dart';
+import '../home/home_screen.dart';
 import '../schools/school_list_screen.dart';
 import '../schools/school_search_screen.dart';
 import 'package:artsee_app/theme/artsee_ui_colors.dart';
@@ -7,12 +11,9 @@ import '../../services/backend_api_service.dart';
 import '../../services/supabase_service.dart';
 import '../../utils/auth_gate.dart';
 import '_radar_compare_chart.dart';
-import '_application_workspace_widgets.dart';
 
 class NewsScaffold extends StatefulWidget {
-  final VoidCallback? onOpenDotChat;
-
-  const NewsScaffold({super.key, this.onOpenDotChat});
+  const NewsScaffold({super.key});
 
   @override
   State<NewsScaffold> createState() => NewsScaffoldState();
@@ -20,15 +21,19 @@ class NewsScaffold extends StatefulWidget {
 
 class NewsScaffoldState extends State<NewsScaffold>
     with SingleTickerProviderStateMixin {
+  static const int _schoolsTabIndex = 1;
+  static const int _planTabIndex = 2;
+  static const int _schoolTabCount = 3;
   late TabController _tabController;
   final GlobalKey<SchoolListScreenState> _schoolKey =
       GlobalKey<SchoolListScreenState>();
   final GlobalKey<_ToolboxTabState> _toolboxKey = GlobalKey<_ToolboxTabState>();
+  int _plazaRefreshSignal = 0;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: _schoolTabCount, vsync: this);
   }
 
   @override
@@ -37,9 +42,17 @@ class NewsScaffoldState extends State<NewsScaffold>
     super.dispose();
   }
 
+  @override
+  void reassemble() {
+    super.reassemble();
+    if (_tabController.length == _schoolTabCount) return;
+    _tabController.dispose();
+    _tabController = TabController(length: _schoolTabCount, vsync: this);
+  }
+
   void toggleSchoolSearchPanel({bool? expand}) {
-    if (_tabController.index != 0) {
-      _tabController.animateTo(0);
+    if (_tabController.index != _schoolsTabIndex) {
+      _tabController.animateTo(_schoolsTabIndex);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _schoolKey.currentState?.openDecisionFilterSheet();
       });
@@ -50,8 +63,8 @@ class NewsScaffoldState extends State<NewsScaffold>
 
   /// 设置院校搜索关键词
   void setSchoolSearchKeyword(String keyword) {
-    if (_tabController.index != 0) {
-      _tabController.animateTo(0);
+    if (_tabController.index != _schoolsTabIndex) {
+      _tabController.animateTo(_schoolsTabIndex);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _schoolKey.currentState?.setSearchKeyword(keyword);
       });
@@ -64,23 +77,24 @@ class NewsScaffoldState extends State<NewsScaffold>
   String get schoolSearchKeyword =>
       _schoolKey.currentState?.searchKeyword ?? '';
 
+  void openComparePage() => _openComparePage();
+
   void openApplicationPlanTab() {
-    if (_tabController.index != 2) {
-      _tabController.animateTo(2);
+    if (_tabController.index != _planTabIndex) {
+      _tabController.animateTo(_planTabIndex);
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _toolboxKey.currentState?.openApplicationPlan();
     });
   }
 
-  void _openDotChat() {
-    widget.onOpenDotChat?.call();
-  }
-
   Future<void> _openSchoolSearch() async {
     final keyword = await Navigator.of(context).push<String>(
       MaterialPageRoute<String>(
-        builder: (_) => SchoolSearchScreen(initialKeyword: schoolSearchKeyword),
+        builder: (_) => SchoolSearchScreen(
+          initialKeyword: schoolSearchKeyword,
+          onOpenCompare: openComparePage,
+        ),
       ),
     );
     if (!mounted) return;
@@ -88,6 +102,143 @@ class NewsScaffoldState extends State<NewsScaffold>
     if (normalized != null && normalized.isNotEmpty) {
       setSchoolSearchKeyword(normalized);
     }
+  }
+
+  Future<void> _openSchoolQuestion(
+      {String? schoolName, String? schoolId}) async {
+    final loggedIn = await ensureLoggedIn(context, message: '请先登录后发布问题');
+    if (!mounted || !loggedIn) return;
+    final normalizedSchool = schoolName?.trim();
+    final createdTitle = await Navigator.of(context).push<String?>(
+      MaterialPageRoute(
+        builder: (_) => AskQuestionScreen(
+          initialTitle: normalizedSchool?.isNotEmpty == true
+              ? '关于$normalizedSchool，我想问：'
+              : null,
+          initialCategory: '艺术留学',
+          initialSchool:
+              normalizedSchool?.isNotEmpty == true ? normalizedSchool : null,
+          initialSchoolId: schoolId,
+        ),
+      ),
+    );
+    if (!mounted || createdTitle == null) return;
+    _tabController.animateTo(0);
+    _refreshPlaza();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('问题已进入院校广场')),
+    );
+  }
+
+  void _refreshPlaza() {
+    if (mounted) setState(() => _plazaRefreshSignal++);
+  }
+
+  Future<void> _openSchoolCreateMenu() async {
+    final action = await showGeneralDialog<_SchoolCreateAction>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '关闭发布菜单',
+      barrierColor: Colors.black.withValues(alpha: 0.58),
+      transitionDuration: const Duration(milliseconds: 180),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        return const _SchoolCreateFloatingMenu();
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return FadeTransition(
+          opacity: curved,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.05),
+              end: Offset.zero,
+            ).animate(curved),
+            child: child,
+          ),
+        );
+      },
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case _SchoolCreateAction.question:
+        await _openSchoolQuestion();
+        break;
+      case _SchoolCreateAction.rating:
+        await _openRatingTargetSheet();
+        break;
+      case _SchoolCreateAction.circle:
+        await _openCreateCircleSheet();
+        break;
+      case _SchoolCreateAction.post:
+        await _openCreatePost();
+        break;
+    }
+  }
+
+  Future<void> _openRatingTargetSheet() async {
+    final created = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(
+        builder: (_) => const PlazaRatingTargetScreen(),
+        fullscreenDialog: true,
+      ),
+    );
+    if (!mounted || created == null) return;
+    _tabController.animateTo(0);
+    _refreshPlaza();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('评分已进入广场')),
+    );
+  }
+
+  Future<void> _openCreateCircleSheet() async {
+    final loggedIn = await ensureLoggedIn(context, message: '请先登录后创建圈子');
+    if (!mounted || !loggedIn) return;
+    final created = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(
+        builder: (_) => const PlazaCreateCircleScreen(),
+        fullscreenDialog: true,
+      ),
+    );
+    if (!mounted || created == null) return;
+    _tabController.animateTo(0);
+    _refreshPlaza();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('圈子已创建，可在广场-圈子查看')),
+    );
+  }
+
+  Future<void> _openCreatePost() async {
+    final loggedIn = await ensureLoggedIn(context, message: '请先登录后发布动态');
+    if (!mounted || !loggedIn) return;
+    final created = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => const CreatePostScreen(),
+        fullscreenDialog: true,
+      ),
+    );
+    if (!mounted || created != true) return;
+    _tabController.animateTo(0);
+    _refreshPlaza();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('动态已发布')),
+    );
+  }
+
+  void _openComparePage() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (routeContext) => SchoolCompareScreen(
+          onGoSchools: () {
+            Navigator.of(routeContext).pop();
+            _tabController.animateTo(_schoolsTabIndex);
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -103,42 +254,31 @@ class NewsScaffoldState extends State<NewsScaffold>
               children: [
                 _SchoolChannelHeader(
                   controller: _tabController,
-                  onAiTap: _openDotChat,
+                  onCreateTap: _openSchoolCreateMenu,
                   onSearchTap: _openSchoolSearch,
                 ),
                 Expanded(
                   child: TabBarView(
                     controller: _tabController,
                     children: [
-                      SchoolListScreen(key: _schoolKey),
-                      _CompareTab(bottom: bottom),
+                      HomeScreen(
+                        compactTopChrome: true,
+                        plazaRefreshSignal: _plazaRefreshSignal,
+                        onReturnToMain: () =>
+                            _tabController.animateTo(_schoolsTabIndex),
+                      ),
+                      SchoolListScreen(
+                        key: _schoolKey,
+                        onOpenCompare: openComparePage,
+                      ),
                       _ToolboxTab(
                         key: _toolboxKey,
                         bottom: bottom,
-                        onGoSchools: () {
-                          _tabController.animateTo(0);
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            _schoolKey.currentState?.openDecisionFilterSheet();
-                          });
-                        },
                       ),
                     ],
                   ),
                 ),
               ],
-            ),
-          ),
-          Positioned(
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: 22,
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onHorizontalDragEnd: (details) {
-                final velocity = details.primaryVelocity ?? 0;
-                if (velocity > 320) _openDotChat();
-              },
             ),
           ),
         ],
@@ -147,14 +287,233 @@ class NewsScaffoldState extends State<NewsScaffold>
   }
 }
 
+enum _SchoolCreateAction { question, rating, post, circle }
+
+class _SchoolCreateFloatingMenu extends StatelessWidget {
+  const _SchoolCreateFloatingMenu();
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final availableWidth =
+        (MediaQuery.sizeOf(context).width - 40).clamp(280.0, 620.0).toDouble();
+    final tileWidth = (availableWidth - 12) / 2;
+
+    return Material(
+      color: Colors.transparent,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => Navigator.of(context).pop(),
+            ),
+          ),
+          Positioned(
+            left: 20,
+            right: 20,
+            bottom: bottomInset + 22,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Center(
+                  child: SizedBox(
+                    width: availableWidth,
+                    child: Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        _SchoolCreateFloatingOption(
+                          width: tileWidth,
+                          emphasized: true,
+                          icon: Icons.help_outline_rounded,
+                          title: '发布问答',
+                          subtitle: '把申请、作品集、院校选择的问题发到广场',
+                          onTap: () => Navigator.of(context)
+                              .pop(_SchoolCreateAction.question),
+                        ),
+                        _SchoolCreateFloatingOption(
+                          width: tileWidth,
+                          icon: Icons.star_border_rounded,
+                          title: '发布评分',
+                          subtitle: '评价艺术家、作品、展览或活动',
+                          onTap: () => Navigator.of(context)
+                              .pop(_SchoolCreateAction.rating),
+                        ),
+                        _SchoolCreateFloatingOption(
+                          width: tileWidth,
+                          icon: Icons.add_photo_alternate_outlined,
+                          title: '发动态',
+                          subtitle: '作品、现场、灵感记录',
+                          onTap: () => Navigator.of(context)
+                              .pop(_SchoolCreateAction.post),
+                        ),
+                        _SchoolCreateFloatingOption(
+                          width: tileWidth,
+                          icon: Icons.groups_2_outlined,
+                          title: '创建圈子',
+                          subtitle: '按学校、城市、作品集或行业方向聚合讨论',
+                          onTap: () => Navigator.of(context)
+                              .pop(_SchoolCreateAction.circle),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const _SchoolCreateCloseButton(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SchoolCreateFloatingOption extends StatelessWidget {
+  final double width;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final bool emphasized;
+
+  const _SchoolCreateFloatingOption({
+    required this.width,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.emphasized = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      height: 82,
+      child: TextButton(
+        onPressed: onTap,
+        style: TextButton.styleFrom(
+          foregroundColor: context.artC.ink,
+          padding: EdgeInsets.zero,
+          minimumSize: Size.zero,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: emphasized ? const Color(0xFFEAF1FF) : Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: emphasized
+                  ? kCobalt.withValues(alpha: 0.46)
+                  : Colors.white.withValues(alpha: 0.92),
+              width: emphasized ? 1.4 : 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: emphasized ? 0.16 : 0.11),
+                blurRadius: emphasized ? 22 : 16,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: emphasized ? kCobalt : kCobalt.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  icon,
+                  color: emphasized ? Colors.white : kCobalt,
+                  size: 19,
+                ),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: context.artC.ink,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: context.artC.ink.withValues(alpha: 0.58),
+                        fontSize: 9.5,
+                        height: 1.2,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SchoolCreateCloseButton extends StatelessWidget {
+  const _SchoolCreateCloseButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.96),
+      shape: const CircleBorder(),
+      elevation: 18,
+      shadowColor: Colors.black.withValues(alpha: 0.24),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: () => Navigator.of(context).pop(),
+        child: SizedBox(
+          width: 54,
+          height: 54,
+          child: Icon(
+            Icons.close_rounded,
+            size: 29,
+            color: context.artC.ink.withValues(alpha: 0.82),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _SchoolChannelHeader extends StatelessWidget {
   final TabController controller;
-  final VoidCallback onAiTap;
+  final VoidCallback onCreateTap;
   final VoidCallback onSearchTap;
 
   const _SchoolChannelHeader({
     required this.controller,
-    required this.onAiTap,
+    required this.onCreateTap,
     required this.onSearchTap,
   });
 
@@ -180,9 +539,9 @@ class _SchoolChannelHeader extends StatelessWidget {
             children: [
               const SizedBox(width: 8),
               _SchoolHeaderIconButton(
-                icon: Icons.chat_bubble_outline_rounded,
-                onTap: onAiTap,
-                tooltip: '问 Art Guide',
+                icon: Icons.add_box_outlined,
+                onTap: onCreateTap,
+                tooltip: '发布内容',
               ),
               Expanded(
                 child: Center(
@@ -244,8 +603,8 @@ class _SchoolChannelTabs extends StatelessWidget {
 
   const _SchoolChannelTabs({required this.controller});
 
-  static const _labels = ['院校', '对比', '计划'];
-  static const _accent = Color(0xFFE64565);
+  static const _labels = ['广场', '院校', '计划'];
+  static const _accent = kCobalt;
 
   @override
   Widget build(BuildContext context) {
@@ -420,12 +779,10 @@ class _ArticlesTabState extends State<_ArticlesTab> {
 
 class _ToolboxTab extends StatefulWidget {
   final double bottom;
-  final VoidCallback onGoSchools;
 
   const _ToolboxTab({
     super.key,
     required this.bottom,
-    required this.onGoSchools,
   });
 
   @override
@@ -433,18 +790,13 @@ class _ToolboxTab extends StatefulWidget {
 }
 
 class _ToolboxTabState extends State<_ToolboxTab> {
-  Map<String, dynamic>? _progress;
   Map<String, dynamic>? _applicationPlan;
-  List<Map<String, dynamic>> _tools = [];
   bool _loading = true;
   bool _loadingApplicationPlan = false;
   bool _generatingApplicationPlan = false;
   bool _needsLogin = false;
   String? _error;
   String? _applicationPlanError;
-  int _targetSchoolCount = 0;
-  int _materialCount = 0;
-  int _completedMaterialCount = 0;
 
   @override
   void initState() {
@@ -459,11 +811,8 @@ class _ToolboxTabState extends State<_ToolboxTab> {
         _needsLogin = true;
         _error = null;
         _applicationPlanError = null;
-        _progress = null;
         _applicationPlan = null;
-        _targetSchoolCount = 0;
-        _materialCount = 0;
-        _completedMaterialCount = 0;
+        _loadingApplicationPlan = false;
       });
       return;
     }
@@ -474,25 +823,19 @@ class _ToolboxTabState extends State<_ToolboxTab> {
       _error = null;
     });
     try {
-      final progressFuture = BackendApiService.fetchApplicationProgress();
-      final toolsFuture = BackendApiService.fetchTools();
-      final results = await Future.wait([progressFuture, toolsFuture]);
-      if (mounted) {
-        setState(() {
-          _progress = results[0] as Map<String, dynamic>;
-          _tools = results[1] as List<Map<String, dynamic>>;
-          _targetSchoolCount = _progress?['target_school_count'] as int? ?? 0;
-          _materialCount = _progress?['material_count'] as int? ?? 0;
-          _completedMaterialCount =
-              _progress?['completed_material_count'] as int? ?? 0;
-          _loading = false;
-        });
-        await _loadApplicationPlan(silent: true);
-      }
+      final data = await BackendApiService.fetchApplicationPlan();
+      if (!mounted) return;
+      setState(() {
+        _applicationPlan = data;
+        _applicationPlanError = null;
+        _loadingApplicationPlan = false;
+        _loading = false;
+      });
     } catch (e) {
       if (mounted) {
         setState(() {
           _error = e.toString();
+          _loadingApplicationPlan = false;
           _loading = false;
         });
       }
@@ -506,7 +849,7 @@ class _ToolboxTabState extends State<_ToolboxTab> {
   Future<void> _loginAndReload() async {
     final ok = await ensureLoggedIn(
       context,
-      message: '登录后可以查看申请计划和材料进度',
+      message: '登录后可以查看申请计划',
     );
     if (!ok || !mounted) return;
     await _loadData();
@@ -531,7 +874,6 @@ class _ToolboxTabState extends State<_ToolboxTab> {
       if (!mounted) return;
       setState(() {
         _applicationPlan = data;
-        _targetSchoolCount = _countFromApplicationPlan(data);
         _applicationPlanError = null;
         _loadingApplicationPlan = false;
       });
@@ -558,10 +900,9 @@ class _ToolboxTabState extends State<_ToolboxTab> {
       if (!mounted) return;
       setState(() {
         _applicationPlan = data;
-        _targetSchoolCount = _countFromApplicationPlan(data);
         _applicationPlanError = null;
       });
-      await _loadData();
+      await _loadApplicationPlan(silent: true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -593,114 +934,97 @@ class _ToolboxTabState extends State<_ToolboxTab> {
     }
   }
 
-  int _countFromApplicationPlan(Map<String, dynamic> data) {
-    final explicitCount = data['saved_school_count'];
-    if (explicitCount is num) return explicitCount.toInt();
-    final schools = data['saved_schools'];
-    if (schools is List) return schools.length;
-    return _targetSchoolCount;
+  void _openConsultationOrganizations() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => const OrganizationListScreen(),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final percentage = _progress?['percentage'] as int? ?? 0;
-    final hasTargetSchools = _targetSchoolCount > 0;
-
-    return RefreshIndicator(
-      color: kCobalt,
-      onRefresh: _loadData,
-      child: ListView(
-        padding: EdgeInsets.fromLTRB(20, 8, 20, widget.bottom + 72),
-        children: [
-          if (_loading)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 60),
-              child: Center(
-                child: CircularProgressIndicator(
-                  color: kCobalt,
-                  strokeWidth: 2.5,
+    return ColoredBox(
+      color: Colors.white,
+      child: RefreshIndicator(
+        color: kCobalt,
+        onRefresh: _loadData,
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(24, 30, 24, widget.bottom + 160),
+          children: [
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 60),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: kCobalt,
+                    strokeWidth: 2.5,
+                  ),
+                ),
+              )
+            else if (_needsLogin)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 40),
+                child: _PlanEmptyState(
+                  icon: Icons.lock_outline_rounded,
+                  title: '登录后查看申请计划',
+                  body: '登录后，AI 会根据你的 onboarding 信息生成一份简单、通俗的申请计划。',
+                  actionLabel: '去登录 →',
+                  onAction: () => _loginAndReload(),
+                ),
+              )
+            else if (_error != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 40),
+                child: Column(
+                  children: [
+                    Text(
+                      '加载失败: $_error',
+                      style: TextStyle(color: context.artC.ink),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    _PlanActionButton(label: '重试 →', onTap: _loadData),
+                  ],
+                ),
+              )
+            else ...[
+              Text(
+                'AI 申请计划',
+                style: TextStyle(
+                  color: context.artC.ink,
+                  fontSize: 24,
+                  height: 1.12,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0,
                 ),
               ),
-            )
-          else if (_needsLogin)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 40),
-              child: _PlanEmptyState(
-                icon: Icons.lock_outline_rounded,
-                title: '登录后查看申请计划',
-                body: '申请进度、目标院校和时间线需要绑定到你的账号，登录后会自动读取你的目标池与材料状态。',
-                actionLabel: '去登录',
-                onAction: () => _loginAndReload(),
+              const SizedBox(height: 14),
+              Text(
+                '根据你的 onboarding 信息生成一份清晰的申请节奏。',
+                style: TextStyle(
+                  color: context.artC.ink.withValues(alpha: 0.42),
+                  fontSize: 13,
+                  height: 1.45,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0,
+                ),
               ),
-            )
-          else if (_error != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 40),
-              child: Column(
-                children: [
-                  Text(
-                    '加载失败: $_error',
-                    style: TextStyle(color: context.artC.ink),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton(
-                    onPressed: _loadData,
-                    style: ElevatedButton.styleFrom(backgroundColor: kCobalt),
-                    child: const Text('重试'),
-                  ),
-                ],
+              const SizedBox(height: 30),
+              _InlineApplicationPlanPanel(
+                data: _applicationPlan,
+                loading: _loadingApplicationPlan,
+                error: _applicationPlanError,
+                generating: _generatingApplicationPlan,
+                onReload: _loadApplicationPlan,
+                onGenerate: _generateApplicationPlan,
+                onToggleTask: _toggleApplicationPlanTask,
               ),
-            )
-          else ...[
-            // 第一层：申请状态总览
-            ApplicationStatusOverview(
-              percentage: percentage,
-              targetSchoolCount: _targetSchoolCount,
-              materialCount: _materialCount,
-              completedMaterialCount: _completedMaterialCount,
-              hasTargetSchools: hasTargetSchools,
-              onPrimaryAction: widget.onGoSchools,
-            ),
-            const SizedBox(height: 14),
-
-            _NewsSectionHeader(title: '申请计划', action: '目标院校驱动'),
-            const SizedBox(height: 6),
-            _InlineApplicationPlanPanel(
-              data: _applicationPlan,
-              loading: _loadingApplicationPlan,
-              error: _applicationPlanError,
-              generating: _generatingApplicationPlan,
-              onReload: _loadApplicationPlan,
-              onGenerate: _generateApplicationPlan,
-              onToggleTask: _toggleApplicationPlanTask,
-              onGoSchools: widget.onGoSchools,
-            ),
-            const SizedBox(height: 18),
-
-            // 第二层：核心工具
-            _NewsSectionHeader(title: '核心工具', action: ''),
-            const SizedBox(height: 2),
-            CoreToolsGrid(
-              tools: _tools,
-              materialCount: _materialCount,
-              completedMaterialCount: _completedMaterialCount,
-              hasTargetSchools: hasTargetSchools,
-            ),
-            const SizedBox(height: 14),
-
-            // 第三层：下一步任务
-            if (!hasTargetSchools) ...[
-              NextStepTasks(hasTargetSchools: hasTargetSchools),
-              const SizedBox(height: 18),
+              const SizedBox(height: 42),
+              _PlanConsultationEntry(onTap: _openConsultationOrganizations),
             ],
-
-            // 第四层：申请资源
-            _NewsSectionHeader(title: '申请资源', action: ''),
-            const SizedBox(height: 6),
-            const ApplicationResources(),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -713,7 +1037,6 @@ class _InlineApplicationPlanPanel extends StatelessWidget {
   final String? error;
   final VoidCallback onReload;
   final VoidCallback onGenerate;
-  final VoidCallback onGoSchools;
   final ValueChanged<Map<String, dynamic>> onToggleTask;
 
   const _InlineApplicationPlanPanel({
@@ -723,33 +1046,29 @@ class _InlineApplicationPlanPanel extends StatelessWidget {
     required this.error,
     required this.onReload,
     required this.onGenerate,
-    required this.onGoSchools,
     required this.onToggleTask,
   });
 
   @override
   Widget build(BuildContext context) {
     if (loading) {
-      return _PlanCard(
-        child: Row(
-          children: [
-            const SizedBox(
-              width: 20,
-              height: 20,
-              child:
-                  CircularProgressIndicator(color: kCobalt, strokeWidth: 2.4),
+      return Row(
+        children: [
+          const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(color: kCobalt, strokeWidth: 2.2),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            '正在加载申请计划...',
+            style: TextStyle(
+              color: context.artC.ink.withValues(alpha: 0.42),
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
             ),
-            const SizedBox(width: 12),
-            Text(
-              '正在加载申请计划...',
-              style: TextStyle(
-                color: context.artC.ink.withValues(alpha: 0.54),
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       );
     }
 
@@ -758,7 +1077,7 @@ class _InlineApplicationPlanPanel extends StatelessWidget {
         icon: Icons.error_outline_rounded,
         title: '申请计划加载失败',
         body: error!,
-        actionLabel: '重新加载',
+        actionLabel: '重新加载 →',
         onAction: onReload,
       );
     }
@@ -768,165 +1087,81 @@ class _InlineApplicationPlanPanel extends StatelessWidget {
     final tasks = (payload['tasks'] as List<dynamic>? ?? [])
         .whereType<Map<String, dynamic>>()
         .toList();
-    final savedSchools = (payload['saved_schools'] as List<dynamic>? ?? [])
-        .whereType<Map<String, dynamic>>()
-        .toList();
-    final savedSchoolCount = payload['saved_school_count'] is num
-        ? (payload['saved_school_count'] as num).toInt()
-        : savedSchools.length;
 
     if (state == 'no_profile') {
       return _PlanEmptyState(
         icon: Icons.auto_awesome_outlined,
         title: '还不能生成申请计划',
-        body: '请先完善申请画像，系统需要知道你的申请阶段、方向和目标城市。',
-        actionLabel: '重新加载',
+        body: '请先完成 onboarding，让系统知道你的申请阶段、方向、预算和城市偏好。',
+        actionLabel: '重新加载 →',
         onAction: onReload,
       );
     }
 
-    if (state == 'no_schools') {
-      return _PlanEmptyState(
-        icon: Icons.school_outlined,
-        title: '先加入目标院校',
-        body: '从院校详情页点击「申请计划」，学校会进入目标院校池，然后在这里生成时间线。',
-        actionLabel: '去选院校',
-        onAction: onGoSchools,
+    if (state == 'ready_to_generate' || state == 'no_schools') {
+      return _PlanActionButton(
+        label: generating ? '生成中...' : '生成我的申请计划 →',
+        onTap: generating ? () {} : onGenerate,
       );
     }
 
-    if (state == 'ready_to_generate') {
-      return _PlanCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _InlineTargetSchools(
-                schools: savedSchools, count: savedSchoolCount),
-            const SizedBox(height: 14),
-            _PlanNote(
-              icon: Icons.event_note_outlined,
-              text: '已具备生成条件，系统会根据当前目标院校和申请画像生成时间线。',
-            ),
-            const SizedBox(height: 14),
-            _PlanActionButton(
-              label: generating ? '生成中...' : '生成申请计划',
-              onTap: generating ? () {} : onGenerate,
-            ),
-          ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _InlineTimeline(tasks: tasks, onToggle: onToggleTask),
+        const SizedBox(height: 18),
+        _PlanActionButton(
+          label: generating ? '重新生成中...' : '重新生成计划 →',
+          onTap: generating ? () {} : onGenerate,
         ),
-      );
-    }
-
-    final summary =
-        (payload['plan'] as Map<String, dynamic>?)?['summary']?.toString() ??
-            '这是根据你的画像和目标院校生成的申请时间线。';
-
-    return _PlanCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _InlineTargetSchools(schools: savedSchools, count: savedSchoolCount),
-          const SizedBox(height: 14),
-          _PlanNote(icon: Icons.route_outlined, text: summary),
-          const SizedBox(height: 14),
-          _InlineTimeline(tasks: tasks, onToggle: onToggleTask),
-          const SizedBox(height: 14),
-          _PlanActionButton(
-            label: generating ? '重新生成中...' : '按当前目标院校重新生成',
-            onTap: generating ? () {} : onGenerate,
-          ),
-        ],
-      ),
+      ],
     );
   }
 }
 
-class _InlineTargetSchools extends StatelessWidget {
-  final List<Map<String, dynamic>> schools;
-  final int count;
+class _PlanConsultationEntry extends StatelessWidget {
+  final VoidCallback onTap;
 
-  const _InlineTargetSchools({required this.schools, required this.count});
+  const _PlanConsultationEntry({required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: kCobalt.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child:
-                  const Icon(Icons.school_outlined, color: kCobalt, size: 18),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                '目标院校池',
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                '如果你需要更专业的建议，也可以将此计划分享给专业机构进行咨询。',
                 style: TextStyle(
-                  color: context.artC.ink,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
+                  color: context.artC.ink.withValues(alpha: 0.36),
+                  fontSize: 12,
+                  height: 1.55,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0,
                 ),
               ),
-            ),
-            _PlanPill('$count 所'),
-          ],
-        ),
-        const SizedBox(height: 12),
-        if (schools.isEmpty)
-          Text(
-            '还没有读取到目标院校。',
-            style: TextStyle(
-              color: context.artC.ink.withValues(alpha: 0.46),
-              fontSize: 13,
-              height: 1.45,
-              fontWeight: FontWeight.w700,
-            ),
-          )
-        else
-          ...schools.take(5).map((school) {
-            final name = school['name_zh']?.toString().isNotEmpty == true
-                ? school['name_zh'].toString()
-                : (school['name_en']?.toString() ?? '目标院校');
-            final country = school['country']?.toString();
-            final city = school['city']?.toString();
-            final meta = [
-              if (city != null && city.isNotEmpty) city,
-              if (country != null && country.isNotEmpty) country,
-            ].join(' · ');
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.check_circle_rounded,
-                    color: kCobalt,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      meta.isEmpty ? name : '$name · $meta',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: context.artC.ink.withValues(alpha: 0.68),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ],
+              Text(
+                '咨询机构 →',
+                style: TextStyle(
+                  color: context.artC.ink.withValues(alpha: 0.62),
+                  fontSize: 12,
+                  height: 1.55,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0,
+                ),
               ),
-            );
-          }),
-      ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -940,9 +1175,8 @@ class _InlineTimeline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (tasks.isEmpty) {
-      return _PlanNote(
-        icon: Icons.info_outline_rounded,
-        text: '计划已创建，但暂时没有任务。可以按当前目标院校重新生成。',
+      return const _PlanNote(
+        text: '计划已创建，但暂时没有任务。可以重新生成一版。',
       );
     }
     final grouped = <String, List<Map<String, dynamic>>>{};
@@ -950,83 +1184,133 @@ class _InlineTimeline extends StatelessWidget {
       final month = task['month_label']?.toString() ?? '待安排';
       grouped.putIfAbsent(month, () => []).add(task);
     }
-    return Column(
-      children: grouped.entries
-          .map(
-            (entry) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: 48,
-                    child: Text(
-                      entry.key,
-                      style: const TextStyle(
-                        color: kCobalt,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
+
+    final entries = grouped.entries.toList();
+    final rows = <Widget>[];
+    var seenTasks = 0;
+    for (var entryIndex = 0; entryIndex < entries.length; entryIndex += 1) {
+      final entry = entries[entryIndex];
+      final taskRows = <Widget>[];
+      for (final task in entry.value) {
+        seenTasks += 1;
+        taskRows.add(
+          _PlanCheckRow(
+            task: task,
+            onTap: () => onToggle(task),
+            showConnector: seenTasks < tasks.length,
+          ),
+        );
+      }
+      rows.add(
+        Padding(
+          padding: EdgeInsets.only(
+            bottom: entryIndex == entries.length - 1 ? 0 : 4,
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 64,
+                child: Text(
+                  entry.key,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    color: context.artC.ink.withValues(alpha: 0.68),
+                    fontSize: 12.5,
+                    height: 1.35,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0,
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      children: entry.value
-                          .map(
-                            (task) => _PlanCheckRow(
-                              task: task,
-                              onTap: () => onToggle(task),
-                            ),
-                          )
-                          .toList(),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
-          )
-          .toList(),
-    );
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  children: taskRows,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(children: rows);
   }
 }
 
 class _PlanCheckRow extends StatelessWidget {
   final Map<String, dynamic> task;
   final VoidCallback onTap;
+  final bool showConnector;
 
-  const _PlanCheckRow({required this.task, required this.onTap});
+  const _PlanCheckRow({
+    required this.task,
+    required this.onTap,
+    this.showConnector = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     final done = task['status'] == 'done';
+    final dotColor = done
+        ? context.artC.ink.withValues(alpha: 0.62)
+        : context.artC.ink.withValues(alpha: 0.24);
     return GestureDetector(
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 9),
-        child: Row(
-          children: [
-            Icon(
-              done ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
-              size: 18,
-              color: done ? kCobalt : context.artC.ink.withValues(alpha: 0.28),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                task['title']?.toString() ?? '任务',
-                style: TextStyle(
-                  color: done
-                      ? context.artC.ink.withValues(alpha: 0.34)
-                      : context.artC.ink.withValues(alpha: 0.66),
-                  fontSize: 13,
-                  height: 1.35,
-                  fontWeight: FontWeight.w800,
-                  decoration: done ? TextDecoration.lineThrough : null,
+      child: IntrinsicHeight(
+        child: Padding(
+          padding: EdgeInsets.only(bottom: showConnector ? 10 : 0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                width: 18,
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 1),
+                      child: Icon(
+                        done
+                            ? Icons.check_circle_rounded
+                            : Icons.radio_button_unchecked,
+                        size: 16,
+                        color: dotColor,
+                      ),
+                    ),
+                    if (showConnector)
+                      Expanded(
+                        child: Center(
+                          child: Container(
+                            width: 1,
+                            margin: const EdgeInsets.only(top: 4),
+                            color: context.artC.silver.withValues(alpha: 0.32),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
-            ),
-          ],
+              const SizedBox(width: 10),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 1),
+                  child: Text(
+                    task['title']?.toString() ?? '任务',
+                    style: TextStyle(
+                      color: done
+                          ? context.artC.ink.withValues(alpha: 0.34)
+                          : context.artC.ink.withValues(alpha: 0.66),
+                      fontSize: 13,
+                      height: 1.35,
+                      fontWeight: FontWeight.w800,
+                      decoration: done ? TextDecoration.lineThrough : null,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1050,69 +1334,51 @@ class _PlanEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _PlanCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: kCobalt, size: 26),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            style: TextStyle(
-              color: context.artC.ink,
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: context.artC.ink.withValues(alpha: 0.44), size: 24),
+        const SizedBox(height: 12),
+        Text(
+          title,
+          style: TextStyle(
+            color: context.artC.ink,
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
           ),
-          const SizedBox(height: 8),
-          Text(
-            body,
-            style: TextStyle(
-              color: context.artC.ink.withValues(alpha: 0.46),
-              fontSize: 13,
-              height: 1.45,
-              fontWeight: FontWeight.w700,
-            ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          body,
+          style: TextStyle(
+            color: context.artC.ink.withValues(alpha: 0.46),
+            fontSize: 13,
+            height: 1.45,
+            fontWeight: FontWeight.w700,
           ),
-          const SizedBox(height: 14),
-          _PlanActionButton(label: actionLabel, onTap: onAction),
-        ],
-      ),
+        ),
+        const SizedBox(height: 14),
+        _PlanActionButton(label: actionLabel, onTap: onAction),
+      ],
     );
   }
 }
 
 class _PlanNote extends StatelessWidget {
-  final IconData icon;
   final String text;
 
-  const _PlanNote({required this.icon, required this.text});
+  const _PlanNote({required this.text});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: kCobalt.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: kCobalt.withValues(alpha: 0.12)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: kCobalt),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                color: kCobalt,
-                fontSize: 12,
-                height: 1.35,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ],
+    return Text(
+      text,
+      style: TextStyle(
+        color: context.artC.ink.withValues(alpha: 0.44),
+        fontSize: 13,
+        height: 1.6,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0,
       ),
     );
   }
@@ -1126,20 +1392,31 @@ class _PlanActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-        decoration: BoxDecoration(
-          color: kCobalt,
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
           borderRadius: BorderRadius.circular(999),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 12,
-            fontWeight: FontWeight.w900,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: context.artC.silver.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: context.artC.ink.withValues(alpha: 0.12),
+              ),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: context.artC.ink.withValues(alpha: 0.84),
+                fontSize: 12.5,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0,
+              ),
+            ),
           ),
         ),
       ),
@@ -1147,61 +1424,71 @@ class _PlanActionButton extends StatelessWidget {
   }
 }
 
-class _PlanPill extends StatelessWidget {
-  final String label;
+class SchoolCompareScreen extends StatelessWidget {
+  final VoidCallback onGoSchools;
 
-  const _PlanPill(this.label);
+  const SchoolCompareScreen({
+    super.key,
+    required this.onGoSchools,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: context.artC.silver.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: context.artC.ink.withValues(alpha: 0.5),
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
+    final bottom = MediaQuery.paddingOf(context).bottom + 16;
+    return Scaffold(
+      backgroundColor: context.artC.porcelain,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            SizedBox(
+              height: 58,
+              child: Row(
+                children: [
+                  const SizedBox(width: 8),
+                  _SchoolHeaderIconButton(
+                    icon: Icons.arrow_back_rounded,
+                    onTap: () => Navigator.of(context).pop(),
+                    tooltip: '返回院校',
+                  ),
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        '院校对比',
+                        style: TextStyle(
+                          color: context.artC.ink,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 44),
+                ],
+              ),
+            ),
+            Expanded(
+              child: _CompareTab(
+                bottom: bottom,
+                onGoSchools: onGoSchools,
+              ),
+            ),
+          ],
         ),
       ),
-    );
-  }
-}
-
-class _PlanCard extends StatelessWidget {
-  final Widget child;
-
-  const _PlanCard({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: context.artC.silver.withValues(alpha: 0.24)),
-        boxShadow: [
-          BoxShadow(
-            color: context.artC.ink.withValues(alpha: 0.04),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: child,
     );
   }
 }
 
 class _CompareTab extends StatefulWidget {
   final double bottom;
+  final VoidCallback onGoSchools;
 
-  const _CompareTab({required this.bottom});
+  const _CompareTab({
+    required this.bottom,
+    required this.onGoSchools,
+  });
 
   @override
   State<_CompareTab> createState() => _CompareTabState();
@@ -1220,6 +1507,8 @@ class _CompareTabState extends State<_CompareTab> {
     super.initState();
     _loadTargetPool();
   }
+
+  Future<void> refreshTargetPool() => _loadTargetPool();
 
   Future<void> _loadTargetPool() async {
     if (!SupabaseService.isLoggedIn) {
@@ -1341,30 +1630,6 @@ class _CompareTabState extends State<_CompareTab> {
     }
   }
 
-  Future<void> _showAddSchoolSheet() async {
-    final ok = await ensureLoggedIn(
-      context,
-      message: '登录后可以添加目标院校',
-    );
-    if (!ok || !mounted) return;
-
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) => _AddSchoolBottomSheet(
-        selected: _selected,
-        onToggle: (school) {
-          _toggleSchool(school);
-        },
-      ),
-    );
-    // 关闭后刷新主页面
-    if (!mounted) return;
-    setState(() {});
-    await _loadTargetPool();
-  }
-
   @override
   Widget build(BuildContext context) {
     return ListView(
@@ -1376,13 +1641,12 @@ class _CompareTabState extends State<_CompareTab> {
         ),
         const SizedBox(height: 16),
 
-        // 已选学校区 或 空状态
         if (_selected.isEmpty)
           _CompareEmptyState(
             title: _needsLogin ? '登录后使用目标院校对比' : '先加入目标池，再做对比',
             subtitle: _needsLogin
                 ? '目标池和对比报告需要绑定到你的账号，登录后可以读取已收藏院校并生成多维对比。'
-                : '从院校页点击「目标池」或在这里添加 2-5 所学校，对比排名、作品集难度、预算和城市资源。',
+                : '先在院校页把感兴趣的学校加入目标池，再在这里选择 2-5 所，对比排名、作品集难度、预算和城市资源。',
             actionLabel: _needsLogin ? '去登录' : null,
             onRetry: _needsLogin ? () => _loginAndReload() : null,
           )
@@ -1392,14 +1656,14 @@ class _CompareTabState extends State<_CompareTab> {
             onRemove: _removeSchool,
           ),
 
-        if (_selected.isEmpty && !_needsLogin) ...[
+        if (!_needsLogin) ...[
           const SizedBox(height: 14),
           _TargetPoolPanel(
             loading: _loadingTargetPool,
             schools: _targetPool,
             selected: _selected,
             onAdd: _toggleSchool,
-            onOpenAddSheet: () => _showAddSchoolSheet(),
+            onGoSchools: widget.onGoSchools,
           ),
         ],
 
@@ -1409,7 +1673,7 @@ class _CompareTabState extends State<_CompareTab> {
         _CompareActionButtons(
           selectedCount: _selected.length,
           comparing: _comparing,
-          onAddSchool: () => _showAddSchoolSheet(),
+          onAddSchool: widget.onGoSchools,
           onCompare: _generateReport,
         ),
 
@@ -1526,14 +1790,14 @@ class _TargetPoolPanel extends StatelessWidget {
   final List<Map<String, dynamic>> schools;
   final List<Map<String, dynamic>> selected;
   final ValueChanged<Map<String, dynamic>> onAdd;
-  final VoidCallback onOpenAddSheet;
+  final VoidCallback onGoSchools;
 
   const _TargetPoolPanel({
     required this.loading,
     required this.schools,
     required this.selected,
     required this.onAdd,
-    required this.onOpenAddSheet,
+    required this.onGoSchools,
   });
 
   @override
@@ -1592,7 +1856,7 @@ class _TargetPoolPanel extends StatelessWidget {
             )
           else if (candidates.isEmpty)
             GestureDetector(
-              onTap: onOpenAddSheet,
+              onTap: onGoSchools,
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 13),
@@ -1602,7 +1866,7 @@ class _TargetPoolPanel extends StatelessWidget {
                 ),
                 child: const Center(
                   child: Text(
-                    '还没有目标院校，先去添加',
+                    '还没有目标院校，先去院校页添加',
                     style: TextStyle(
                       color: kCobalt,
                       fontSize: 12,
@@ -1744,351 +2008,6 @@ class _CompareActionButtons extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-// 添加院校 Bottom Sheet
-class _AddSchoolBottomSheet extends StatefulWidget {
-  final List<Map<String, dynamic>> selected;
-  final ValueChanged<Map<String, dynamic>> onToggle;
-
-  const _AddSchoolBottomSheet({
-    required this.selected,
-    required this.onToggle,
-  });
-
-  @override
-  State<_AddSchoolBottomSheet> createState() => _AddSchoolBottomSheetState();
-}
-
-class _AddSchoolBottomSheetState extends State<_AddSchoolBottomSheet> {
-  List<Map<String, dynamic>> _schools = [];
-  bool _loading = false;
-  String? _error;
-  final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
-
-  // 本地维护已选列表，用于 UI 即时更新
-  late List<Map<String, dynamic>> _localSelected;
-
-  @override
-  void initState() {
-    super.initState();
-    _localSelected = List.from(widget.selected);
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadSchools({String? keyword}) async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final result = await BackendApiService.fetchSchools(
-        limit: 60,
-        keyword: keyword,
-      );
-      if (!mounted) return;
-      setState(() {
-        _schools = result.data;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
-    }
-  }
-
-  bool _isSelected(Map<String, dynamic> school) {
-    final id = _schoolId(school);
-    if (id == null) return false;
-    return _localSelected.any((item) => _schoolId(item) == id);
-  }
-
-  void _handleToggle(Map<String, dynamic> school) {
-    final id = _schoolId(school);
-    if (id == null) return;
-
-    var changed = false;
-    setState(() {
-      final exists = _localSelected.any((item) => _schoolId(item) == id);
-      if (exists) {
-        _localSelected.removeWhere((item) => _schoolId(item) == id);
-        changed = true;
-      } else if (_localSelected.length < 5) {
-        _localSelected.add(school);
-        changed = true;
-      }
-    });
-
-    if (!changed) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('最多选择 5 所院校')),
-      );
-      return;
-    }
-
-    // 同步到父组件
-    widget.onToggle(school);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.75,
-      minChildSize: 0.5,
-      maxChildSize: 0.92,
-      builder: (context, scrollController) {
-        return Container(
-          decoration: BoxDecoration(
-            color: context.artC.porcelain,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            children: [
-              // 拖动条
-              Container(
-                margin: const EdgeInsets.only(top: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: context.artC.silver.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              // 标题
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-                child: Row(
-                  children: [
-                    Text(
-                      '添加对比院校',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: context.artC.ink,
-                      ),
-                    ),
-                    const Spacer(),
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: context.artC.silver.withValues(alpha: 0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.close_rounded,
-                          size: 18,
-                          color: context.artC.ink.withValues(alpha: 0.6),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // 搜索框
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: context.artC.silver.withValues(alpha: 0.42),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.search,
-                        color: context.artC.ink.withValues(alpha: 0.36),
-                        size: 22,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          controller: _searchController,
-                          onChanged: (value) {
-                            setState(() => _searchQuery = value);
-                            if (value.trim().isNotEmpty) {
-                              _loadSchools(keyword: value.trim());
-                            } else {
-                              setState(() {
-                                _schools = [];
-                                _error = null;
-                              });
-                            }
-                          },
-                          decoration: InputDecoration(
-                            hintText: '搜索院校名称、城市或国家',
-                            hintStyle: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: context.artC.ink.withValues(alpha: 0.36),
-                            ),
-                            border: InputBorder.none,
-                            isDense: true,
-                            contentPadding:
-                                const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: context.artC.ink,
-                          ),
-                        ),
-                      ),
-                      if (_searchQuery.isNotEmpty)
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _searchController.clear();
-                              _searchQuery = '';
-                              _schools = [];
-                              _error = null;
-                            });
-                          },
-                          child: Icon(
-                            Icons.clear,
-                            color: context.artC.ink.withValues(alpha: 0.36),
-                            size: 20,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              // 热门标签（搜索为空时显示）
-              if (_searchQuery.isEmpty && !_loading)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _HotSearchTags(
-                    onTagTap: (keyword) {
-                      _searchController.text = keyword;
-                      setState(() => _searchQuery = keyword);
-                      _loadSchools(keyword: keyword);
-                    },
-                  ),
-                ),
-              const SizedBox(height: 12),
-              // 搜索结果列表
-              Expanded(
-                child: _loading
-                    ? const Center(
-                        child: CircularProgressIndicator(color: kCobalt))
-                    : _error != null
-                        ? Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text('搜索失败',
-                                    style: TextStyle(color: context.artC.ink)),
-                                const SizedBox(height: 8),
-                                TextButton(
-                                  onPressed: () =>
-                                      _loadSchools(keyword: _searchQuery),
-                                  child: const Text('重试'),
-                                ),
-                              ],
-                            ),
-                          )
-                        : _schools.isEmpty
-                            ? Center(
-                                child: Text(
-                                  _searchQuery.isEmpty ? '输入关键词搜索院校' : '未找到院校',
-                                  style: TextStyle(
-                                    color:
-                                        context.artC.ink.withValues(alpha: 0.5),
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              )
-                            : ListView.separated(
-                                controller: scrollController,
-                                padding:
-                                    const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                                itemCount: _schools.length,
-                                separatorBuilder: (_, __) =>
-                                    const SizedBox(height: 12),
-                                itemBuilder: (context, index) {
-                                  final school = _schools[index];
-                                  final selected = _isSelected(school);
-                                  return _CompareSchoolListItem(
-                                    school: school,
-                                    selected: selected,
-                                    onTap: () => _handleToggle(school),
-                                  );
-                                },
-                              ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _HotSearchTags extends StatelessWidget {
-  final ValueChanged<String> onTagTap;
-
-  const _HotSearchTags({required this.onTagTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final tags = ['RCA', 'UAL', 'Parsons', '伦敦', '纽约', '交互设计', '视觉传达'];
-
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: tags.map((tag) {
-        return GestureDetector(
-          onTap: () => onTagTap(tag),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: context.artC.silver.withValues(alpha: 0.42),
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.local_fire_department_rounded,
-                  size: 14,
-                  color: context.artC.ink.withValues(alpha: 0.42),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  tag,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: context.artC.ink.withValues(alpha: 0.72),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
     );
   }
 }
@@ -2328,158 +2247,6 @@ class _SelectedCompareStrip extends StatelessWidget {
             ),
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _CompareSchoolListItem extends StatelessWidget {
-  final Map<String, dynamic> school;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _CompareSchoolListItem({
-    required this.school,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final name =
-        school['name_zh']?.toString() ?? school['name']?.toString() ?? '未知';
-    final enName = school['name']?.toString() ?? '';
-    final city = school['city']?.toString() ?? '';
-    final country = school['country']?.toString() ?? '';
-    final ranking = school['qs_ranking']?.toString() ?? '';
-    final location = [city, country].where((s) => s.isNotEmpty).join(', ');
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: selected ? kCobalt.withValues(alpha: 0.08) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: selected
-                ? kCobalt
-                : context.artC.silver.withValues(alpha: 0.42),
-            width: selected ? 2 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          name,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w900,
-                            color: context.artC.ink,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (ranking.isNotEmpty) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: kCobalt.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            'QS #$ranking',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: kCobalt,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  if (enName.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      enName,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: context.artC.ink.withValues(alpha: 0.5),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                  if (location.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.location_on_outlined,
-                          size: 14,
-                          color: context.artC.ink.withValues(alpha: 0.36),
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            location,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: context.artC.ink.withValues(alpha: 0.42),
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: selected ? kCobalt : Colors.white,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: selected
-                      ? kCobalt
-                      : context.artC.silver.withValues(alpha: 0.42),
-                  width: 2,
-                ),
-              ),
-              child: selected
-                  ? const Icon(
-                      Icons.check,
-                      color: Colors.white,
-                      size: 18,
-                    )
-                  : Icon(
-                      Icons.add,
-                      color: context.artC.ink.withValues(alpha: 0.36),
-                      size: 18,
-                    ),
-            ),
-          ],
-        ),
       ),
     );
   }

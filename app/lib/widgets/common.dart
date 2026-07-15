@@ -4,14 +4,14 @@ import 'package:flutter/material.dart';
 // artiqore 艺见心配色方案
 // ═══════════════════════════════════════════════════════════════
 
-/// 瓷器白 - 主背景色
-const kPorcelain = Color(0xFFF8F9FA);
+/// 纯白 - 主背景色
+const kPorcelain = Color(0xFFFFFFFF);
 
-/// 钴蓝 - 主品牌色
-const kCobalt = Color(0xFF003399);
+/// Imperial Blue - 主品牌色
+const kCobalt = Color(0xFF001D51);
 
-/// 柔和钴蓝 - 辅助色
-const kCobaltMuted = Color(0xFF4A6FA5);
+/// 雾蓝灰 - 辅助色
+const kCobaltMuted = Color(0xFF8FA9C7);
 
 /// 墨黑 - 主要文字
 const kInk = Color(0xFF1A1A1A);
@@ -19,8 +19,8 @@ const kInk = Color(0xFF1A1A1A);
 /// 银灰 - 次要背景/边框
 const kSilver = Color(0xFFE9ECEF);
 
-/// 深墨 - 导航背景
-const kInkDark = Color(0xFF2D2D2D);
+/// 深海墨 - 深色品牌背景
+const kInkDark = Color(0xFF07111F);
 
 // 保留旧常量名以便兼容，但指向新颜色
 const kPrimary = kCobalt;
@@ -402,7 +402,7 @@ class InfoCard extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 青花瓷风格卡片组件
+// Imperial Blue 风格卡片组件
 // ═══════════════════════════════════════════════════════════════
 
 class PorcelainCard extends StatelessWidget {
@@ -505,7 +505,7 @@ class CobaltButton extends StatelessWidget {
   }
 }
 
-/// 浮动操作按钮（青花瓷风格）
+/// 浮动操作按钮（Imperial Blue 风格）
 class FloatingCobaltButton extends StatelessWidget {
   final VoidCallback? onTap;
   final IconData icon;

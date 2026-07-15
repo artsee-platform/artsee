@@ -5,9 +5,9 @@ import '../../config/api_config.dart';
 import '../../services/backend_api_service.dart';
 import '../../widgets/common.dart';
 import '../consultation/organization_list_screen.dart';
+import '../home/home_screen.dart';
 import 'package:artsee_app/theme/artsee_ui_colors.dart';
 import 'workbench_consultation_detail_screen.dart';
-import 'workbench_contracts_screen.dart';
 import 'workbench_team_screen.dart';
 
 class InstitutionWorkspaceScreen extends StatefulWidget {
@@ -28,15 +28,14 @@ class _InstitutionWorkspaceScreenState
   List<Map<String, dynamic>> _leads = [];
   List<Map<String, dynamic>> _serviceBookings = [];
   List<Map<String, dynamic>> _organizations = [];
-  int _pendingContractCount = 0;
   bool _loading = true;
   bool _bookingLoading = true;
   bool _orgLoading = true;
-  bool _contractLoading = false;
   String? _error;
   String? _bookingError;
   String? _orgError;
-  String? _contractError;
+  int _selectedWorkspaceTab = 0;
+  String? _actingLeadId;
 
   @override
   void initState() {
@@ -89,47 +88,11 @@ class _InstitutionWorkspaceScreenState
         _organizations = result.data;
         _orgLoading = false;
       });
-      if (_canManageContractsFor(result.data)) {
-        _loadPendingContracts();
-      } else {
-        setState(() {
-          _pendingContractCount = 0;
-          _contractLoading = false;
-          _contractError = null;
-        });
-      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _orgError = e.toString();
         _orgLoading = false;
-        _pendingContractCount = 0;
-        _contractLoading = false;
-      });
-    }
-  }
-
-  Future<void> _loadPendingContracts() async {
-    setState(() {
-      _contractLoading = true;
-      _contractError = null;
-    });
-    try {
-      final result = await BackendApiService.fetchWorkbenchContracts(
-        limit: 1,
-        status: 'pending',
-      );
-      if (!mounted) return;
-      setState(() {
-        _pendingContractCount = result.count ?? result.data.length;
-        _contractLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _pendingContractCount = 0;
-        _contractError = e.toString();
-        _contractLoading = false;
       });
     }
   }
@@ -166,24 +129,37 @@ class _InstitutionWorkspaceScreenState
     );
   }
 
-  bool get _canManageContracts {
-    return _canManageContractsFor(_organizations);
+  int get _requestedBookingCount {
+    return _serviceBookings
+        .where((booking) => booking['status']?.toString() == 'requested')
+        .length;
+  }
+
+  int get _unassignedLeadCount {
+    return _leads
+        .where((lead) =>
+            lead['status']?.toString() != 'closed' &&
+            lead['status']?.toString() != 'converted' &&
+            _leadAssignmentKey(lead) == 'unassigned')
+        .length;
+  }
+
+  int get _activePlanningCount {
+    return _leads
+        .where(
+          (lead) =>
+              lead['status']?.toString() == 'active' &&
+              _conversionType(lead) == null,
+        )
+        .length;
+  }
+
+  int get _quotedOrderCount {
+    return _leads.where((lead) => _conversionType(lead) == 'order').length;
   }
 
   _OrganizationMembership? get _primaryOrganization {
     return _firstOrganization(_organizations);
-  }
-
-  String get _contractActionSubtitle {
-    if (_orgLoading) return '同步机构权限';
-    if (_orgError != null) return '机构权限待恢复';
-    if (_contractLoading) return '同步合同存档';
-    if (_contractError != null) return '合同存档待恢复';
-    if (_canManageContracts && _pendingContractCount > 0) {
-      return '$_pendingContractCount 份待确认';
-    }
-    if (_canManageContracts) return '确认签约与争议';
-    return '仅负责人/管理员可用';
   }
 
   Future<void> _openLead(Map<String, dynamic> lead) async {
@@ -197,6 +173,91 @@ class _InstitutionWorkspaceScreenState
     if (mounted) {
       _loadLeads();
       _loadServiceBookings();
+    }
+  }
+
+  Future<void> _assignLead(Map<String, dynamic> lead) async {
+    final id = lead['id']?.toString();
+    if (id == null || id.isEmpty || _actingLeadId != null) return;
+    setState(() => _actingLeadId = id);
+    try {
+      final team = await BackendApiService.fetchWorkbenchTeam();
+      if (!mounted) return;
+      if (team.data.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('暂无可分配成员')),
+        );
+        return;
+      }
+      final member = await showModalBottomSheet<Map<String, dynamic>>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => _BulkAssignmentSheet(members: team.data),
+      );
+      if (!mounted || member == null) return;
+      await BackendApiService.assignWorkbenchConsultation(
+        id: id,
+        memberId: member['id']?.toString(),
+        memberUserId: member['user_id']?.toString(),
+      );
+      if (!mounted) return;
+      await _loadLeads();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已分配给 ${_workbenchMemberName(member)}')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('分配失败：$e')),
+      );
+    } finally {
+      if (mounted) setState(() => _actingLeadId = null);
+    }
+  }
+
+  Future<void> _closeLead(Map<String, dynamic> lead) async {
+    final id = lead['id']?.toString();
+    if (id == null || id.isEmpty || _actingLeadId != null) return;
+    final targetName = lead['target_name']?.toString() ?? '这条咨询';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('关闭咨询'),
+        content: Text('确认将「$targetName」标记为已关闭？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _actingLeadId = id);
+    try {
+      await BackendApiService.updateWorkbenchConsultation(
+        id: id,
+        status: 'closed',
+      );
+      if (!mounted) return;
+      await _loadLeads();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已关闭咨询')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('关闭失败：$e')),
+      );
+    } finally {
+      if (mounted) setState(() => _actingLeadId = null);
     }
   }
 
@@ -247,25 +308,6 @@ class _InstitutionWorkspaceScreenState
     }
   }
 
-  Future<void> _openWorkbenchContracts() async {
-    if (!_canManageContracts) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('仅机构负责人或管理员可管理合同存档')),
-      );
-      return;
-    }
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => WorkbenchContractsScreen(
-          initialStatus: _pendingContractCount > 0 ? 'pending' : 'all',
-        ),
-      ),
-    );
-    if (mounted) {
-      _loadOrganizations();
-    }
-  }
-
   Future<void> _openLeadList(_WorkbenchListMode mode) async {
     await showModalBottomSheet<void>(
       context: context,
@@ -301,13 +343,79 @@ class _InstitutionWorkspaceScreenState
 
   @override
   Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _InstitutionWorkspaceTabs(
+          selectedIndex: _selectedWorkspaceTab,
+          onChanged: (index) => setState(() => _selectedWorkspaceTab = index),
+        ),
+        Expanded(
+          child: IndexedStack(
+            index: _selectedWorkspaceTab,
+            children: [
+              _buildWorkbenchView(context),
+              HomeScreen(
+                compactTopChrome: true,
+                institutionLeadMode: true,
+                onReturnToMain: () => setState(() => _selectedWorkspaceTab = 0),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWorkbenchView(BuildContext context) {
     final verified = widget.profile?['is_verified'] == true;
     final primaryOrganization = _primaryOrganization;
+    final analytics = _WorkbenchAnalyticsSnapshot.from(
+      leads: _leads,
+      serviceBookings: _serviceBookings,
+    );
+    final todoItems = [
+      _WorkbenchTodoItem(
+        label: '新线索',
+        count: _countStatus('new'),
+        caption: '刚分配',
+        onTap: () => _openLeadList(_WorkbenchListMode.leads),
+      ),
+      _WorkbenchTodoItem(
+        label: '待分配',
+        count: _unassignedLeadCount,
+        caption: '需要指定顾问',
+        onTap: _openTeamManagement,
+      ),
+      _WorkbenchTodoItem(
+        label: '待回复',
+        count: _countStatus('pending'),
+        caption: '等待机构响应',
+        onTap: () => _openLeadList(_WorkbenchListMode.leads),
+      ),
+      _WorkbenchTodoItem(
+        label: '待确认预约',
+        count: _requestedBookingCount,
+        caption: '短咨询',
+        onTap: () => _openLeadList(_WorkbenchListMode.bookings),
+      ),
+      _WorkbenchTodoItem(
+        label: '待出方案',
+        count: _activePlanningCount,
+        caption: '需求确认后',
+        onTap: () => _openLeadList(_WorkbenchListMode.leads),
+      ),
+      _WorkbenchTodoItem(
+        label: '待支付订单',
+        count: _quotedOrderCount,
+        caption: '已报价',
+        onTap: () => _openLeadList(_WorkbenchListMode.orders),
+      ),
+    ];
     return CustomScrollView(
       slivers: [
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
+            padding: const EdgeInsets.fromLTRB(18, 2, 18, 0),
             child: _WorkspaceIdentityPanel(
               profile: widget.profile,
               organization: primaryOrganization,
@@ -323,30 +431,21 @@ class _InstitutionWorkspaceScreenState
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
-            child: _LeadStatusStrip(
-              items: [
-                _WorkbenchMetric(
-                  '新线索',
-                  '${_countStatus('new')}',
-                  '刚分配',
-                  Icons.auto_awesome_motion_rounded,
-                  kCobalt,
-                ),
-                _WorkbenchMetric(
-                  '待回复',
-                  '${_countStatus('pending')}',
-                  '等待回复',
-                  Icons.mark_chat_unread_rounded,
-                  const Color(0xFFD97706),
-                ),
-                _WorkbenchMetric(
-                  '沟通中',
-                  '${_countStatus('active')}',
-                  '持续跟进',
-                  Icons.forum_rounded,
-                  const Color(0xFF059669),
-                ),
-              ],
+            child: _WorkbenchTodayPanel(
+              items: todoItems,
+              loading: _loading || _bookingLoading,
+              onEmptyAction: _openOrganizationProfile,
+            ),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
+            child: _WorkbenchAnalyticsPanel(
+              snapshot: analytics,
+              loading: _loading || _bookingLoading,
+              onOpenLeads: () => _openLeadList(_WorkbenchListMode.leads),
+              onOpenBookings: () => _openLeadList(_WorkbenchListMode.bookings),
             ),
           ),
         ),
@@ -361,6 +460,10 @@ class _InstitutionWorkspaceScreenState
               onRetry: _loadLeads,
               onViewAll: () => _openLeadList(_WorkbenchListMode.leads),
               onOpen: _openLead,
+              onAssign: _assignLead,
+              onPlan: _openLead,
+              onClose: _closeLead,
+              actingLeadId: _actingLeadId,
             ),
           ),
         ),
@@ -375,49 +478,55 @@ class _InstitutionWorkspaceScreenState
             child: _WorkspaceActionGrid(
               items: [
                 _WorkbenchAction(
-                  icon: Icons.support_agent_outlined,
-                  title: '咨询线索',
-                  subtitle: _leads.isEmpty
-                      ? '处理申请咨询'
-                      : _leadUnreadCount > 0
-                          ? '${_leads.length} 条可处理 · $_leadUnreadCount 条未读'
-                          : '${_leads.length} 条可处理',
-                  badgeCount: _leadUnreadCount,
-                  onTap: () => _openLeadList(_WorkbenchListMode.leads),
-                ),
-                _WorkbenchAction(
-                  icon: Icons.event_available_outlined,
-                  title: '预约服务',
-                  subtitle: _conversionSubtitle('service_booking', '转预约'),
-                  onTap: () => _openLeadList(_WorkbenchListMode.bookings),
-                ),
-                _WorkbenchAction(
-                  icon: Icons.receipt_long_outlined,
-                  title: '订单转化',
-                  subtitle: _conversionSubtitle('order', '转订单'),
-                  onTap: () => _openLeadList(_WorkbenchListMode.orders),
-                ),
-                _WorkbenchAction(
-                  icon: Icons.groups_2_outlined,
-                  title: '团队管理',
-                  subtitle: '成员角色与工作量',
-                  onTap: _openTeamManagement,
-                ),
-                _WorkbenchAction(
-                  icon: Icons.description_outlined,
-                  title: '合同存档',
-                  subtitle: _contractActionSubtitle,
-                  badgeCount: _pendingContractCount,
-                  onTap: _openWorkbenchContracts,
-                ),
-                _WorkbenchAction(
-                  icon: Icons.verified_user_outlined,
-                  title: '机构资料',
+                  icon: Icons.edit_note_rounded,
+                  title: '信息输入',
                   subtitle: _organizationActionSubtitle(
                     _organizations,
                     _orgLoading,
                   ),
                   onTap: _openOrganizationProfile,
+                ),
+                _WorkbenchAction(
+                  icon: Icons.auto_awesome_outlined,
+                  title: '做计划',
+                  subtitle: _leads.isEmpty
+                      ? '基于用户画像生成申请节奏'
+                      : '${_leads.length} 个用户可跟进计划',
+                  badgeCount: _leadUnreadCount,
+                  onTap: () => _openLeadList(_WorkbenchListMode.leads),
+                ),
+                _WorkbenchAction(
+                  icon: Icons.map_outlined,
+                  title: '留学方案',
+                  subtitle: _conversionSubtitle('order', '方案/订单'),
+                  onTap: () => _openLeadList(_WorkbenchListMode.orders),
+                ),
+                _WorkbenchAction(
+                  icon: Icons.storefront_outlined,
+                  title: '机构显示',
+                  subtitle: _organizations.isEmpty ? '先创建公开机构页' : '预览并优化机构主页',
+                  onTap: _openPublicOrganizationPreview,
+                ),
+                _WorkbenchAction(
+                  icon: Icons.schedule_outlined,
+                  title: '免费咨询',
+                  subtitle: _conversionSubtitle('service_booking', '短咨询'),
+                  onTap: () => _openLeadList(_WorkbenchListMode.bookings),
+                ),
+                _WorkbenchAction(
+                  icon: Icons.groups_2_outlined,
+                  title: '团队协作',
+                  subtitle: '成员角色、邀请与工作量',
+                  onTap: _openTeamManagement,
+                ),
+                _WorkbenchAction(
+                  icon: Icons.support_agent_outlined,
+                  title: '线索管理',
+                  subtitle: _leadUnreadCount > 0
+                      ? '$_leadUnreadCount 条未读 · 可分配团队'
+                      : '咨询分配与协作记录',
+                  badgeCount: _leadUnreadCount,
+                  onTap: () => _openLeadList(_WorkbenchListMode.leads),
                 ),
               ],
             ),
@@ -428,29 +537,708 @@ class _InstitutionWorkspaceScreenState
   }
 }
 
-class _LeadStatusStrip extends StatelessWidget {
-  final List<_WorkbenchMetric> items;
+class _InstitutionWorkspaceTabs extends StatelessWidget {
+  final int selectedIndex;
+  final ValueChanged<int> onChanged;
 
-  const _LeadStatusStrip({required this.items});
+  const _InstitutionWorkspaceTabs({
+    required this.selectedIndex,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-      decoration: _panelDecoration(context),
-      child: Row(
-        children: [
-          for (var i = 0; i < items.length; i++) ...[
-            Expanded(child: _LeadMetricCell(item: items[i])),
-            if (i != items.length - 1)
-              Container(
-                width: 1,
-                height: 50,
-                color: context.artC.silver.withValues(alpha: 0.28),
+      decoration: BoxDecoration(
+        color: context.artC.cardIconBg,
+        border: Border(
+          bottom: BorderSide(
+            color: context.artC.silver.withValues(alpha: 0.28),
+          ),
+        ),
+      ),
+      child: SizedBox(
+        height: 62,
+        child: Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _InstitutionWorkspaceTab(
+                label: '工作台',
+                selected: selectedIndex == 0,
+                onTap: () => onChanged(0),
               ),
+              _InstitutionWorkspaceTab(
+                label: '广场',
+                selected: selectedIndex == 1,
+                onTap: () => onChanged(1),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InstitutionWorkspaceTab extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _InstitutionWorkspaceTab({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor =
+        selected ? context.artC.ink : context.artC.ink.withValues(alpha: 0.42);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        width: label.length > 2 ? 74 : 58,
+        height: 62,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SizedBox(height: 6),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: textColor,
+                fontSize: 16,
+                height: 1.08,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w400,
+                letterSpacing: 0,
+              ),
+            ),
+            const SizedBox(height: 7),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              width: selected ? (label.length > 2 ? 38 : 30) : 0,
+              height: 3.5,
+              decoration: BoxDecoration(
+                color: kCobalt,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WorkbenchTodayPanel extends StatelessWidget {
+  final List<_WorkbenchTodoItem> items;
+  final bool loading;
+  final VoidCallback onEmptyAction;
+
+  const _WorkbenchTodayPanel({
+    required this.items,
+    required this.loading,
+    required this.onEmptyAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final total = items.fold<int>(0, (sum, item) => sum + item.count);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                '今日待处理',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: context.artC.ink,
+                ),
+              ),
+            ),
+            _StatusPill(
+              label: loading ? '同步中' : '$total 项',
+              strong: total > 0,
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (!loading && total == 0)
+          _WorkbenchQuietEmpty(
+            text: '暂无待处理事项。可以先完善机构主页，让学生更愿意发起咨询。',
+            actionLabel: '完善机构主页 →',
+            onAction: onEmptyAction,
+          )
+        else
+          Column(
+            children: [
+              for (var index = 0; index < items.length; index++) ...[
+                _WorkbenchTodoRow(item: items[index]),
+                if (index != items.length - 1)
+                  Divider(
+                    height: 1,
+                    color: context.artC.silver.withValues(alpha: 0.2),
+                  ),
+              ],
+            ],
+          ),
+      ],
+    );
+  }
+}
+
+class _WorkbenchTodoRow extends StatelessWidget {
+  final _WorkbenchTodoItem item;
+
+  const _WorkbenchTodoRow({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: item.onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 42,
+                child: Text(
+                  '${item.count}',
+                  style: TextStyle(
+                    fontSize: 24,
+                    height: 1,
+                    fontWeight: FontWeight.w800,
+                    color: context.artC.ink,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.15,
+                        fontWeight: FontWeight.w800,
+                        color: context.artC.ink,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      item.caption,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        height: 1.2,
+                        fontWeight: FontWeight.w500,
+                        color: context.artC.ink.withValues(alpha: 0.38),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 19,
+                color: context.artC.ink.withValues(alpha: 0.22),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WorkbenchAnalyticsPanel extends StatelessWidget {
+  final _WorkbenchAnalyticsSnapshot snapshot;
+  final bool loading;
+  final VoidCallback onOpenLeads;
+  final VoidCallback onOpenBookings;
+
+  const _WorkbenchAnalyticsPanel({
+    required this.snapshot,
+    required this.loading,
+    required this.onOpenLeads,
+    required this.onOpenBookings,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final metrics = [
+      _WorkbenchAnalyticsMetric(
+        label: '本周新增',
+        value: '${snapshot.weeklyNewLeads}',
+        onTap: onOpenLeads,
+      ),
+      _WorkbenchAnalyticsMetric(
+        label: '跟进率',
+        value: snapshot.followUpRateLabel,
+        onTap: onOpenLeads,
+      ),
+      _WorkbenchAnalyticsMetric(
+        label: '待回复',
+        value: '${snapshot.replyPressure}',
+        onTap: onOpenLeads,
+      ),
+      _WorkbenchAnalyticsMetric(
+        label: '预约转化',
+        value: snapshot.bookingRateLabel,
+        onTap: onOpenBookings,
+      ),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                '数据看板',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: context.artC.ink,
+                ),
+              ),
+            ),
+            _StatusPill(
+              label: loading ? '同步中' : '近 7 天',
+              strong: !loading && snapshot.weeklyNewLeads > 0,
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '线索 · 回复 · 转化',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: context.artC.ink.withValues(alpha: 0.38),
+          ),
+        ),
+        const SizedBox(height: 14),
+        _WorkbenchAnalyticsGrid(metrics: metrics),
+        if (snapshot.totalLeads > 0) ...[
+          const SizedBox(height: 14),
+          _WorkbenchAnalyticsFlow(snapshot: snapshot),
+        ],
+      ],
+    );
+  }
+}
+
+class _WorkbenchAnalyticsGrid extends StatelessWidget {
+  final List<_WorkbenchAnalyticsMetric> metrics;
+
+  const _WorkbenchAnalyticsGrid({required this.metrics});
+
+  @override
+  Widget build(BuildContext context) {
+    const cellHeight = 82.0;
+    final lineColor = context.artC.ink.withValues(alpha: 0.055);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final halfWidth = constraints.maxWidth / 2;
+        return SizedBox(
+          height: cellHeight * 2,
+          child: Stack(
+            children: [
+              Positioned(
+                left: halfWidth,
+                top: 0,
+                bottom: 0,
+                child: IgnorePointer(
+                  child: Container(width: 0.6, color: lineColor),
+                ),
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                top: cellHeight,
+                child: IgnorePointer(
+                  child: Container(height: 0.6, color: lineColor),
+                ),
+              ),
+              Column(
+                children: [
+                  Row(
+                    children: [
+                      _WorkbenchAnalyticsGridCell(
+                        metric: metrics[0],
+                        padding: const EdgeInsets.fromLTRB(0, 14, 18, 0),
+                      ),
+                      _WorkbenchAnalyticsGridCell(
+                        metric: metrics[1],
+                        padding: const EdgeInsets.fromLTRB(22, 14, 0, 0),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      _WorkbenchAnalyticsGridCell(
+                        metric: metrics[2],
+                        padding: const EdgeInsets.fromLTRB(0, 16, 18, 0),
+                      ),
+                      _WorkbenchAnalyticsGridCell(
+                        metric: metrics[3],
+                        padding: const EdgeInsets.fromLTRB(22, 16, 0, 0),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _WorkbenchAnalyticsGridCell extends StatelessWidget {
+  final _WorkbenchAnalyticsMetric metric;
+  final EdgeInsets padding;
+
+  const _WorkbenchAnalyticsGridCell({
+    required this.metric,
+    required this.padding,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: SizedBox(
+        height: 82,
+        child: _WorkbenchAnalyticsMetricTile(
+          metric: metric,
+          padding: padding,
+        ),
+      ),
+    );
+  }
+}
+
+class _WorkbenchAnalyticsMetricTile extends StatelessWidget {
+  final _WorkbenchAnalyticsMetric metric;
+  final EdgeInsets padding;
+
+  const _WorkbenchAnalyticsMetricTile({
+    required this.metric,
+    required this.padding,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: metric.onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: padding,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    metric.value,
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: 28,
+                      height: 1,
+                      fontWeight: FontWeight.w900,
+                      color: context.artC.ink,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                metric.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.12,
+                  fontWeight: FontWeight.w800,
+                  color: context.artC.ink,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WorkbenchAnalyticsFlow extends StatelessWidget {
+  final _WorkbenchAnalyticsSnapshot snapshot;
+
+  const _WorkbenchAnalyticsFlow({required this.snapshot});
+
+  @override
+  Widget build(BuildContext context) {
+    final segments = [
+      (label: '新线索', value: snapshot.totalLeads),
+      (label: '沟通中', value: snapshot.activeLeads),
+      (label: '预约', value: snapshot.bookingCount),
+      (label: '订单', value: snapshot.orderCount),
+    ];
+    final maxValue = segments
+        .fold<int>(0, (max, item) => item.value > max ? item.value : max)
+        .clamp(1, 999999);
+    return Column(
+      children: [
+        for (var i = 0; i < segments.length; i++) ...[
+          Row(
+            children: [
+              SizedBox(
+                width: 48,
+                child: Text(
+                  segments[i].label,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: context.artC.ink.withValues(alpha: 0.42),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _QuietProgressLine(
+                  value: segments[i].value / maxValue,
+                ),
+              ),
+              const SizedBox(width: 10),
+              SizedBox(
+                width: 28,
+                child: Text(
+                  '${segments[i].value}',
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: context.artC.ink.withValues(alpha: 0.58),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (i != segments.length - 1) const SizedBox(height: 9),
+        ],
+      ],
+    );
+  }
+}
+
+class _WorkbenchQuietEmpty extends StatelessWidget {
+  final String text;
+  final String actionLabel;
+  final VoidCallback onAction;
+
+  const _WorkbenchQuietEmpty({
+    required this.text,
+    required this.actionLabel,
+    required this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.45,
+              fontWeight: FontWeight.w500,
+              color: context.artC.ink.withValues(alpha: 0.52),
+            ),
+          ),
+          const SizedBox(height: 8),
+          _QuietTextAction(label: actionLabel, onTap: onAction),
         ],
       ),
+    );
+  }
+}
+
+class _OrganizationCompletenessInline extends StatelessWidget {
+  final _OrganizationCompleteness completeness;
+  final VoidCallback onManage;
+
+  const _OrganizationCompletenessInline({
+    required this.completeness,
+    required this.onManage,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                '主页完成度 ${completeness.completed}/${completeness.total}',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  height: 1.2,
+                  fontWeight: FontWeight.w700,
+                  color: context.artC.ink.withValues(alpha: 0.56),
+                ),
+              ),
+            ),
+            if (!completeness.complete)
+              _QuietTextAction(label: '补资料 →', onTap: onManage),
+          ],
+        ),
+        const SizedBox(height: 7),
+        _QuietProgressLine(value: completeness.ratio),
+        if (!completeness.complete) ...[
+          const SizedBox(height: 6),
+          Text(
+            '待补：${completeness.missingLabels.take(3).join('、')}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 10.5,
+              height: 1.2,
+              fontWeight: FontWeight.w500,
+              color: context.artC.ink.withValues(alpha: 0.38),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _OrganizationCompletenessCard extends StatelessWidget {
+  final _OrganizationCompleteness completeness;
+  final VoidCallback? onTap;
+
+  const _OrganizationCompletenessCard({
+    required this.completeness,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '公开主页完成度',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        color: context.artC.ink,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '${(completeness.ratio * 100).round()}%',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      color: context.artC.ink,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _QuietProgressLine(value: completeness.ratio),
+              const SizedBox(height: 9),
+              if (completeness.complete)
+                Text(
+                  '核心信息已完整。后续可继续补充案例与视觉素材。',
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                    color: context.artC.ink.withValues(alpha: 0.52),
+                  ),
+                )
+              else
+                Wrap(
+                  spacing: 7,
+                  runSpacing: 7,
+                  children: [
+                    for (final label in completeness.missingLabels)
+                      _MiniLeadTag(label: label),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QuietProgressLine extends StatelessWidget {
+  final double value;
+
+  const _QuietProgressLine({required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final clamped = value.clamp(0.0, 1.0);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Stack(
+          children: [
+            Container(
+              height: 2,
+              width: double.infinity,
+              color: context.artC.silver.withValues(alpha: 0.28),
+            ),
+            Container(
+              height: 2,
+              width: constraints.maxWidth * clamped,
+              color: context.artC.ink.withValues(alpha: 0.82),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -491,169 +1279,123 @@ class _WorkspaceIdentityPanel extends StatelessWidget {
         ? _cleanText(profile?['nickname'])
         : '个人账号';
     final canPreview = organization != null;
+    final completeness = org == null ? null : _organizationCompleteness(org);
+    final visibleStatusTags = <Widget>[
+      if (verification != 'verified')
+        _MiniLeadTag(
+          label: _verificationLabel(verification),
+          strong: true,
+        ),
+      if (status != null && status != 'active')
+        _MiniLeadTag(label: _organizationStatusLabel(status)),
+      if (subscription != 'active')
+        _MiniLeadTag(
+          label: _subscriptionStatusLabel(subscription, null),
+        ),
+    ];
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(15, 15, 15, 14),
-      decoration: _panelDecoration(context),
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: kCobalt.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(
-                  Icons.switch_account_outlined,
-                  color: kCobalt,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 11),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '当前机构视角',
+                      '机构工作台',
                       style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        color: context.artC.ink,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: context.artC.ink.withValues(alpha: 0.42),
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 5),
                     Text(
-                      '个人账号保留，工作台只处理机构服务与协作',
+                      name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w800,
-                        color: context.artC.ink.withValues(alpha: 0.42),
+                        fontSize: 30,
+                        height: 1.04,
+                        fontWeight: FontWeight.w900,
+                        color: context.artC.ink,
                       ),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: 12),
               if (loading)
-                const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    color: kCobalt,
-                    strokeWidth: 2,
+                const Padding(
+                  padding: EdgeInsets.only(top: 7),
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      color: kCobalt,
+                      strokeWidth: 1.8,
+                    ),
                   ),
                 )
               else if (error != null)
-                TextButton.icon(
-                  style: TextButton.styleFrom(
-                    foregroundColor: kCobalt,
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                  ),
-                  onPressed: onRetry,
-                  icon: const Icon(Icons.refresh_rounded, size: 16),
-                  label: const Text('重试'),
-                )
+                _QuietTextAction(label: '重试', onTap: onRetry)
               else
-                _StatusPill(
-                  label: organization == null ? '待创建' : '已关联',
-                  strong: organization != null,
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: _StatusPill(
+                    label: organization == null ? '待创建' : role,
+                    strong: organization != null,
+                  ),
                 ),
             ],
           ),
-          const SizedBox(height: 13),
+          const SizedBox(height: 10),
           _IdentitySegmentStrip(
             personalLabel: profileName,
             organizationLabel: name,
             organizationCount: organizationCount,
           ),
-          const SizedBox(height: 13),
+          const SizedBox(height: 14),
           if (error != null)
             _LeadInlineError(error: error!, onRetry: onRetry)
-          else
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: context.artC.porcelain,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: context.artC.silver.withValues(alpha: 0.22),
-                ),
+          else ...[
+            if (visibleStatusTags.isNotEmpty) ...[
+              Wrap(
+                spacing: 12,
+                runSpacing: 7,
+                children: visibleStatusTags,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w900,
-                            color: context.artC.ink,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      _MiniLeadTag(label: role, strong: true),
-                    ],
-                  ),
-                  const SizedBox(height: 9),
-                  Wrap(
-                    spacing: 7,
-                    runSpacing: 7,
-                    children: [
-                      _MiniLeadTag(label: _verificationLabel(verification)),
-                      _MiniLeadTag(label: _organizationStatusLabel(status)),
-                      _MiniLeadTag(
-                        label: _subscriptionStatusLabel(subscription, null),
-                        strong: subscription == 'active',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  _OrganizationExposureSteps(
-                    hasOrganization: organization != null,
-                    verified: verification == 'verified',
-                    subscribed: subscription == 'active',
-                  ),
-                ],
+              const SizedBox(height: 15),
+            ],
+            if (completeness != null) ...[
+              _OrganizationCompletenessInline(
+                completeness: completeness,
+                onManage: onManage,
               ),
+              const SizedBox(height: 15),
+            ],
+            _OrganizationExposureSteps(
+              hasOrganization: organization != null,
+              verified: verification == 'verified',
+              subscribed: subscription == 'active',
             ),
-          const SizedBox(height: 12),
-          Row(
+          ],
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 16,
+            runSpacing: 4,
             children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: onManage,
-                  icon: const Icon(Icons.tune_outlined, size: 18),
-                  label: Text(canPreview ? '管理资料' : '创建机构'),
-                ),
+              _QuietTextAction(
+                label: canPreview ? '管理资料 →' : '创建机构 →',
+                onTap: onManage,
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: FilledButton.icon(
-                  style: FilledButton.styleFrom(backgroundColor: kCobalt),
-                  onPressed: canPreview ? onPreview : onManage,
-                  icon: Icon(
-                    canPreview
-                        ? Icons.visibility_outlined
-                        : Icons.add_business_outlined,
-                    size: 18,
-                  ),
-                  label: Text(canPreview ? '预览主页' : '先建档案'),
-                ),
-              ),
+              if (canPreview)
+                _QuietTextAction(label: '预览主页 →', onTap: onPreview),
             ],
           ),
         ],
@@ -675,34 +1417,37 @@ class _IdentitySegmentStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: context.artC.silver.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _IdentitySegment(
-              label: personalLabel,
-              subtitle: '个人',
-              icon: Icons.person_outline_rounded,
-              selected: false,
+    return Row(
+      children: [
+        Expanded(
+          child: _IdentitySegment(
+            label: personalLabel,
+            subtitle: '个人',
+            icon: Icons.person_outline_rounded,
+            selected: false,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Text(
+            '/',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w400,
+              color: context.artC.ink.withValues(alpha: 0.24),
             ),
           ),
-          const SizedBox(width: 4),
-          Expanded(
-            child: _IdentitySegment(
-              label: organizationLabel,
-              subtitle:
-                  organizationCount > 1 ? '机构 · $organizationCount 个' : '机构',
-              icon: Icons.apartment_rounded,
-              selected: true,
-            ),
+        ),
+        Expanded(
+          child: _IdentitySegment(
+            label: organizationLabel,
+            subtitle:
+                organizationCount > 1 ? '机构 · $organizationCount 个' : '机构',
+            icon: Icons.apartment_rounded,
+            selected: true,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -722,57 +1467,43 @@ class _IdentitySegment extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 160),
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 9),
-      decoration: BoxDecoration(
-        color: selected ? Colors.white : Colors.transparent,
-        borderRadius: BorderRadius.circular(7),
-        border: selected
-            ? Border.all(color: kCobalt.withValues(alpha: 0.16))
-            : null,
-      ),
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            size: 17,
-            color:
-                selected ? kCobalt : context.artC.ink.withValues(alpha: 0.38),
-          ),
-          const SizedBox(width: 7),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 15,
+          color: context.artC.ink.withValues(alpha: selected ? 0.72 : 0.34),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: RichText(
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            text: TextSpan(
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.2,
+                color: context.artC.ink.withValues(alpha: 0.44),
+              ),
               children: [
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    color: selected
-                        ? kCobalt
-                        : context.artC.ink.withValues(alpha: 0.38),
-                  ),
+                TextSpan(
+                  text: '$subtitle ',
+                  style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                TextSpan(
+                  text: label,
                   style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w900,
-                    color: selected
-                        ? context.artC.ink
-                        : context.artC.ink.withValues(alpha: 0.48),
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                    color: context.artC.ink.withValues(
+                      alpha: selected ? 0.78 : 0.42,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -831,20 +1562,20 @@ class _ExposureStep extends StatelessWidget {
     return Column(
       children: [
         Container(
-          width: 24,
-          height: 24,
+          width: 14,
+          height: 14,
           decoration: BoxDecoration(
-            color: done ? kCobalt : context.artC.silver.withValues(alpha: 0.2),
+            color: done ? context.artC.ink : Colors.transparent,
             shape: BoxShape.circle,
-          ),
-          child: Icon(
-            done ? Icons.check_rounded : Icons.more_horiz_rounded,
-            size: 15,
-            color:
-                done ? Colors.white : context.artC.ink.withValues(alpha: 0.4),
+            border: Border.all(
+              color: done
+                  ? context.artC.ink
+                  : context.artC.silver.withValues(alpha: 0.56),
+              width: 1.1,
+            ),
           ),
         ),
-        const SizedBox(height: 5),
+        const SizedBox(height: 7),
         Text(
           label,
           maxLines: 1,
@@ -852,8 +1583,8 @@ class _ExposureStep extends StatelessWidget {
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 10,
-            fontWeight: FontWeight.w900,
-            color: done ? kCobalt : context.artC.ink.withValues(alpha: 0.42),
+            fontWeight: done ? FontWeight.w700 : FontWeight.w500,
+            color: context.artC.ink.withValues(alpha: done ? 0.72 : 0.38),
           ),
         ),
       ],
@@ -869,75 +1600,12 @@ class _ExposureConnector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 22,
-      height: 2,
-      margin: const EdgeInsets.only(bottom: 19),
-      decoration: BoxDecoration(
-        color: active
-            ? kCobalt.withValues(alpha: 0.55)
-            : context.artC.silver.withValues(alpha: 0.24),
-        borderRadius: BorderRadius.circular(99),
-      ),
-    );
-  }
-}
-
-class _LeadMetricCell extends StatelessWidget {
-  final _WorkbenchMetric item;
-
-  const _LeadMetricCell({required this.item});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: item.accent.withValues(alpha: 0.09),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(item.icon, size: 15, color: item.accent),
-              ),
-              const Spacer(),
-              Text(
-                item.value,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: item.accent,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 9),
-          Text(
-            item.label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w900,
-              color: context.artC.ink,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            item.caption,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: context.artC.ink.withValues(alpha: 0.42),
-            ),
-          ),
-        ],
-      ),
+      width: 28,
+      height: 1,
+      margin: const EdgeInsets.only(bottom: 21),
+      color: active
+          ? context.artC.ink.withValues(alpha: 0.42)
+          : context.artC.silver.withValues(alpha: 0.34),
     );
   }
 }
@@ -950,6 +1618,10 @@ class _LeadInboxPreview extends StatelessWidget {
   final VoidCallback onRetry;
   final VoidCallback onViewAll;
   final ValueChanged<Map<String, dynamic>> onOpen;
+  final ValueChanged<Map<String, dynamic>> onAssign;
+  final ValueChanged<Map<String, dynamic>> onPlan;
+  final ValueChanged<Map<String, dynamic>> onClose;
+  final String? actingLeadId;
 
   const _LeadInboxPreview({
     required this.verified,
@@ -959,117 +1631,90 @@ class _LeadInboxPreview extends StatelessWidget {
     required this.onRetry,
     required this.onViewAll,
     required this.onOpen,
+    required this.onAssign,
+    required this.onPlan,
+    required this.onClose,
+    required this.actingLeadId,
   });
 
   @override
   Widget build(BuildContext context) {
     final visibleLeads = leads.take(5).toList();
-    return Container(
-      padding: const EdgeInsets.fromLTRB(15, 15, 15, 16),
-      decoration: _panelDecoration(context),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: kCobalt.withValues(alpha: 0.09),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  Icons.mark_chat_unread_outlined,
-                  color: kCobalt.withValues(alpha: 0.92),
-                  size: 19,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                '咨询线索',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: context.artC.ink,
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '咨询线索',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        color: context.artC.ink,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '最近分配与未读消息',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w800,
-                        color: context.artC.ink.withValues(alpha: 0.4),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (!loading && leads.isNotEmpty)
-                TextButton(
-                  style: TextButton.styleFrom(
-                    foregroundColor: kCobalt,
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    textStyle: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  onPressed: onViewAll,
-                  child: const Text('查看全部'),
-                )
-              else
-                _StatusPill(
-                  label: loading
-                      ? '同步中'
-                      : verified
-                          ? '等待分配'
-                          : '先完成认证',
-                  strong: verified,
-                ),
-            ],
-          ),
-          if (loading || error != null || visibleLeads.isNotEmpty) ...[
-            const SizedBox(height: 13),
-            if (loading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 18),
-                child: Center(
-                  child: CircularProgressIndicator(
-                    color: kCobalt,
-                    strokeWidth: 2.5,
-                  ),
-                ),
-              )
-            else if (error != null)
-              _LeadInlineError(error: error!, onRetry: onRetry)
+            ),
+            if (!loading && leads.isNotEmpty)
+              _QuietTextAction(label: '查看全部 →', onTap: onViewAll)
             else
-              Column(
-                children: [
-                  for (var i = 0; i < visibleLeads.length; i++) ...[
-                    _LeadRow(
-                      lead: visibleLeads[i],
-                      onTap: () => onOpen(visibleLeads[i]),
-                    ),
-                    if (i != visibleLeads.length - 1)
-                      Divider(
-                        height: 1,
-                        color: context.artC.silver.withValues(alpha: 0.22),
-                      ),
-                  ],
-                ],
+              _StatusPill(
+                label: loading
+                    ? '同步中'
+                    : verified
+                        ? '等待分配'
+                        : '先完成认证',
+                strong: verified,
               ),
           ],
+        ),
+        const SizedBox(height: 3),
+        Text(
+          '最近分配与未读消息',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: context.artC.ink.withValues(alpha: 0.38),
+          ),
+        ),
+        if (loading || error != null || visibleLeads.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          if (loading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 18),
+              child: Center(
+                child: CircularProgressIndicator(
+                  color: kCobalt,
+                  strokeWidth: 2.2,
+                ),
+              ),
+            )
+          else if (error != null)
+            _LeadInlineError(error: error!, onRetry: onRetry)
+          else
+            Column(
+              children: [
+                for (var i = 0; i < visibleLeads.length; i++) ...[
+                  _LeadPriorityCard(
+                    lead: visibleLeads[i],
+                    busy: actingLeadId == visibleLeads[i]['id']?.toString(),
+                    onOpen: () => onOpen(visibleLeads[i]),
+                    onAssign: () => onAssign(visibleLeads[i]),
+                    onPlan: () => onPlan(visibleLeads[i]),
+                    onClose: () => onClose(visibleLeads[i]),
+                  ),
+                  if (i != visibleLeads.length - 1)
+                    Divider(
+                      height: 1,
+                      color: context.artC.silver.withValues(alpha: 0.22),
+                    ),
+                ],
+              ],
+            ),
         ],
-      ),
+      ],
     );
   }
 }
@@ -1119,20 +1764,15 @@ class _LeadRow extends StatelessWidget {
                   ),
                 )
               else
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: kCobalt.withValues(alpha: 0.09),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
+                SizedBox(
+                  width: 24,
+                  child: Icon(
                     Icons.school_outlined,
-                    color: kCobalt,
-                    size: 19,
+                    color: context.artC.ink.withValues(alpha: 0.4),
+                    size: 18,
                   ),
                 ),
-              const SizedBox(width: 11),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1197,7 +1837,134 @@ class _LeadRow extends StatelessWidget {
               const SizedBox(width: 8),
               Icon(
                 Icons.chevron_right_rounded,
-                color: context.artC.ink.withValues(alpha: 0.28),
+                color: context.artC.ink.withValues(alpha: 0.22),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LeadPriorityCard extends StatelessWidget {
+  final Map<String, dynamic> lead;
+  final bool busy;
+  final VoidCallback onOpen;
+  final VoidCallback onAssign;
+  final VoidCallback onPlan;
+  final VoidCallback onClose;
+
+  const _LeadPriorityCard({
+    required this.lead,
+    required this.busy,
+    required this.onOpen,
+    required this.onAssign,
+    required this.onPlan,
+    required this.onClose,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final title = _leadStudentName(lead);
+    final goal = _leadGoalSummary(lead);
+    final lastMessage = lead['last_message']?.toString().trim();
+    final status = lead['status']?.toString() ?? 'new';
+    final updatedAt =
+        _formatShortTime(lead['updated_at'] ?? lead['created_at']);
+    final unread = _intValue(lead['unread_count']);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onOpen,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 13),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 15,
+                        height: 1.15,
+                        fontWeight: FontWeight.w900,
+                        color: context.artC.ink,
+                      ),
+                    ),
+                  ),
+                  if (unread > 0) ...[
+                    const SizedBox(width: 8),
+                    _LeadUnreadBadge(count: unread),
+                  ],
+                  if (updatedAt != null) ...[
+                    const SizedBox(width: 8),
+                    Text(
+                      updatedAt,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: context.artC.ink.withValues(alpha: 0.34),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 5),
+              Text(
+                goal,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.25,
+                  fontWeight: FontWeight.w600,
+                  color: context.artC.ink.withValues(alpha: 0.52),
+                ),
+              ),
+              if (lastMessage != null && lastMessage.isNotEmpty) ...[
+                const SizedBox(height: 7),
+                Text(
+                  lastMessage,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    height: 1.38,
+                    fontWeight: FontWeight.w600,
+                    color: context.artC.ink.withValues(alpha: 0.68),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 12,
+                runSpacing: 7,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  _MiniLeadTag(label: _statusLabel(status), strong: true),
+                  _MiniLeadTag(label: _leadAssignmentName(lead)),
+                  if (busy)
+                    const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        color: kCobalt,
+                        strokeWidth: 1.8,
+                      ),
+                    )
+                  else ...[
+                    _QuietTextAction(label: '回复 →', onTap: onOpen),
+                    _QuietTextAction(label: '分配 →', onTap: onAssign),
+                    _QuietTextAction(label: '做方案 →', onTap: onPlan),
+                    _QuietTextAction(label: '关闭', onTap: onClose),
+                  ],
+                ],
               ),
             ],
           ),
@@ -1276,19 +2043,22 @@ class _MiniLeadTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: strong
-            ? kCobalt.withValues(alpha: 0.09)
-            : context.artC.silver.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: strong
+              ? context.artC.ink.withValues(alpha: 0.2)
+              : context.artC.silver.withValues(alpha: 0.34),
+          width: 0.8,
+        ),
       ),
       child: Text(
         label,
         style: TextStyle(
           fontSize: 10,
-          fontWeight: FontWeight.w900,
-          color: strong ? kCobalt : context.artC.ink.withValues(alpha: 0.48),
+          fontWeight: strong ? FontWeight.w700 : FontWeight.w500,
+          color: context.artC.ink.withValues(alpha: strong ? 0.7 : 0.46),
         ),
       ),
     );
@@ -1306,7 +2076,7 @@ class _LeadUnreadBadge extends StatelessWidget {
       constraints: const BoxConstraints(minWidth: 20),
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: const Color(0xFFE11D48),
+        color: context.artC.ink,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
@@ -1333,142 +2103,137 @@ class _WorkspaceActionGrid extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(2, 0, 2, 10),
+          padding: const EdgeInsets.fromLTRB(0, 0, 0, 10),
           child: Row(
             children: [
               Expanded(
                 child: Text(
                   '工作入口',
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
                     color: context.artC.ink,
                   ),
                 ),
               ),
               Text(
-                '线索 · 预约 · 协作',
+                '输入 · 计划 · 咨询',
                 style: TextStyle(
                   fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: context.artC.ink.withValues(alpha: 0.42),
+                  fontWeight: FontWeight.w500,
+                  color: context.artC.ink.withValues(alpha: 0.36),
                 ),
               ),
             ],
           ),
         ),
-        GridView.builder(
-          shrinkWrap: true,
-          padding: EdgeInsets.zero,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: items.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: 1.42,
+        Column(
+          children: [
+            for (var index = 0; index < items.length; index++) ...[
+              _WorkspaceActionRow(
+                item: items[index],
+                showDivider: index != items.length - 1,
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _WorkspaceActionRow extends StatelessWidget {
+  final _WorkbenchAction item;
+  final bool showDivider;
+
+  const _WorkspaceActionRow({
+    required this.item,
+    required this.showDivider,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: showDivider
+                ? context.artC.ink.withValues(alpha: 0.055)
+                : Colors.transparent,
+            width: 0.6,
           ),
-          itemBuilder: (context, index) {
-            final item = items[index];
-            final primary = index == 0;
-            return Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: item.onTap,
-                child: Ink(
-                  padding: const EdgeInsets.all(13),
-                  decoration: BoxDecoration(
-                    color: primary
-                        ? kCobalt.withValues(alpha: 0.055)
-                        : context.artC.cardIconBg,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: primary
-                          ? kCobalt.withValues(alpha: 0.14)
-                          : context.artC.silver.withValues(alpha: 0.26),
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: item.onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 15),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 25,
+                  child: IconTheme(
+                    data: IconThemeData(
+                      size: 18,
+                      color: context.artC.ink.withValues(alpha: 0.42),
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: context.artC.ink.withValues(alpha: 0.024),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    child: Icon(item.icon),
                   ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              Container(
-                                width: 35,
-                                height: 35,
-                                decoration: BoxDecoration(
-                                  color: primary
-                                      ? kCobalt.withValues(alpha: 0.12)
-                                      : kCobalt.withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Icon(
-                                  item.icon,
-                                  size: 18,
-                                  color: kCobalt,
-                                ),
+                          Flexible(
+                            child: Text(
+                              item.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 14,
+                                height: 1.15,
+                                fontWeight: FontWeight.w800,
+                                color: context.artC.ink,
                               ),
-                              if ((item.badgeCount ?? 0) > 0)
-                                Positioned(
-                                  right: -6,
-                                  top: -6,
-                                  child:
-                                      _LeadUnreadBadge(count: item.badgeCount!),
-                                ),
-                            ],
+                            ),
                           ),
-                          const Spacer(),
-                          Icon(
-                            Icons.chevron_right_rounded,
-                            size: 19,
-                            color: primary
-                                ? kCobalt.withValues(alpha: 0.72)
-                                : context.artC.ink.withValues(alpha: 0.24),
-                          ),
+                          if ((item.badgeCount ?? 0) > 0) ...[
+                            const SizedBox(width: 8),
+                            _LeadUnreadBadge(count: item.badgeCount!),
+                          ],
                         ],
-                      ),
-                      const Spacer(),
-                      Text(
-                        item.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
-                          color: context.artC.ink,
-                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         item.subtitle,
-                        maxLines: 2,
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 10.5,
+                          fontSize: 11,
                           height: 1.22,
-                          fontWeight: FontWeight.w700,
-                          color: context.artC.ink.withValues(alpha: 0.46),
+                          fontWeight: FontWeight.w500,
+                          color: context.artC.ink.withValues(alpha: 0.42),
                         ),
                       ),
                     ],
                   ),
                 ),
-              ),
-            );
-          },
+                const SizedBox(width: 10),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 19,
+                  color: context.artC.ink.withValues(alpha: 0.22),
+                ),
+              ],
+            ),
+          ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -3105,6 +3870,7 @@ class _OrganizationSummary extends StatelessWidget {
     final focusAreas = _stringList(organization['focus_areas']);
     final supportsOnline = organization['supports_online'] == true;
     final supportsOffline = organization['supports_offline'] == true;
+    final completeness = _organizationCompleteness(organization);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -3125,6 +3891,11 @@ class _OrganizationSummary extends StatelessWidget {
               fontWeight: FontWeight.w900,
               color: context.artC.ink,
             ),
+          ),
+          const SizedBox(height: 12),
+          _OrganizationCompletenessCard(
+            completeness: completeness,
+            onTap: canManageOrganization ? () => _openEditSheet(context) : null,
           ),
           const SizedBox(height: 10),
           Wrap(
@@ -3620,24 +4391,25 @@ class _OrganizationSwitchTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: context.artC.porcelain,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: SwitchListTile.adaptive(
-        value: value,
-        onChanged: enabled ? onChanged : null,
-        dense: true,
-        activeThumbColor: kCobalt,
-        contentPadding: EdgeInsets.zero,
-        title: Text(
-          title,
-          style: TextStyle(
-            color: context.artC.ink,
-            fontSize: 13,
-            fontWeight: FontWeight.w900,
+    return Material(
+      color: context.artC.porcelain,
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: SwitchListTile.adaptive(
+          value: value,
+          onChanged: enabled ? onChanged : null,
+          dense: true,
+          activeThumbColor: kCobalt,
+          contentPadding: EdgeInsets.zero,
+          title: Text(
+            title,
+            style: TextStyle(
+              color: context.artC.ink,
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ),
       ),
@@ -3867,6 +4639,106 @@ String _leadAssignmentName(Map<String, dynamic> lead) {
   return '已分配老师';
 }
 
+String _leadStudentName(Map<String, dynamic> lead) {
+  final metadata = _mapValue(lead['metadata']);
+  final profile = _mapValue(lead['profile']);
+  final value = _firstCleanText(
+    metadata['student_name'],
+    metadata['student_nickname'],
+    metadata['nickname'],
+    metadata['display_name'],
+    profile['nickname'],
+    profile['display_name'],
+    lead['student_name'],
+    lead['target_name'],
+  );
+  return value.isEmpty ? '未命名咨询' : value;
+}
+
+String _leadGoalSummary(Map<String, dynamic> lead) {
+  final metadata = _mapValue(lead['metadata']);
+  final topic = _topicLabel(lead['topic']?.toString());
+  final targetName = _cleanText(lead['target_name']);
+  final major = _firstCleanText(
+    lead['target_major'],
+    metadata['target_major'],
+    metadata['major'],
+    metadata['intended_major'],
+  );
+  final country = _firstCleanText(
+    metadata['target_country'],
+    metadata['country'],
+    metadata['destination'],
+  );
+  final intake = _firstCleanText(lead['intake'], metadata['intake']);
+  final budget = _leadBudgetLabel(metadata);
+  final parts = [
+    if (targetName.isNotEmpty) targetName,
+    if (country.isNotEmpty) country,
+    if (major.isNotEmpty) major,
+    if (budget.isNotEmpty) budget,
+    if (intake.isNotEmpty) intake,
+    if (topic != null) topic,
+  ];
+  return parts.isEmpty ? '申请目标待补充' : parts.join(' · ');
+}
+
+String _leadBudgetLabel(Map<String, dynamic> metadata) {
+  final budget = _firstCleanText(
+    metadata['budget'],
+    metadata['budget_label'],
+    metadata['target_budget'],
+  );
+  if (budget.isNotEmpty) return budget;
+  final min = _cleanText(metadata['budget_min']);
+  final max = _cleanText(metadata['budget_max']);
+  if (min.isEmpty && max.isEmpty) return '';
+  if (min.isNotEmpty && max.isNotEmpty) return '$min-$max';
+  if (min.isNotEmpty) return '$min 起';
+  return '$max 内';
+}
+
+_OrganizationCompleteness _organizationCompleteness(
+  Map<String, dynamic> organization,
+) {
+  final metadata = _mapValue(organization['metadata']);
+  final city = _firstCleanText(organization['city'], organization['province']);
+  final summary = _firstCleanText(
+    organization['summary'],
+    metadata['summary'],
+    metadata['description'],
+  );
+  final contact = _firstCleanText(
+    metadata['phone'],
+    metadata['wechat_qr_url'],
+    metadata['contact_note'],
+  );
+  final hasServiceMode = organization['supports_online'] == true ||
+      organization['supports_offline'] == true;
+  return _OrganizationCompleteness([
+    _OrganizationCompletenessItem(
+      '机构名称',
+      _cleanText(organization['name']).isNotEmpty,
+    ),
+    _OrganizationCompletenessItem(
+      '机构类型',
+      _cleanText(organization['type']).isNotEmpty,
+    ),
+    _OrganizationCompletenessItem('地区', city.isNotEmpty),
+    _OrganizationCompletenessItem(
+      '服务方向',
+      _stringList(organization['focus_areas']).isNotEmpty,
+    ),
+    _OrganizationCompletenessItem('简介', summary.isNotEmpty),
+    _OrganizationCompletenessItem('服务方式', hasServiceMode),
+    _OrganizationCompletenessItem('联系方式', contact.isNotEmpty),
+    _OrganizationCompletenessItem(
+      '认证',
+      organization['verification_status']?.toString() == 'verified',
+    ),
+  ]);
+}
+
 Map<String, dynamic>? _consultationFromBooking(Map<String, dynamic> booking) {
   final consultation = booking['consultation'];
   return consultation is Map<String, dynamic> ? consultation : null;
@@ -3903,13 +4775,6 @@ _OrganizationMembership? _firstOrganization(
     }
   }
   return null;
-}
-
-bool _canManageContractsFor(List<Map<String, dynamic>> organizations) {
-  return organizations.any((row) {
-    final role = row['role']?.toString();
-    return role == 'owner' || role == 'admin';
-  });
 }
 
 String _organizationActionSubtitle(
@@ -4045,6 +4910,35 @@ String _bulkAssignmentErrorText(Object error) {
   return text;
 }
 
+class _QuietTextAction extends StatelessWidget {
+  final String label;
+  final VoidCallback? onTap;
+
+  const _QuietTextAction({
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      style: TextButton.styleFrom(
+        foregroundColor: context.artC.ink,
+        minimumSize: Size.zero,
+        padding: EdgeInsets.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        textStyle: const TextStyle(
+          fontSize: 12,
+          height: 1.2,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      onPressed: onTap,
+      child: Text(label),
+    );
+  }
+}
+
 class _StatusPill extends StatelessWidget {
   final String label;
   final bool strong;
@@ -4054,44 +4948,138 @@ class _StatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: strong
-            ? kCobalt.withValues(alpha: 0.1)
-            : context.artC.silver.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
-          color: strong
-              ? kCobalt.withValues(alpha: 0.12)
-              : context.artC.silver.withValues(alpha: 0.2),
+          color: context.artC.silver.withValues(alpha: strong ? 0.44 : 0.28),
+          width: 0.8,
         ),
       ),
       child: Text(
         label,
         style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-          color: strong ? kCobalt : context.artC.ink.withValues(alpha: 0.5),
+          fontSize: 10.5,
+          fontWeight: strong ? FontWeight.w700 : FontWeight.w500,
+          color: context.artC.ink.withValues(alpha: strong ? 0.68 : 0.46),
         ),
       ),
     );
   }
 }
 
-class _WorkbenchMetric {
+class _WorkbenchTodoItem {
+  final String label;
+  final int count;
+  final String caption;
+  final VoidCallback onTap;
+
+  const _WorkbenchTodoItem({
+    required this.label,
+    required this.count,
+    required this.caption,
+    required this.onTap,
+  });
+}
+
+class _WorkbenchAnalyticsMetric {
   final String label;
   final String value;
-  final String caption;
-  final IconData icon;
-  final Color accent;
+  final VoidCallback onTap;
 
-  const _WorkbenchMetric(
-    this.label,
-    this.value,
-    this.caption,
-    this.icon,
-    this.accent,
-  );
+  const _WorkbenchAnalyticsMetric({
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+}
+
+class _WorkbenchAnalyticsSnapshot {
+  final int totalLeads;
+  final int weeklyNewLeads;
+  final int followedLeads;
+  final int pendingLeads;
+  final int unreadLeads;
+  final int activeLeads;
+  final int bookingCount;
+  final int orderCount;
+
+  const _WorkbenchAnalyticsSnapshot({
+    required this.totalLeads,
+    required this.weeklyNewLeads,
+    required this.followedLeads,
+    required this.pendingLeads,
+    required this.unreadLeads,
+    required this.activeLeads,
+    required this.bookingCount,
+    required this.orderCount,
+  });
+
+  factory _WorkbenchAnalyticsSnapshot.from({
+    required List<Map<String, dynamic>> leads,
+    required List<Map<String, dynamic>> serviceBookings,
+  }) {
+    final now = DateTime.now();
+    final currentStart = now.subtract(const Duration(days: 7));
+    var weeklyNew = 0;
+    var followed = 0;
+    var pending = 0;
+    var unread = 0;
+    var active = 0;
+    var orders = 0;
+    for (final lead in leads) {
+      final createdAt = _dateValue(lead['created_at']);
+      if (_dateInRange(createdAt, currentStart, now)) weeklyNew++;
+      final status = lead['status']?.toString();
+      if (status == 'pending') pending++;
+      if (status == 'active') active++;
+      if (status == 'active' || status == 'converted' || status == 'closed') {
+        followed++;
+      }
+      unread += _intValue(lead['unread_count']);
+      if (_conversionType(lead) == 'order') orders++;
+    }
+    final bookings = serviceBookings
+        .where((booking) => booking['status']?.toString() != 'canceled')
+        .length;
+    return _WorkbenchAnalyticsSnapshot(
+      totalLeads: leads.length,
+      weeklyNewLeads: weeklyNew,
+      followedLeads: followed,
+      pendingLeads: pending,
+      unreadLeads: unread,
+      activeLeads: active,
+      bookingCount: bookings,
+      orderCount: orders,
+    );
+  }
+
+  int get replyPressure => unreadLeads > 0 ? unreadLeads : pendingLeads;
+
+  String get followUpRateLabel => _rateLabel(followedLeads, totalLeads);
+  String get bookingRateLabel => _rateLabel(bookingCount, totalLeads);
+}
+
+class _OrganizationCompleteness {
+  final List<_OrganizationCompletenessItem> items;
+
+  const _OrganizationCompleteness(this.items);
+
+  int get total => items.length;
+  int get completed => items.where((item) => item.done).length;
+  bool get complete => completed >= total;
+  double get ratio => total == 0 ? 0 : completed / total;
+  List<String> get missingLabels => items
+      .where((item) => !item.done)
+      .map((item) => item.label)
+      .toList(growable: false);
+}
+
+class _OrganizationCompletenessItem {
+  final String label;
+  final bool done;
+
+  const _OrganizationCompletenessItem(this.label, this.done);
 }
 
 class _WorkbenchAction {
@@ -4108,21 +5096,6 @@ class _WorkbenchAction {
     this.onTap,
     this.badgeCount,
   });
-}
-
-BoxDecoration _panelDecoration(BuildContext context) {
-  return BoxDecoration(
-    color: context.artC.cardIconBg,
-    borderRadius: BorderRadius.circular(22),
-    border: Border.all(color: context.artC.silver.withValues(alpha: 0.24)),
-    boxShadow: [
-      BoxShadow(
-        color: context.artC.ink.withValues(alpha: 0.024),
-        blurRadius: 14,
-        offset: const Offset(0, 4),
-      ),
-    ],
-  );
 }
 
 String _statusLabel(String status) {
@@ -4179,6 +5152,23 @@ String? _formatBookingTime(dynamic raw) {
   return '${two(local.month)}-${two(local.day)} ${two(local.hour)}:${two(local.minute)}';
 }
 
+DateTime? _dateValue(dynamic raw) {
+  final value = raw?.toString();
+  if (value == null || value.isEmpty) return null;
+  return DateTime.tryParse(value)?.toLocal();
+}
+
+bool _dateInRange(DateTime? value, DateTime start, DateTime end) {
+  if (value == null) return false;
+  return !value.isBefore(start) && value.isBefore(end);
+}
+
+String _rateLabel(int numerator, int denominator) {
+  if (denominator <= 0) return '0%';
+  final value = (numerator / denominator * 100).round().clamp(0, 999);
+  return '$value%';
+}
+
 int _intValue(dynamic value) {
   if (value is num) return value.toInt();
   return int.tryParse(value?.toString() ?? '') ?? 0;
@@ -4201,8 +5191,21 @@ String _firstCleanText(
   Object? second,
   Object? third,
   Object? fourth,
+  Object? fifth,
+  Object? sixth,
+  Object? seventh,
+  Object? eighth,
 ]) {
-  for (final value in [first, second, third, fourth]) {
+  for (final value in [
+    first,
+    second,
+    third,
+    fourth,
+    fifth,
+    sixth,
+    seventh,
+    eighth,
+  ]) {
     final text = _cleanText(value);
     if (text.isNotEmpty) return text;
   }

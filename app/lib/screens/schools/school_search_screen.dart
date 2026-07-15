@@ -7,10 +7,12 @@ import 'school_detail_screen.dart';
 
 class SchoolSearchScreen extends StatefulWidget {
   final String initialKeyword;
+  final VoidCallback? onOpenCompare;
 
   const SchoolSearchScreen({
     super.key,
     this.initialKeyword = '',
+    this.onOpenCompare,
   });
 
   @override
@@ -94,7 +96,10 @@ class _SchoolSearchScreenState extends State<SchoolSearchScreen> {
     if (id == null || id.isEmpty) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => SchoolDetailScreen(id: id),
+        builder: (_) => SchoolDetailScreen(
+          id: id,
+          onOpenCompare: widget.onOpenCompare,
+        ),
       ),
     );
   }

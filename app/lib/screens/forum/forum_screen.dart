@@ -1,7 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../config/api_config.dart';
 import '../../models/models.dart';
 import '../../services/backend_api_service.dart';
 import '../../services/supabase_service.dart';
@@ -15,6 +18,12 @@ import '../messages/add_friend_screen.dart';
 import '../messages/light_message_screen.dart';
 import '../profile/public_user_profile_screen.dart';
 import 'package:artsee_app/theme/artsee_ui_colors.dart';
+
+const _whatsAppGreen = kCobalt;
+const _whatsAppGreenLight = kCobalt;
+const _whatsAppAccent = kCobalt;
+const _whatsAppMuted = Color(0xFF667781);
+const _marketFilters = ['全部', '艺术', '工艺', '出版', '定制'];
 
 class ForumScreen extends StatefulWidget {
   final VoidCallback? onTabChanged;
@@ -223,28 +232,38 @@ class ForumScreenState extends State<ForumScreen>
     _ensureTabController();
     _ensureSearchKeywords();
     final bottom = mainTabBottomInset(context);
-    return Scaffold(
-      backgroundColor: context.artC.porcelain,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            _MessagePageHeader(
-              searchExpanded: _searchExpanded,
-              searchController: _searchController,
-              onSearchTap: _toggleSearch,
-              onSearchChanged: applySearch,
-              onSearchClose: _closeSearch,
-              onAddTap: _showAddMenu,
-            ),
-            Expanded(
-              child: _ChatTab(
-                key: _chatKey,
-                bottom: bottom,
-                searchKeyword: _searchKeywordAt(0),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.dark.copyWith(
+        statusBarColor: Colors.white,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              _MessagePageHeader(
+                searchExpanded: _searchExpanded,
+                searchController: _searchController,
+                onSearchTap: _toggleSearch,
+                onSearchChanged: applySearch,
+                onSearchClose: _closeSearch,
+                onAddTap: _showAddMenu,
               ),
-            ),
-          ],
+              Expanded(
+                child: ColoredBox(
+                  color: Colors.white,
+                  child: _ChatTab(
+                    key: _chatKey,
+                    bottom: bottom,
+                    searchKeyword: _searchKeywordAt(0),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -270,8 +289,9 @@ class _MessagePageHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(18, 10, 14, 14),
       child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 180),
         switchInCurve: Curves.easeOutCubic,
@@ -279,7 +299,7 @@ class _MessagePageHeader extends StatelessWidget {
         child: searchExpanded
             ? SizedBox(
                 key: const ValueKey('message-search-mode'),
-                height: 44,
+                height: 42,
                 child: _MessageSearchField(
                   controller: searchController,
                   onChanged: onSearchChanged,
@@ -288,38 +308,30 @@ class _MessagePageHeader extends StatelessWidget {
               )
             : SizedBox(
                 key: const ValueKey('message-title-mode'),
-                height: 44,
-                child: Stack(
-                  alignment: Alignment.center,
+                height: 42,
+                child: Row(
                   children: [
-                    Center(
+                    Expanded(
                       child: Text(
                         '消息',
                         style: TextStyle(
                           color: context.artC.ink,
-                          fontSize: 18,
+                          fontSize: 26,
                           fontWeight: FontWeight.w900,
                           letterSpacing: 0,
                         ),
                       ),
                     ),
-                    Positioned(
-                      right: 0,
-                      child: Row(
-                        children: [
-                          _MessageHeaderIconButton(
-                            icon: Icons.search_rounded,
-                            tooltip: '搜索消息',
-                            onTap: onSearchTap,
-                          ),
-                          const SizedBox(width: 6),
-                          _MessageHeaderIconButton(
-                            icon: Icons.add_circle_outline_rounded,
-                            tooltip: '添加好友',
-                            onTap: onAddTap,
-                          ),
-                        ],
-                      ),
+                    _MessageHeaderIconButton(
+                      icon: Icons.search_rounded,
+                      tooltip: '搜索消息',
+                      onTap: onSearchTap,
+                    ),
+                    const SizedBox(width: 2),
+                    _MessageHeaderIconButton(
+                      icon: Icons.add_circle_outline_rounded,
+                      tooltip: '添加好友',
+                      onTap: onAddTap,
                     ),
                   ],
                 ),
@@ -352,7 +364,7 @@ class _MessageHeaderIconButton extends StatelessWidget {
           height: 36,
           child: Icon(
             icon,
-            color: context.artC.ink.withValues(alpha: 0.82),
+            color: kCobalt,
             size: 22,
           ),
         ),
@@ -381,7 +393,7 @@ class _MessageSearchField extends StatelessWidget {
             height: 40,
             padding: const EdgeInsets.only(left: 13, right: 4),
             decoration: BoxDecoration(
-              color: context.artC.silver.withValues(alpha: 0.18),
+              color: context.artC.silver.withValues(alpha: 0.14),
               borderRadius: BorderRadius.circular(999),
             ),
             child: Row(
@@ -389,7 +401,7 @@ class _MessageSearchField extends StatelessWidget {
                 Icon(
                   Icons.search_rounded,
                   size: 19,
-                  color: context.artC.ink.withValues(alpha: 0.36),
+                  color: _whatsAppMuted,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -399,15 +411,15 @@ class _MessageSearchField extends StatelessWidget {
                     onChanged: onChanged,
                     textInputAction: TextInputAction.search,
                     cursorColor: kCobalt,
-                    style: TextStyle(
-                      color: context.artC.ink,
+                    style: const TextStyle(
+                      color: Color(0xFF111B21),
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
                     ),
                     decoration: InputDecoration(
                       hintText: '搜索联系人、合作、圈子、通知',
                       hintStyle: TextStyle(
-                        color: context.artC.ink.withValues(alpha: 0.32),
+                        color: _whatsAppMuted,
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                       ),
@@ -435,7 +447,7 @@ class _MessageSearchField extends StatelessWidget {
                         height: 34,
                         child: Icon(
                           Icons.close_rounded,
-                          color: context.artC.ink.withValues(alpha: 0.42),
+                          color: _whatsAppMuted,
                           size: 18,
                         ),
                       ),
@@ -1888,6 +1900,2269 @@ class _ScanEntryCard extends StatelessWidget {
   }
 }
 
+class MarketplaceSurface extends StatefulWidget {
+  final double bottom;
+  final String searchKeyword;
+  final VoidCallback? onCreateTap;
+
+  const MarketplaceSurface({
+    super.key,
+    required this.bottom,
+    required this.searchKeyword,
+    this.onCreateTap,
+  });
+
+  @override
+  State<MarketplaceSurface> createState() => MarketplaceSurfaceState();
+}
+
+class MarketplaceSurfaceState extends State<MarketplaceSurface> {
+  List<AppCommunityPost> _posts = const [];
+  final List<_MarketBagEntry> _bagEntries = [];
+  bool _loading = true;
+  String? _error;
+  String _selectedFilter = '全部';
+
+  @override
+  void initState() {
+    super.initState();
+    refresh();
+    unawaited(_syncBagEntries());
+  }
+
+  Future<void> refresh() async {
+    await _loadListings();
+  }
+
+  Future<void> _loadListings() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final posts = await BackendApiService.fetchPlazaPosts(
+        limit: 40,
+        kind: 'market',
+        sort: 'latest',
+      );
+      if (!mounted) return;
+      setState(() {
+        _posts = posts;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _posts = const [];
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> openCreateMarketDialog() async {
+    if (!await ensureLoggedIn(context, message: '请先登录后发布市集商品')) return;
+    if (!mounted) return;
+    final titleCtrl = TextEditingController();
+    final categoryCtrl = TextEditingController(text: '艺术');
+    final cityCtrl = TextEditingController();
+    final priceCtrl = TextEditingController();
+    final imageCtrl = TextEditingController();
+    final noteCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    var submitting = false;
+
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            Future<void> submit() async {
+              if (!formKey.currentState!.validate() || submitting) return;
+              setDialogState(() => submitting = true);
+              final category = categoryCtrl.text.trim();
+              final city = cityCtrl.text.trim();
+              final price = priceCtrl.text.trim();
+              final imageUrl = imageCtrl.text.trim();
+              final amountTotal = _marketPriceAmountTotal(price);
+              try {
+                await BackendApiService.createPlazaPost(
+                  title: titleCtrl.text.trim(),
+                  body: noteCtrl.text.trim(),
+                  imageUrls: imageUrl.isEmpty ? const [] : [imageUrl],
+                  kind: 'market',
+                  group: category.isEmpty ? '市集' : category,
+                  tags: [
+                    if (category.isNotEmpty) category,
+                    if (city.isNotEmpty) city,
+                    if (price.isNotEmpty) price,
+                  ],
+                  metadata: {
+                    'kind': 'market',
+                    'category': category.isEmpty ? '艺术' : category,
+                    'source': 'market_resource',
+                    'city': city,
+                    'price': price,
+                    if (amountTotal != null) 'amount_total': amountTotal,
+                    if (imageUrl.isNotEmpty) 'image_url': imageUrl,
+                  },
+                );
+                if (!mounted || !dialogContext.mounted) return;
+                Navigator.of(dialogContext).pop();
+                await refresh();
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('商品已发布到市集')),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                setDialogState(() => submitting = false);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('发布失败：$e')),
+                );
+              }
+            }
+
+            return AlertDialog(
+              title: const Text('发布市集商品'),
+              content: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: titleCtrl,
+                        decoration: const InputDecoration(
+                          labelText: '商品标题',
+                          hintText: '例如 限量版画 / 陶瓷器物 / 独立画册 / 装裱定制',
+                        ),
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                                ? '请填写商品标题'
+                                : null,
+                      ),
+                      TextFormField(
+                        controller: categoryCtrl,
+                        decoration: const InputDecoration(
+                          labelText: '分类',
+                          hintText: '艺术 / 工艺 / 出版 / 定制',
+                        ),
+                      ),
+                      TextFormField(
+                        controller: priceCtrl,
+                        decoration: const InputDecoration(
+                          labelText: '价格或条件',
+                          hintText: '¥199 / 议价 / 接受委托 / 可交换',
+                        ),
+                      ),
+                      TextFormField(
+                        controller: imageCtrl,
+                        decoration: const InputDecoration(
+                          labelText: '商品图片 URL',
+                          hintText: '可选。粘贴一张作品或商品图链接',
+                        ),
+                        keyboardType: TextInputType.url,
+                      ),
+                      TextFormField(
+                        controller: cityCtrl,
+                        decoration: const InputDecoration(
+                          labelText: '城市或交付方式',
+                          hintText: '线上 / 上海 / 伦敦',
+                        ),
+                      ),
+                      TextFormField(
+                        controller: noteCtrl,
+                        minLines: 3,
+                        maxLines: 5,
+                        decoration: const InputDecoration(
+                          labelText: '商品说明',
+                          hintText: '写清楚材质、尺寸、版本、交付或定制方式',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: submitting
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(),
+                  child: const Text('取消'),
+                ),
+                FilledButton(
+                  onPressed: submitting ? null : submit,
+                  child: Text(submitting ? '发布中' : '发布'),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    } finally {
+      titleCtrl.dispose();
+      categoryCtrl.dispose();
+      cityCtrl.dispose();
+      priceCtrl.dispose();
+      imageCtrl.dispose();
+      noteCtrl.dispose();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final listings = _visibleListings();
+    final fallbackListings = _visibleFallbackListings();
+    final displayListings =
+        _posts.isEmpty && !_loading ? fallbackListings : listings;
+    return RefreshIndicator(
+      onRefresh: refresh,
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(20, 0, 20, widget.bottom + 88),
+        children: [
+          _MarketFilterRow(
+            selected: _selectedFilter,
+            bagCount: _bagEntries.length,
+            onSelected: (value) => setState(() => _selectedFilter = value),
+            onBagTap: () => unawaited(_openShoppingBag()),
+          ),
+          const SizedBox(height: 16),
+          if (_loading)
+            const LoadingIndicator()
+          else ...[
+            if (_error != null) ...[
+              _MarketNotice(
+                title: '市集数据暂时没连上',
+                subtitle: '先展示推荐商品样式，稍后下拉刷新即可重试。',
+                onRetry: refresh,
+              ),
+              const SizedBox(height: 14),
+            ],
+            _MarketplaceSectionHeader(
+              title: _selectedFilter == '全部' ? '推荐商品' : '$_selectedFilter商品',
+            ),
+            const SizedBox(height: 10),
+            if (displayListings.isEmpty)
+              _MarketNotice(
+                title: '没有匹配商品',
+                subtitle: '换个关键词或分类试试，也可以发布一件新的市集商品。',
+                onRetry: widget.onCreateTap ?? openCreateMarketDialog,
+              )
+            else
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: EdgeInsets.zero,
+                itemCount: displayListings.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 18,
+                  mainAxisSpacing: 30,
+                  mainAxisExtent: 274,
+                ),
+                itemBuilder: (context, index) {
+                  final item = displayListings[index];
+                  return _MarketListingCard(
+                    item: item,
+                    onOpen: () => _openListing(item),
+                  );
+                },
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  List<_MarketListing> _visibleListings() {
+    final keyword = widget.searchKeyword.trim().toLowerCase();
+    return _posts
+        .map(_listingFromPost)
+        .where((item) => _matchesMarketFilter(item))
+        .where((item) {
+      if (keyword.isEmpty) return true;
+      return [
+        item.title,
+        item.body,
+        item.category,
+        item.city,
+        item.price,
+        item.author,
+      ].join(' ').toLowerCase().contains(keyword);
+    }).toList();
+  }
+
+  List<_MarketListing> _visibleFallbackListings() {
+    final keyword = widget.searchKeyword.trim().toLowerCase();
+    return _fallbackMarketListings
+        .where((item) => _matchesMarketFilter(item))
+        .where((item) {
+      if (keyword.isEmpty) return true;
+      return [
+        item.title,
+        item.body,
+        item.category,
+        item.city,
+        item.price,
+        item.author,
+      ].join(' ').toLowerCase().contains(keyword);
+    }).toList();
+  }
+
+  bool _matchesMarketFilter(_MarketListing item) {
+    if (_selectedFilter == '全部') return true;
+    final raw = '${item.category} ${item.title} ${item.body}'.toLowerCase();
+    return switch (_selectedFilter) {
+      '艺术' => [
+          '艺术',
+          '艺术品',
+          '原作',
+          '绘画',
+          '油画',
+          '水彩',
+          '版画',
+          '摄影',
+          '雕塑',
+          '装置',
+          '收藏',
+          '画廊',
+          'art',
+        ].any(raw.contains),
+      '工艺' => [
+          '工艺',
+          '工艺品',
+          '非遗',
+          '陶瓷',
+          '陶艺',
+          '木作',
+          '漆器',
+          '金工',
+          '织物',
+          '首饰',
+          '手作',
+          'craft',
+        ].any(raw.contains),
+      '出版' => [
+          '出版',
+          '书',
+          '书本',
+          '书籍',
+          '画册',
+          '图录',
+          'zine',
+          '杂志',
+          '海报',
+          '印刷',
+          '资料',
+          'pdf',
+          '清单',
+        ].any(raw.contains),
+      '定制' => [
+          '定制',
+          '委托',
+          '服务',
+          '装裱',
+          '展陈',
+          '框',
+          '零件',
+          '材料',
+          '画材',
+          '设备',
+          '咨询',
+          '诊断',
+          'commission',
+          'custom',
+        ].any(raw.contains),
+      _ => true,
+    };
+  }
+
+  _MarketListing _listingFromPost(AppCommunityPost post) {
+    final rawCategory = _marketPostMeta(
+      post,
+      const ['category', 'group', 'type'],
+      _inferMarketCategory(post),
+    );
+    final category = _normalizeMarketCategory(
+      rawCategory,
+      '${post.title} ${post.body ?? ''}',
+    );
+    final city = _marketPostMeta(
+      post,
+      const ['city', 'location', 'mode'],
+      '线上',
+    );
+    final price = _marketPostMeta(
+      post,
+      const ['price', 'budget', 'amount', 'exchange'],
+      '可沟通',
+    );
+    final author = post.authorNickname?.trim().isNotEmpty == true
+        ? post.authorNickname!.trim()
+        : '艺见心用户';
+    return _MarketListing(
+      id: post.id,
+      title: post.title.trim().isEmpty ? '未命名商品' : post.title.trim(),
+      body: post.body?.trim().isNotEmpty == true
+          ? post.body!.trim()
+          : '商品详情待补充，可先咨询发布者确认材质、版本和交付方式。',
+      category: category,
+      city: city,
+      price: price,
+      author: author,
+      imageUrl: post.imageUrls.isNotEmpty ? post.imageUrls.first : null,
+      post: post,
+    );
+  }
+
+  String _marketPostMeta(
+    AppCommunityPost post,
+    List<String> keys,
+    String fallback,
+  ) {
+    for (final key in keys) {
+      final value = post.metadata[key]?.toString().trim();
+      if (value != null && value.isNotEmpty) return value;
+    }
+    return fallback;
+  }
+
+  String _inferMarketCategory(AppCommunityPost post) {
+    final raw = '${post.title} ${post.body ?? ''}'.toLowerCase();
+    if ([
+      '工艺',
+      '工艺品',
+      '非遗',
+      '陶瓷',
+      '陶艺',
+      '木作',
+      '漆器',
+      '金工',
+      '织物',
+      '首饰',
+      '手作',
+    ].any(raw.contains)) {
+      return '工艺';
+    }
+    if ([
+      '出版',
+      '书',
+      '书本',
+      '书籍',
+      '画册',
+      '图录',
+      'zine',
+      '杂志',
+      '海报',
+      '印刷',
+      '资料',
+      'pdf',
+      '清单',
+    ].any(raw.contains)) {
+      return '出版';
+    }
+    if ([
+      '定制',
+      '委托',
+      '服务',
+      '装裱',
+      '展陈',
+      '框',
+      '零件',
+      '材料',
+      '画材',
+      '设备',
+      '咨询',
+      '诊断',
+    ].any(raw.contains)) {
+      return '定制';
+    }
+    return '艺术';
+  }
+
+  String _normalizeMarketCategory(String value, [String context = '']) {
+    final raw = '$value $context'.toLowerCase();
+    if ([
+      '工艺',
+      '工艺品',
+      '非遗',
+      '陶瓷',
+      '陶艺',
+      '木作',
+      '漆器',
+      '金工',
+      '织物',
+      '首饰',
+      '手作',
+      'craft',
+    ].any(raw.contains)) {
+      return '工艺';
+    }
+    if ([
+      '出版',
+      '书',
+      '书本',
+      '书籍',
+      '画册',
+      '图录',
+      'zine',
+      '杂志',
+      '海报',
+      '印刷',
+      '资料',
+      'pdf',
+      '清单',
+    ].any(raw.contains)) {
+      return '出版';
+    }
+    if ([
+      '定制',
+      '委托',
+      '服务',
+      '装裱',
+      '展陈',
+      '框',
+      '零件',
+      '材料',
+      '画材',
+      '设备',
+      '咨询',
+      '诊断',
+      'commission',
+      'custom',
+    ].any(raw.contains)) {
+      return '定制';
+    }
+    return '艺术';
+  }
+
+  void _openListing(_MarketListing item) {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => _MarketListingDetailScreen(
+          item: item,
+          initiallySaved: _isSavedListing(item),
+          initiallyInBag: _isPendingListing(item),
+          onSave: _saveListing,
+          onAddToBag: _addListingToBag,
+          onConsult: _consultListing,
+          onCheckout: _checkoutListing,
+        ),
+      ),
+    );
+  }
+
+  bool _isSavedListing(_MarketListing item) =>
+      _bagEntryFor(item)?.saved == true;
+
+  bool _isPendingListing(_MarketListing item) {
+    final entry = _bagEntryFor(item);
+    return entry?.pending == true && entry?.consulted != true;
+  }
+
+  _MarketBagEntry? _bagEntryFor(_MarketListing item) {
+    for (final entry in _bagEntries) {
+      if (entry.item.id == item.id) return entry;
+    }
+    return null;
+  }
+
+  void _upsertBagEntry(
+    _MarketListing item, {
+    bool? saved,
+    bool? pending,
+    bool? consulted,
+    String? message,
+    String? conversationId,
+    String? orderId,
+  }) {
+    final index = _bagEntries.indexWhere((entry) => entry.item.id == item.id);
+    final current = index >= 0
+        ? _bagEntries[index]
+        : _MarketBagEntry(
+            item: item,
+            updatedAt: DateTime.now(),
+          );
+    final next = current.copyWith(
+      item: item,
+      saved: saved,
+      pending: pending,
+      consulted: consulted,
+      message: message,
+      conversationId: conversationId,
+      orderId: orderId,
+      updatedAt: DateTime.now(),
+    );
+    setState(() {
+      if (index >= 0) {
+        _bagEntries[index] = next;
+      } else {
+        _bagEntries.insert(0, next);
+      }
+      _bagEntries.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    });
+  }
+
+  Future<bool> _saveListing(_MarketListing item) async {
+    if (item.post != null) {
+      final loggedIn = await ensureLoggedIn(context, message: '请先登录后收藏商品');
+      if (!mounted || !loggedIn) return false;
+    }
+    try {
+      if (item.post != null) {
+        await BackendApiService.upsertMarketplaceBagItem(
+          listingPostId: item.id,
+          saved: true,
+        );
+      }
+      if (!mounted) return false;
+      _upsertBagEntry(item, saved: true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已收藏「${item.title}」')),
+      );
+      return true;
+    } catch (e) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('收藏失败：$e')),
+      );
+      return false;
+    }
+  }
+
+  Future<bool> _addListingToBag(_MarketListing item) async {
+    if (item.post != null) {
+      final loggedIn = await ensureLoggedIn(context, message: '请先登录后加入购物袋');
+      if (!mounted || !loggedIn) return false;
+    }
+    try {
+      if (item.post != null) {
+        await BackendApiService.upsertMarketplaceBagItem(
+          listingPostId: item.id,
+          status: 'pending',
+        );
+      }
+      if (!mounted) return false;
+      _upsertBagEntry(item, pending: true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已加入购物袋「${item.title}」')),
+      );
+      return true;
+    } catch (e) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('加入购物袋失败：$e')),
+      );
+      return false;
+    }
+  }
+
+  Future<void> _consultListing(_MarketListing item) async {
+    final loggedIn = await ensureLoggedIn(context, message: '请先登录后咨询市集商品');
+    if (!mounted || !loggedIn) return;
+    final message = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _MarketConsultSheet(item: item),
+    );
+    if (!mounted || message == null) return;
+    final trimmed = message.trim();
+
+    final peerId = item.post?.authorId?.trim();
+    final currentUserId = SupabaseService.currentUser?.id;
+    final initialMessage = _marketConsultMessage(item, trimmed);
+    if (peerId == null || peerId.isEmpty) {
+      _upsertBagEntry(
+        item,
+        pending: false,
+        consulted: true,
+        message: trimmed,
+      );
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => LightMessageScreen(
+            peer: LightMessagePeer.person(
+              name: item.author,
+              identityLabel: '市集发布者',
+            ),
+            initialMessage: initialMessage,
+          ),
+        ),
+      );
+      return;
+    }
+    if (peerId == currentUserId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('这是你发布的商品，可以在发布记录里管理')),
+      );
+      return;
+    }
+
+    try {
+      final conversation = await BackendApiService.createConversation(
+        participantIds: [peerId],
+        type: 'direct',
+        title: item.author,
+        metadata: {
+          'source': 'market_listing_consult',
+          'market_listing_id': item.id,
+          'market_listing_title': item.title,
+          'market_listing_category': item.category,
+          'market_listing_price': item.price,
+          'market_listing_city': item.city,
+          'peer_user_id': peerId,
+        },
+      );
+      await BackendApiService.sendConversationMessage(
+        conversationId: conversation['id'].toString(),
+        body: initialMessage,
+        metadata: {
+          'source': 'market_listing_consult',
+          'market_listing_id': item.id,
+          'market_listing_title': item.title,
+        },
+      );
+      if (!mounted) return;
+      await BackendApiService.upsertMarketplaceBagItem(
+        listingPostId: item.id,
+        status: 'consulted',
+        message: trimmed,
+        conversationId: conversation['id']?.toString(),
+      );
+      if (!mounted) return;
+      _upsertBagEntry(
+        item,
+        pending: false,
+        consulted: true,
+        message: trimmed,
+      );
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => LightMessageScreen(conversation: conversation),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('发起咨询失败：$e')),
+      );
+    }
+  }
+
+  Future<void> _checkoutListing(_MarketListing item) async {
+    final loggedIn = await ensureLoggedIn(context, message: '请先登录后购买市集商品');
+    if (!mounted || !loggedIn) return;
+    if (item.post == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('示例商品不能创建真实订单')),
+      );
+      return;
+    }
+    try {
+      final checkout = await BackendApiService.createMarketplaceOrder(
+        listingPostId: item.id,
+      );
+      if (!mounted) return;
+      final order = checkout['order'];
+      final orderId = checkout['orderId']?.toString() ??
+          (order is Map<String, dynamic> ? order['id']?.toString() : null);
+      if (orderId != null && orderId.isNotEmpty) {
+        _upsertBagEntry(
+          item,
+          pending: false,
+          consulted: true,
+          orderId: orderId,
+        );
+      }
+      final checkoutUrl = checkout['checkoutUrl']?.toString() ?? '';
+      if (checkoutUrl.startsWith('/orders/') && orderId != null) {
+        await BackendApiService.confirmExistingOrder(orderId);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('订单已创建并确认支付')),
+        );
+        return;
+      }
+      if (checkoutUrl.isNotEmpty) {
+        final url = checkoutUrl.startsWith('http')
+            ? checkoutUrl
+            : '${ApiConfig.baseUrl.replaceAll(RegExp(r'/$'), '')}$checkoutUrl';
+        final opened = await launchUrl(
+          Uri.parse(url),
+          mode: LaunchMode.externalApplication,
+        );
+        if (!mounted) return;
+        if (!opened) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('无法打开支付链接：$url')),
+          );
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('创建订单失败：$e')),
+      );
+    }
+  }
+
+  Future<void> _syncBagEntries({bool showError = false}) async {
+    if (!SupabaseService.isLoggedIn) return;
+    try {
+      final remote = await BackendApiService.fetchMarketplaceBag(limit: 80);
+      if (!mounted) return;
+      setState(() {
+        _bagEntries
+          ..clear()
+          ..addAll(remote.data.map(_bagEntryFromRemote));
+      });
+    } catch (e) {
+      if (!showError || !mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('同步购物袋失败：$e')),
+      );
+    }
+  }
+
+  Future<void> _openShoppingBag() async {
+    if (SupabaseService.isLoggedIn) {
+      await _syncBagEntries(showError: true);
+    }
+    if (!mounted) return;
+    final entries = List<_MarketBagEntry>.unmodifiable(_bagEntries);
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => _MarketShoppingBagScreen(
+          entries: entries,
+          onOpenListing: _openListing,
+          onConsult: _consultListing,
+        ),
+      ),
+    );
+  }
+
+  _MarketBagEntry _bagEntryFromRemote(Map<String, dynamic> row) {
+    final listingRaw = row['listing'];
+    final listing = listingRaw is Map<String, dynamic>
+        ? _listingFromPost(AppCommunityPost.fromJson(listingRaw))
+        : _fallbackMarketListings.first;
+    final status = row['status']?.toString() ?? 'pending';
+    return _MarketBagEntry(
+      item: listing,
+      saved: row['saved'] == true,
+      pending: status == 'pending',
+      consulted: status == 'consulted' || status == 'ordered',
+      message: row['message']?.toString(),
+      conversationId: row['conversation_id']?.toString(),
+      orderId: row['order_id']?.toString(),
+      updatedAt: DateTime.tryParse(row['updated_at']?.toString() ?? '') ??
+          DateTime.now(),
+    );
+  }
+}
+
+class _MarketListing {
+  final String id;
+  final String title;
+  final String body;
+  final String category;
+  final String city;
+  final String price;
+  final String author;
+  final String? imageUrl;
+  final AppCommunityPost? post;
+
+  const _MarketListing({
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.category,
+    required this.city,
+    required this.price,
+    required this.author,
+    this.imageUrl,
+    this.post,
+  });
+}
+
+class _MarketBagEntry {
+  final _MarketListing item;
+  final bool saved;
+  final bool pending;
+  final bool consulted;
+  final String? message;
+  final String? conversationId;
+  final String? orderId;
+  final DateTime updatedAt;
+
+  const _MarketBagEntry({
+    required this.item,
+    this.saved = false,
+    this.pending = false,
+    this.consulted = false,
+    this.message,
+    this.conversationId,
+    this.orderId,
+    required this.updatedAt,
+  });
+
+  _MarketBagEntry copyWith({
+    _MarketListing? item,
+    bool? saved,
+    bool? pending,
+    bool? consulted,
+    String? message,
+    String? conversationId,
+    String? orderId,
+    DateTime? updatedAt,
+  }) {
+    return _MarketBagEntry(
+      item: item ?? this.item,
+      saved: saved ?? this.saved,
+      pending: pending ?? this.pending,
+      consulted: consulted ?? this.consulted,
+      message: message ?? this.message,
+      conversationId: conversationId ?? this.conversationId,
+      orderId: orderId ?? this.orderId,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+}
+
+List<_MarketListing> get _fallbackMarketListings => const [
+      _MarketListing(
+        id: 'sample-art-print',
+        title: '限量版画《Blue Room》',
+        body: '艺术家签名限量 30 版，适合收藏、空间陈列或送礼。',
+        category: '艺术',
+        city: '上海',
+        price: '¥1,280',
+        author: 'Studio Echo',
+      ),
+      _MarketListing(
+        id: 'sample-craft-ceramic',
+        title: '手工陶瓷香器',
+        body: '小批量手作器物，非遗工艺可归入工艺品分类。',
+        category: '工艺',
+        city: '景德镇',
+        price: '¥360',
+        author: '土与火工坊',
+      ),
+      _MarketListing(
+        id: 'sample-publication-book',
+        title: '独立艺术书《Archive Notes》',
+        body: '小开本艺术出版物，含访谈、展览照片和创作手稿。',
+        category: '出版',
+        city: '北京',
+        price: '¥128',
+        author: '野册出版',
+      ),
+      _MarketListing(
+        id: 'sample-custom-frame',
+        title: '展陈装裱与亚克力底座定制',
+        body: '面向作品展示、毕业展和小型空间陈列的装裱、底座和展陈零件定制。',
+        category: '定制',
+        city: '线上 / 广州',
+        price: '按尺寸报价',
+        author: 'White Cube Works',
+      ),
+    ];
+
+class _MarketFilterRow extends StatelessWidget {
+  final String selected;
+  final int bagCount;
+  final ValueChanged<String> onSelected;
+  final VoidCallback onBagTap;
+
+  const _MarketFilterRow({
+    required this.selected,
+    required this.bagCount,
+    required this.onSelected,
+    required this.onBagTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _marketFilters
+                  .map(
+                    (value) => Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: GestureDetector(
+                        onTap: () => onSelected(value),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          padding: const EdgeInsets.only(
+                            left: 2,
+                            right: 14,
+                            top: 8,
+                            bottom: 7,
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                value,
+                                style: TextStyle(
+                                  color: selected == value
+                                      ? context.artC.ink
+                                      : context.artC.ink
+                                          .withValues(alpha: 0.34),
+                                  fontSize: 13,
+                                  fontWeight: selected == value
+                                      ? FontWeight.w900
+                                      : FontWeight.w700,
+                                  letterSpacing: 0,
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 150),
+                                width: selected == value ? 18 : 0,
+                                height: 1.5,
+                                decoration: BoxDecoration(
+                                  color: context.artC.ink,
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Tooltip(
+          message: '购物袋',
+          child: GestureDetector(
+            onTap: onBagTap,
+            behavior: HitTestBehavior.opaque,
+            child: SizedBox(
+              width: 38,
+              height: 38,
+              child: Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.center,
+                children: [
+                  Icon(
+                    Icons.shopping_bag_outlined,
+                    size: 22,
+                    color: context.artC.ink.withValues(alpha: 0.56),
+                  ),
+                  if (bagCount > 0)
+                    Positioned(
+                      right: 2,
+                      top: 2,
+                      child: Container(
+                        constraints: const BoxConstraints(
+                          minWidth: 15,
+                          minHeight: 15,
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        decoration: BoxDecoration(
+                          color: kCobalt,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          bagCount > 99 ? '99+' : '$bagCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 8.5,
+                            height: 1,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MarketplaceSectionHeader extends StatelessWidget {
+  final String title;
+
+  const _MarketplaceSectionHeader({
+    required this.title,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      style: TextStyle(
+        color: context.artC.ink,
+        fontSize: 15,
+        fontWeight: FontWeight.w900,
+        letterSpacing: 0,
+      ),
+    );
+  }
+}
+
+class _MarketNotice extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final VoidCallback onRetry;
+
+  const _MarketNotice({
+    required this.title,
+    required this.subtitle,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onRetry,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: kCobalt.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.refresh_rounded, color: kCobalt, size: 19),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: kCobalt,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: context.artC.ink.withValues(alpha: 0.48),
+                      fontSize: 10.5,
+                      height: 1.35,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MarketListingCard extends StatelessWidget {
+  final _MarketListing item;
+  final VoidCallback onOpen;
+
+  const _MarketListingCard({
+    required this.item,
+    required this.onOpen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final quotedPrice = _isQuotedMarketPrice(item.price);
+    return Semantics(
+      button: true,
+      label: '打开${item.title}详情',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onOpen,
+          hoverColor: context.artC.silver.withValues(alpha: 0.08),
+          highlightColor: context.artC.silver.withValues(alpha: 0.10),
+          splashColor: Colors.transparent,
+          borderRadius: BorderRadius.circular(3),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _MarketListingThumb(item: item),
+              const SizedBox(height: 16),
+              Text(
+                item.author,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: context.artC.ink.withValues(alpha: 0.34),
+                  fontSize: 10,
+                  height: 1.2,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0,
+                ),
+              ),
+              const SizedBox(height: 5),
+              SizedBox(
+                height: 34,
+                child: Text(
+                  item.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: context.artC.ink,
+                    fontSize: 13,
+                    height: 1.25,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 7),
+              Text(
+                item.price,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: context.artC.ink
+                      .withValues(alpha: quotedPrice ? 0.48 : 0.82),
+                  fontSize: quotedPrice ? 11.5 : 12,
+                  height: 1.18,
+                  fontWeight: quotedPrice ? FontWeight.w500 : FontWeight.w800,
+                  letterSpacing: 0,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MarketListingThumb extends StatelessWidget {
+  final _MarketListing item;
+
+  const _MarketListingThumb({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = item.imageUrl;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(3),
+      child: AspectRatio(
+        aspectRatio: 1,
+        child: SizedBox(
+          width: double.infinity,
+          child: imageUrl == null
+              ? _MarketFallbackImage(item: item)
+              : Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) =>
+                      _MarketFallbackImage(item: item),
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MarketFallbackImage extends StatelessWidget {
+  final _MarketListing item;
+
+  const _MarketFallbackImage({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final encoded = Uri.encodeComponent(item.id);
+    return Image.network(
+      'https://picsum.photos/seed/artsee_market_$encoded/720/520',
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => Container(
+        color: context.artC.silver.withValues(alpha: 0.14),
+      ),
+    );
+  }
+}
+
+class _MarketListingDetailScreen extends StatefulWidget {
+  final _MarketListing item;
+  final bool initiallySaved;
+  final bool initiallyInBag;
+  final Future<bool> Function(_MarketListing item) onSave;
+  final Future<bool> Function(_MarketListing item) onAddToBag;
+  final Future<void> Function(_MarketListing item) onConsult;
+  final Future<void> Function(_MarketListing item) onCheckout;
+
+  const _MarketListingDetailScreen({
+    required this.item,
+    required this.initiallySaved,
+    required this.initiallyInBag,
+    required this.onSave,
+    required this.onAddToBag,
+    required this.onConsult,
+    required this.onCheckout,
+  });
+
+  @override
+  State<_MarketListingDetailScreen> createState() =>
+      _MarketListingDetailScreenState();
+}
+
+class _MarketListingDetailScreenState
+    extends State<_MarketListingDetailScreen> {
+  late bool _saved = widget.initiallySaved;
+  late bool _inBag = widget.initiallyInBag;
+  bool _saving = false;
+  bool _adding = false;
+  bool _consulting = false;
+  bool _checkingOut = false;
+
+  Future<void> _consult() async {
+    if (_consulting) return;
+    setState(() => _consulting = true);
+    try {
+      await widget.onConsult(widget.item);
+    } finally {
+      if (mounted) setState(() => _consulting = false);
+    }
+  }
+
+  Future<void> _save() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      final saved = await widget.onSave(widget.item);
+      if (saved && mounted) setState(() => _saved = true);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _addToBag() async {
+    if (_adding) return;
+    setState(() => _adding = true);
+    try {
+      final added = await widget.onAddToBag(widget.item);
+      if (added && mounted) setState(() => _inBag = true);
+    } finally {
+      if (mounted) setState(() => _adding = false);
+    }
+  }
+
+  Future<void> _checkout() async {
+    if (_checkingOut) return;
+    setState(() => _checkingOut = true);
+    try {
+      await widget.onCheckout(widget.item);
+    } finally {
+      if (mounted) setState(() => _checkingOut = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.item;
+    final quotedPrice = _isQuotedMarketPrice(item.price);
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 6),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: 19,
+                      color: context.artC.ink,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    tooltip: '收藏',
+                    onPressed: _saving ? null : _save,
+                    icon: Icon(
+                      _saved
+                          ? Icons.bookmark_rounded
+                          : Icons.bookmark_border_rounded,
+                      size: 22,
+                      color: context.artC.ink.withValues(alpha: 0.54),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: '加入购物袋',
+                    onPressed: _adding ? null : _addToBag,
+                    icon: Icon(
+                      _inBag
+                          ? Icons.shopping_bag_rounded
+                          : Icons.shopping_bag_outlined,
+                      size: 22,
+                      color: context.artC.ink.withValues(alpha: 0.54),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 36),
+                children: [
+                  _MarketListingThumb(item: item),
+                  const SizedBox(height: 22),
+                  Text(
+                    item.author,
+                    style: TextStyle(
+                      color: context.artC.ink.withValues(alpha: 0.34),
+                      fontSize: 12,
+                      height: 1.2,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    item.title,
+                    style: TextStyle(
+                      color: context.artC.ink,
+                      fontSize: 24,
+                      height: 1.18,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    item.price,
+                    style: TextStyle(
+                      color: context.artC.ink
+                          .withValues(alpha: quotedPrice ? 0.52 : 0.84),
+                      fontSize: quotedPrice ? 14 : 17,
+                      height: 1.2,
+                      fontWeight:
+                          quotedPrice ? FontWeight.w500 : FontWeight.w800,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  Text(
+                    item.body,
+                    style: TextStyle(
+                      color: context.artC.ink.withValues(alpha: 0.58),
+                      fontSize: 14,
+                      height: 1.7,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                  const SizedBox(height: 26),
+                  _MarketDetailMeta(label: '分类', value: item.category),
+                  _MarketDetailMeta(label: '位置', value: item.city),
+                  _MarketDetailMeta(label: '发布者', value: item.author),
+                  const SizedBox(height: 24),
+                  _MarketDetailStepLine(
+                    index: '01',
+                    title: '加入购物袋',
+                    body: '先把感兴趣的作品、工艺品或定制服务放进待咨询清单。',
+                    active: _inBag,
+                  ),
+                  const _MarketDetailStepLine(
+                    index: '02',
+                    title: '发送咨询',
+                    body: '写一句需求，系统会把商品信息一并发给发布者。',
+                    active: false,
+                  ),
+                  const _MarketDetailStepLine(
+                    index: '03',
+                    title: '消息页沟通',
+                    body: '价格、尺寸、交付、定制细节在私信里确认。',
+                    active: false,
+                  ),
+                  if (item.post != null) ...[
+                    const SizedBox(height: 26),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.of(context).push<void>(
+                          MaterialPageRoute<void>(
+                            builder: (_) => CommunityPostDetailScreen(
+                              postId: item.post!.id,
+                              initialPost: item.post,
+                            ),
+                          ),
+                        );
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: Text(
+                        '查看发布记录 →',
+                        style: TextStyle(
+                          color: context.artC.ink.withValues(alpha: 0.58),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 10, 24, 18),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 46,
+                      child: TextButton(
+                        onPressed: _inBag
+                            ? (_checkingOut ? null : _checkout)
+                            : (_adding ? null : _addToBag),
+                        style: TextButton.styleFrom(
+                          foregroundColor: context.artC.ink,
+                          backgroundColor:
+                              context.artC.silver.withValues(alpha: 0.16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                        child: Text(
+                          _inBag
+                              ? (_checkingOut ? '生成中' : '生成订单')
+                              : (_adding ? '加入中' : '加入购物袋'),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: SizedBox(
+                      height: 46,
+                      child: TextButton(
+                        onPressed: _consulting ? null : _consult,
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          backgroundColor: context.artC.ink,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                        child: Text(
+                          _consulting ? '发起中' : '咨询商品',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MarketDetailMeta extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _MarketDetailMeta({
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 52,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: context.artC.ink.withValues(alpha: 0.28),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                color: context.artC.ink.withValues(alpha: 0.58),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MarketDetailStepLine extends StatelessWidget {
+  final String index;
+  final String title;
+  final String body;
+  final bool active;
+
+  const _MarketDetailStepLine({
+    required this.index,
+    required this.title,
+    required this.body,
+    required this.active,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 13),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 28,
+            child: Text(
+              index,
+              style: TextStyle(
+                color: context.artC.ink.withValues(alpha: active ? 0.72 : 0.26),
+                fontSize: 11,
+                height: 1.28,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: context.artC.ink.withValues(alpha: 0.78),
+                    fontSize: 12,
+                    height: 1.28,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  body,
+                  style: TextStyle(
+                    color: context.artC.ink.withValues(alpha: 0.42),
+                    fontSize: 11.5,
+                    height: 1.42,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+enum _MarketBagTab { pending, consulted, saved }
+
+class _MarketShoppingBagScreen extends StatefulWidget {
+  final List<_MarketBagEntry> entries;
+  final ValueChanged<_MarketListing> onOpenListing;
+  final Future<void> Function(_MarketListing item) onConsult;
+
+  const _MarketShoppingBagScreen({
+    required this.entries,
+    required this.onOpenListing,
+    required this.onConsult,
+  });
+
+  @override
+  State<_MarketShoppingBagScreen> createState() =>
+      _MarketShoppingBagScreenState();
+}
+
+class _MarketShoppingBagScreenState extends State<_MarketShoppingBagScreen> {
+  late final List<_MarketBagEntry> _entries = List.of(widget.entries);
+  late _MarketBagTab _selected = _initialTab();
+  bool _consulting = false;
+
+  _MarketBagTab _initialTab() {
+    if (_entries.any((entry) => entry.pending && !entry.consulted)) {
+      return _MarketBagTab.pending;
+    }
+    if (_entries.any((entry) => entry.consulted)) {
+      return _MarketBagTab.consulted;
+    }
+    return _MarketBagTab.saved;
+  }
+
+  List<_MarketBagEntry> _entriesFor(_MarketBagTab tab) {
+    return switch (tab) {
+      _MarketBagTab.pending =>
+        _entries.where((entry) => entry.pending && !entry.consulted).toList(),
+      _MarketBagTab.consulted =>
+        _entries.where((entry) => entry.consulted).toList(),
+      _MarketBagTab.saved => _entries.where((entry) => entry.saved).toList(),
+    };
+  }
+
+  String _labelFor(_MarketBagTab tab) {
+    return switch (tab) {
+      _MarketBagTab.pending => '待咨询',
+      _MarketBagTab.consulted => '已咨询',
+      _MarketBagTab.saved => '已收藏',
+    };
+  }
+
+  Future<void> _consult(_MarketBagEntry entry) async {
+    if (_consulting) return;
+    setState(() => _consulting = true);
+    try {
+      await widget.onConsult(entry.item);
+      if (!mounted) return;
+      setState(() {
+        final index =
+            _entries.indexWhere((item) => item.item.id == entry.item.id);
+        if (index >= 0) {
+          _entries[index] = _entries[index].copyWith(
+            pending: false,
+            consulted: true,
+            updatedAt: DateTime.now(),
+          );
+        }
+        _selected = _MarketBagTab.consulted;
+      });
+    } finally {
+      if (mounted) setState(() => _consulting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = _entriesFor(_selected);
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 8, 18, 4),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: 19,
+                      color: context.artC.ink,
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Text(
+                    '购物袋',
+                    style: TextStyle(
+                      color: context.artC.ink,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${_entries.length} 件',
+                    style: TextStyle(
+                      color: context.artC.ink.withValues(alpha: 0.34),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
+              child: Row(
+                children: _MarketBagTab.values
+                    .map(
+                      (tab) => Padding(
+                        padding: const EdgeInsets.only(right: 18),
+                        child: GestureDetector(
+                          onTap: () => setState(() => _selected = tab),
+                          behavior: HitTestBehavior.opaque,
+                          child: _MarketBagTabLabel(
+                            label: _labelFor(tab),
+                            count: _entriesFor(tab).length,
+                            selected: _selected == tab,
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+            Expanded(
+              child: visible.isEmpty
+                  ? _MarketBagEmptyState(label: _labelFor(_selected))
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(24, 12, 24, 34),
+                      itemCount: visible.length,
+                      separatorBuilder: (_, __) => Divider(
+                        height: 28,
+                        thickness: 0.8,
+                        color: context.artC.silver.withValues(alpha: 0.36),
+                      ),
+                      itemBuilder: (context, index) {
+                        final entry = visible[index];
+                        return _MarketBagEntryRow(
+                          entry: entry,
+                          tab: _selected,
+                          consulting: _consulting,
+                          onOpen: () => widget.onOpenListing(entry.item),
+                          onConsult: () => _consult(entry),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MarketBagTabLabel extends StatelessWidget {
+  final String label;
+  final int count;
+  final bool selected;
+
+  const _MarketBagTabLabel({
+    required this.label,
+    required this.count,
+    required this.selected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '$label $count',
+          style: TextStyle(
+            color: selected
+                ? context.artC.ink
+                : context.artC.ink.withValues(alpha: 0.32),
+            fontSize: 13,
+            fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+            letterSpacing: 0,
+          ),
+        ),
+        const SizedBox(height: 5),
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          width: selected ? 18 : 0,
+          height: 1.5,
+          decoration: BoxDecoration(
+            color: context.artC.ink,
+            borderRadius: BorderRadius.circular(999),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MarketBagEmptyState extends StatelessWidget {
+  final String label;
+
+  const _MarketBagEmptyState({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 34),
+        child: Text(
+          label == '待咨询'
+              ? '还没有待咨询商品。\n在详情页点购物袋图标，先把感兴趣的作品放进来。'
+              : label == '已咨询'
+                  ? '还没有咨询记录。\n咨询后会自动沉淀到这里，方便回看。'
+                  : '还没有收藏。\n点详情页右上角书签即可收藏。',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: context.artC.ink.withValues(alpha: 0.38),
+            fontSize: 13,
+            height: 1.65,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MarketBagEntryRow extends StatelessWidget {
+  final _MarketBagEntry entry;
+  final _MarketBagTab tab;
+  final bool consulting;
+  final VoidCallback onOpen;
+  final VoidCallback onConsult;
+
+  const _MarketBagEntryRow({
+    required this.entry,
+    required this.tab,
+    required this.consulting,
+    required this.onOpen,
+    required this.onConsult,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final item = entry.item;
+    final message = entry.message?.trim();
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 74,
+          child: _MarketListingThumb(item: item),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.author,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: context.artC.ink.withValues(alpha: 0.34),
+                  fontSize: 10.5,
+                  height: 1.2,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                item.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: context.artC.ink,
+                  fontSize: 14,
+                  height: 1.25,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0,
+                ),
+              ),
+              const SizedBox(height: 7),
+              Text(
+                '${item.category} · ${item.price}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: context.artC.ink.withValues(alpha: 0.46),
+                  fontSize: 11.5,
+                  height: 1.25,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0,
+                ),
+              ),
+              if (message != null && message.isNotEmpty) ...[
+                const SizedBox(height: 7),
+                Text(
+                  message,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: context.artC.ink.withValues(alpha: 0.38),
+                    fontSize: 11,
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  GestureDetector(
+                    onTap: onOpen,
+                    behavior: HitTestBehavior.opaque,
+                    child: Text(
+                      '查看详情',
+                      style: TextStyle(
+                        color: context.artC.ink.withValues(alpha: 0.74),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                  ),
+                  if (tab != _MarketBagTab.consulted) ...[
+                    const SizedBox(width: 18),
+                    GestureDetector(
+                      onTap: consulting ? null : onConsult,
+                      behavior: HitTestBehavior.opaque,
+                      child: Text(
+                        consulting ? '发起中' : '咨询',
+                        style: TextStyle(
+                          color: context.artC.ink.withValues(alpha: 0.54),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MarketConsultSheet extends StatefulWidget {
+  final _MarketListing item;
+
+  const _MarketConsultSheet({required this.item});
+
+  @override
+  State<_MarketConsultSheet> createState() => _MarketConsultSheetState();
+}
+
+class _MarketConsultSheetState extends State<_MarketConsultSheet> {
+  late final TextEditingController _message = TextEditingController(
+    text: '我想了解尺寸、库存、交付方式和是否可以继续沟通。',
+  );
+  String? _error;
+
+  @override
+  void dispose() {
+    _message.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final text = _message.text.trim();
+    if (text.isEmpty) {
+      setState(() => _error = '写一句想咨询什么');
+      return;
+    }
+    Navigator.of(context).pop(text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    final item = widget.item;
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottom),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 22, 24, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '咨询商品',
+              style: TextStyle(
+                color: context.artC.ink,
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              item.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: context.artC.ink,
+                fontSize: 15,
+                height: 1.35,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${item.author} · ${item.price}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: context.artC.ink.withValues(alpha: 0.38),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0,
+              ),
+            ),
+            const SizedBox(height: 22),
+            Container(
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    color: context.artC.silver.withValues(alpha: 0.55),
+                    width: 0.8,
+                  ),
+                ),
+              ),
+              child: TextField(
+                controller: _message,
+                minLines: 3,
+                maxLines: 5,
+                autofocus: true,
+                cursorColor: context.artC.ink,
+                style: TextStyle(
+                  color: context.artC.ink,
+                  fontSize: 14,
+                  height: 1.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0,
+                ),
+                decoration: InputDecoration(
+                  border: InputBorder.none,
+                  hintText: '写下你想确认的尺寸、版本、库存或交付方式',
+                  hintStyle: TextStyle(
+                    color: context.artC.ink.withValues(alpha: 0.28),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                style: const TextStyle(
+                  color: Color(0xFF9F2A2A),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0,
+                ),
+              ),
+            ],
+            const SizedBox(height: 22),
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: TextButton(
+                onPressed: _submit,
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  backgroundColor: context.artC.ink,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+                child: const Text(
+                  '发送咨询',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _marketConsultMessage(_MarketListing item, String message) {
+  final note = message.trim();
+  return [
+    '你好，我在市集看到「${item.title}」，想咨询一下。',
+    '',
+    '我的问题：$note',
+    '',
+    '商品信息：${item.category} · ${item.price} · ${item.city}',
+  ].join('\n');
+}
+
+bool _isQuotedMarketPrice(String price) {
+  final raw = price.trim().toLowerCase();
+  if (raw.isEmpty) return true;
+  return !RegExp(r'\d').hasMatch(raw) ||
+      raw.contains('~') ||
+      raw.contains('-') ||
+      raw.contains('起') ||
+      raw.contains('报价') ||
+      raw.contains('议价') ||
+      raw.contains('沟通') ||
+      raw.contains('委托') ||
+      raw.contains('custom');
+}
+
+int? _marketPriceAmountTotal(String price) {
+  final raw = price.trim().replaceAll(',', '');
+  if (_isQuotedMarketPrice(raw)) return null;
+  final match = RegExp(r'(\d+(?:\.\d{1,2})?)').firstMatch(raw);
+  if (match == null) return null;
+  final amount = double.tryParse(match.group(1)!);
+  if (amount == null || amount <= 0) return null;
+  return (amount * 100).round();
+}
+
 class CommunityCircleSurface extends StatefulWidget {
   final double bottom;
   final String searchKeyword;
@@ -2012,8 +4287,8 @@ class _QaCommunityTabState extends State<_QaCommunityTab> {
     (
       title: '艺术市场',
       count: '收藏 / 展览',
-      color: Color(0xFFFFF7ED),
-      text: Color(0xFFEA580C)
+      color: Color(0xFFF6F8FC),
+      text: Color(0xFF001D51)
     ),
   ];
 
@@ -2726,8 +5001,14 @@ class _CircleTabState extends State<_CircleTab> {
             title: _selectedFilter == '已加入' ? '你还没有加入圈子' : '没有匹配的圈子',
             subtitle: _selectedFilter == '已加入'
                 ? '先从推荐、留学或作品集方向选择一个圈子加入。'
-                : '换个专业方向、学校或城市关键词试试，也可以创建一个新圈子。',
-            actionLabel: _selectedFilter == '已加入' ? '去推荐' : '创建圈子',
+                : widget.onCreateCircle == null
+                    ? '换个专业方向、学校或城市关键词试试。'
+                    : '换个专业方向、学校或城市关键词试试，也可以创建一个新圈子。',
+            actionLabel: _selectedFilter == '已加入'
+                ? '去推荐'
+                : widget.onCreateCircle == null
+                    ? '重试'
+                    : '创建圈子',
             onRetry: () {
               if (_selectedFilter == '已加入') {
                 setState(() => _selectedFilter = '推荐');
@@ -3432,47 +5713,49 @@ class _ChatTabState extends State<_ChatTab> {
     final circleCount = _items.where(_conversationIsCircle).length;
 
     return ListView(
-      padding: EdgeInsets.fromLTRB(20, 8, 20, widget.bottom + 32),
+      padding: EdgeInsets.fromLTRB(0, 10, 0, widget.bottom + 32),
       children: [
-        _MessageQuickEntryRow(
-          interactionCount: unreadCount,
-          cooperationCount: cooperationCount,
-          circleCount: circleCount,
-          onInteractionTap: () => _showMessageCategoryHint(
-            '互动通知会聚合赞、收藏、评论和 @，后续会从作品动态和圈子同步到这里。',
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
+          child: _MessageQuickEntryRow(
+            interactionCount: unreadCount,
+            cooperationCount: cooperationCount,
+            circleCount: circleCount,
+            onInteractionTap: () => _showMessageCategoryHint(
+              '互动通知会聚合赞、收藏、评论和 @，后续会从作品动态和圈子同步到这里。',
+            ),
+            onCooperationTap: () => setState(() => _selectedFilter = '合作'),
+            onCircleTap: () => setState(() => _selectedFilter = '圈子'),
           ),
-          onCooperationTap: () => setState(() => _selectedFilter = '合作'),
-          onCircleTap: () => setState(() => _selectedFilter = '圈子'),
         ),
-        const SizedBox(height: 26),
         if (visibleItems.isEmpty)
-          _CommunityEmptyState(
-            icon: Icons.mark_chat_unread_outlined,
-            title: widget.searchKeyword.isNotEmpty
-                ? '没有匹配的消息'
-                : isFiltered
-                    ? '暂无$_selectedFilter消息'
-                    : '暂无消息',
-            subtitle: widget.searchKeyword.isNotEmpty
-                ? '换个联系人、合作或通知关键词试试。'
-                : isFiltered
-                    ? '切回全部，或等待新的$_selectedFilter消息。'
-                    : '新的互动、合作邀约、圈子回复和私信会显示在这里。',
-            actionLabel:
-                widget.searchKeyword.isEmpty && isFiltered ? '查看全部' : '刷新消息',
-            onRetry: widget.searchKeyword.isEmpty && isFiltered
-                ? () => setState(() => _selectedFilter = '全部')
-                : _refreshAll,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: _CommunityEmptyState(
+              icon: Icons.mark_chat_unread_outlined,
+              title: widget.searchKeyword.isNotEmpty
+                  ? '没有匹配的消息'
+                  : isFiltered
+                      ? '暂无$_selectedFilter消息'
+                      : '暂无消息',
+              subtitle: widget.searchKeyword.isNotEmpty
+                  ? '换个联系人、合作或通知关键词试试。'
+                  : isFiltered
+                      ? '切回全部，或等待新的$_selectedFilter消息。'
+                      : '新的互动、合作邀约、圈子回复和私信会显示在这里。',
+              actionLabel:
+                  widget.searchKeyword.isEmpty && isFiltered ? '查看全部' : '刷新消息',
+              onRetry: widget.searchKeyword.isEmpty && isFiltered
+                  ? () => setState(() => _selectedFilter = '全部')
+                  : _refreshAll,
+            ),
           )
         else
           ...visibleItems.asMap().entries.map(
-                (entry) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _ChatCard(
-                    conversation: entry.value,
-                    index: entry.key,
-                    onTap: () => _openConversation(entry.value),
-                  ),
+                (entry) => _ChatCard(
+                  conversation: entry.value,
+                  index: entry.key,
+                  onTap: () => _openConversation(entry.value),
                 ),
               ),
       ],
@@ -3512,8 +5795,8 @@ class _MessageQuickEntryRow extends StatelessWidget {
             icon: Icons.favorite_rounded,
             label: '互动',
             count: interactionCount,
-            color: const Color(0xFFFF5A5F),
-            background: const Color(0xFFFFECEE),
+            color: kCobalt,
+            background: kCobalt.withValues(alpha: 0.08),
             onTap: onInteractionTap,
           ),
         ),
@@ -3524,7 +5807,7 @@ class _MessageQuickEntryRow extends StatelessWidget {
             label: '合作',
             count: cooperationCount,
             color: kCobalt,
-            background: const Color(0xFFEAF1FF),
+            background: kCobalt.withValues(alpha: 0.08),
             onTap: onCooperationTap,
           ),
         ),
@@ -3534,8 +5817,8 @@ class _MessageQuickEntryRow extends StatelessWidget {
             icon: Icons.forum_rounded,
             label: '圈子',
             count: circleCount,
-            color: const Color(0xFF21C997),
-            background: const Color(0xFFE8FBF4),
+            color: kCobalt,
+            background: kCobalt.withValues(alpha: 0.08),
             onTap: onCircleTap,
           ),
         ),
@@ -3564,7 +5847,7 @@ class _MessageQuickEntry extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(18),
       onTap: onTap,
       child: Column(
         children: [
@@ -3576,7 +5859,7 @@ class _MessageQuickEntry extends StatelessWidget {
                 height: 48,
                 decoration: BoxDecoration(
                   color: background,
-                  borderRadius: BorderRadius.circular(16),
+                  shape: BoxShape.circle,
                 ),
                 child: Icon(icon, color: color, size: 24),
               ),
@@ -3589,9 +5872,9 @@ class _MessageQuickEntry extends StatelessWidget {
                         const BoxConstraints(minWidth: 16, minHeight: 16),
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFF2D55),
-                      borderRadius: BorderRadius.circular(999),
+                      color: kCobalt,
                       border: Border.all(color: Colors.white, width: 1.8),
+                      borderRadius: BorderRadius.circular(999),
                     ),
                     alignment: Alignment.center,
                     child: Text(
@@ -5968,11 +8251,10 @@ class _PillFilterRow extends StatelessWidget {
                     vertical: 9,
                   ),
                   decoration: BoxDecoration(
-                    color: selected == value ? context.artC.ink : Colors.white,
+                    color: selected == value
+                        ? context.artC.ink
+                        : context.artC.silver.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: context.artC.silver.withValues(alpha: 0.4),
-                    ),
                   ),
                   child: Text(
                     value,
@@ -6393,7 +8675,7 @@ class CircleDetailScreen extends StatefulWidget {
 
 class _CircleDetailScreenState extends State<CircleDetailScreen> {
   late String _joinStatus = widget.joinStatus;
-  String _selectedSection = '动态';
+  String _selectedSection = '概览';
   final List<({String type, String title, String meta})> _localPosts = [];
   final List<({String type, String title, String meta})> _localQuestions = [];
 
@@ -6477,6 +8759,15 @@ class _CircleDetailScreenState extends State<CircleDetailScreen> {
   }
 
   List<Widget> _buildSectionItems() {
+    if (_selectedSection == '概览') {
+      return [
+        _CircleOverviewSection(
+          circle: widget.circle,
+          index: widget.index,
+          joinStatus: _joinStatus,
+        ),
+      ];
+    }
     final items = switch (_selectedSection) {
       '问答' => [
           ..._localQuestions,
@@ -6622,6 +8913,289 @@ class _CircleDetailScreenState extends State<CircleDetailScreen> {
     });
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('问题已发布，也会进入问答流')),
+    );
+  }
+}
+
+class _CircleOverviewSection extends StatelessWidget {
+  final Map<String, dynamic> circle;
+  final int index;
+  final String joinStatus;
+
+  const _CircleOverviewSection({
+    required this.circle,
+    required this.index,
+    required this.joinStatus,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final title = circle['title']?.toString() ?? '艺术圈子';
+    final subtitle = circle['subtitle']?.toString().isNotEmpty == true
+        ? circle['subtitle'].toString()
+        : circle['category']?.toString() ?? '这个圈子的定位还在完善';
+    final members = circle['member_count'] ?? (index + 1) * 128;
+    final discussions =
+        int.tryParse(circle['today_post_count']?.toString() ?? '') ??
+            (8 + index * 5);
+    final joinType = _circleJoinType(circle, index);
+    final tags = _circleTags(circle, index);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: [
+              BoxShadow(
+                color: context.artC.ink.withValues(alpha: 0.035),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '圈子概览',
+                style: TextStyle(
+                  color: context.artC.ink,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0,
+                ),
+              ),
+              const SizedBox(height: 7),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  color: context.artC.ink.withValues(alpha: 0.52),
+                  fontSize: 12,
+                  height: 1.45,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: _CircleOverviewMetric(
+                      label: '成员',
+                      value: '$members',
+                      icon: Icons.people_outline,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _CircleOverviewMetric(
+                      label: '今日动态',
+                      value: '$discussions',
+                      icon: Icons.bolt_outlined,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _CircleOverviewMetric(
+                      label: '加入方式',
+                      value: joinType == 'approval'
+                          ? '审核'
+                          : joinType == 'private'
+                              ? '私密'
+                              : '开放',
+                      icon: Icons.verified_user_outlined,
+                    ),
+                  ),
+                ],
+              ),
+              if (tags.isNotEmpty) ...[
+                const SizedBox(height: 13),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: tags.map((tag) => _MiniTag(label: tag)).toList(),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: kCobalt.withValues(alpha: 0.07),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.local_fire_department_outlined,
+                    color: kCobalt,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '正在聊：${_circleHotTopic(circle, index)}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: kCobalt,
+                        fontSize: 12.5,
+                        height: 1.35,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                _circleAnnouncementText(circle, index),
+                style: TextStyle(
+                  color: context.artC.ink.withValues(alpha: 0.56),
+                  fontSize: 11.5,
+                  height: 1.45,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: context.artC.silver.withValues(alpha: 0.16),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                joinStatus == 'joined' ? '你可以在这里做什么' : '加入前可以先了解',
+                style: TextStyle(
+                  color: context.artC.ink,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0,
+                ),
+              ),
+              const SizedBox(height: 10),
+              _CircleOverviewLine(
+                icon: Icons.chat_bubble_outline_rounded,
+                text: '看圈内动态，了解$title最近的讨论方向。',
+              ),
+              _CircleOverviewLine(
+                icon: Icons.help_outline,
+                text: '把具体问题发到问答，方便同方向成员集中回答。',
+              ),
+              _CircleOverviewLine(
+                icon: Icons.event_available_outlined,
+                text: '关注活动、互评和资源交换，不错过重要节点。',
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CircleOverviewMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+
+  const _CircleOverviewMetric({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(
+        color: context.artC.silver.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: kCobalt, size: 17),
+          const SizedBox(height: 7),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: context.artC.ink,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: context.artC.ink.withValues(alpha: 0.42),
+              fontSize: 9,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CircleOverviewLine extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _CircleOverviewLine({
+    required this.icon,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: kCobalt, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: context.artC.ink.withValues(alpha: 0.54),
+                fontSize: 11.2,
+                height: 1.38,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -7091,7 +9665,8 @@ class _CircleBottomAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = background ?? (dark ? context.artC.ink : Colors.white);
+    final bg = background ??
+        (dark ? context.artC.ink : context.artC.silver.withValues(alpha: 0.22));
     final fg = foreground ?? (dark ? Colors.white : context.artC.ink);
     return GestureDetector(
       onTap: onTap,
@@ -7102,10 +9677,7 @@ class _CircleBottomAction extends StatelessWidget {
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(17),
-          border: Border.all(
-            color: borderColor ??
-                (dark ? bg : context.artC.silver.withValues(alpha: 0.45)),
-          ),
+          border: borderColor == null ? null : Border.all(color: borderColor!),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -7188,7 +9760,7 @@ class _CircleDetailTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const values = ['动态', '问答', '活动'];
+    const values = ['概览', '动态', '问答', '活动'];
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
@@ -7324,9 +9896,8 @@ _CircleActionStyle _circleActionStyle(
   if (status == 'joined') {
     return _CircleActionStyle(
       label: '进入',
-      background: Colors.white,
+      background: context.artC.silver.withOpacity(0.28),
       foreground: context.artC.ink,
-      borderColor: context.artC.silver.withOpacity(0.55),
     );
   }
   if (status == 'pending') {
@@ -8950,19 +11521,23 @@ class _ChatCard extends StatelessWidget {
         : _conversationPersonIdentityLabel(conversation);
 
     return InkWell(
-      borderRadius: BorderRadius.circular(8),
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 9),
+      child: Container(
+        decoration: const BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: Color(0xFFE9EDEF), width: 0.8),
+          ),
+        ),
+        padding: const EdgeInsets.fromLTRB(18, 10, 14, 10),
         child: Row(
           children: [
             Stack(
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(28),
+                  borderRadius: BorderRadius.circular(27),
                   child: SizedBox(
-                    width: 56,
-                    height: 56,
+                    width: 54,
+                    height: 54,
                     child: avatarUrl != null && avatarUrl.isNotEmpty
                         ? Image.network(
                             avatarUrl,
@@ -8980,7 +11555,7 @@ class _ChatCard extends StatelessWidget {
                     width: 13,
                     height: 13,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF22C55E),
+                      color: kCobalt,
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 3),
                     ),
@@ -8988,7 +11563,7 @@ class _ChatCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -9001,9 +11576,10 @@ class _ChatCard extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: context.artC.ink,
+                            color: const Color(0xFF111B21),
                             fontSize: 16,
-                            fontWeight: FontWeight.w900,
+                            fontWeight:
+                                unread > 0 ? FontWeight.w900 : FontWeight.w800,
                             letterSpacing: 0,
                           ),
                         ),
@@ -9012,9 +11588,10 @@ class _ChatCard extends StatelessWidget {
                       Text(
                         time,
                         style: TextStyle(
-                          color: context.artC.ink.withValues(alpha: 0.34),
+                          color: unread > 0 ? _whatsAppAccent : _whatsAppMuted,
                           fontSize: 12,
-                          fontWeight: FontWeight.w900,
+                          fontWeight:
+                              unread > 0 ? FontWeight.w900 : FontWeight.w700,
                         ),
                       ),
                     ],
@@ -9030,20 +11607,34 @@ class _ChatCard extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: context.artC.ink.withValues(alpha: 0.42),
+                            color: _whatsAppMuted,
                             fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
+                            fontWeight:
+                                unread > 0 ? FontWeight.w900 : FontWeight.w700,
                           ),
                         ),
                       ),
                       if (unread > 0)
                         Container(
-                          width: 9,
-                          height: 9,
+                          constraints: const BoxConstraints(
+                            minWidth: 20,
+                            minHeight: 20,
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 5),
                           alignment: Alignment.center,
                           decoration: const BoxDecoration(
-                            color: Color(0xFFFF2D55),
-                            shape: BoxShape.circle,
+                            color: _whatsAppAccent,
+                            borderRadius: BorderRadius.all(
+                              Radius.circular(999),
+                            ),
+                          ),
+                          child: Text(
+                            unread > 99 ? '99+' : '$unread',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
                         ),
                     ],
@@ -9089,20 +11680,22 @@ class _ChatAvatarFallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = [
-      kCobalt,
-      context.artC.ink,
-      const Color(0xFF7C3AED),
-      const Color(0xFF0F9F7A),
+      _whatsAppGreen,
+      kCobaltMuted,
+      const Color(0xFFE8EEF7),
+      const Color(0xFFF2F5FA),
     ];
     final color = colors[seed % colors.length];
+    final foreground =
+        color == kCobalt ? Colors.white : kCobalt.withValues(alpha: 0.86);
     return Container(
       width: 54,
       height: 54,
       alignment: Alignment.center,
-      color: color.withOpacity(0.1),
+      color: color == kCobalt ? kCobalt : color,
       child: Icon(
         org ? Icons.storefront_outlined : Icons.person_outline,
-        color: color,
+        color: foreground,
         size: 24,
       ),
     );
@@ -9122,8 +11715,8 @@ class _ChatIdentityTag extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color:
-              (org ? const Color(0xFF047857) : kCobalt).withValues(alpha: 0.08),
+          color: (org ? _whatsAppGreen : _whatsAppGreenLight)
+              .withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(999),
         ),
         child: Text(
@@ -9131,7 +11724,7 @@ class _ChatIdentityTag extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            color: org ? const Color(0xFF047857) : kCobalt,
+            color: org ? _whatsAppGreen : _whatsAppGreenLight,
             fontSize: 10,
             fontWeight: FontWeight.w900,
           ),

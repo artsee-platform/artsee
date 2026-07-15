@@ -222,6 +222,51 @@ class BackendApiService {
         .toList();
   }
 
+  static Future<List<AppCommunityPost>> fetchPlazaPosts({
+    int limit = 20,
+    int offset = 0,
+    String? kind,
+    String? group,
+    String? source,
+    String sort = 'latest',
+  }) async {
+    final decoded = await _requestJson(
+      'GET',
+      '/api/v1/plaza/feed',
+      withAuth: true,
+      query: _params(
+        limit: limit,
+        offset: offset,
+        extra: {
+          'kind': kind,
+          'group': group,
+          'source': source,
+          'sort': sort,
+        },
+      ),
+    );
+    final list = decoded['data'] as List<dynamic>? ?? [];
+    return list
+        .map((e) => AppCommunityPost.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  static Future<AppCommunityPost?> fetchPlazaPost(String id) async {
+    try {
+      final decoded = await _requestJson(
+        'GET',
+        '/api/v1/plaza/posts/$id',
+        withAuth: true,
+      );
+      return AppCommunityPost.fromJson(
+        decoded['data'] as Map<String, dynamic>,
+      );
+    } on Exception catch (e) {
+      if (e.toString().contains('未找到')) return null;
+      rethrow;
+    }
+  }
+
   static Future<List<AppCommunityPost>> fetchSavedCommunityPosts({
     int limit = 20,
     int offset = 0,
@@ -441,6 +486,37 @@ class BackendApiService {
     }
     return AppCommunityComment.fromJson(
         decoded['data'] as Map<String, dynamic>);
+  }
+
+  static Future<
+      ({
+        AppCommunityComment comment,
+        AppCommunityComment? aiReply,
+      })> createPlazaComment({
+    required String postId,
+    required String body,
+    String? parentId,
+    Map<String, dynamic>? metadata,
+  }) async {
+    final decoded = await _requestJson(
+      'POST',
+      '/api/v1/plaza/posts/$postId/comments',
+      withAuth: true,
+      body: {
+        'body': body,
+        if (parentId != null) 'parent_id': parentId,
+        if (metadata != null) 'metadata': metadata,
+      },
+    );
+    final rawAiReply = decoded['ai_reply'];
+    return (
+      comment: AppCommunityComment.fromJson(
+        decoded['data'] as Map<String, dynamic>,
+      ),
+      aiReply: rawAiReply is Map<String, dynamic>
+          ? AppCommunityComment.fromJson(rawAiReply)
+          : null,
+    );
   }
 
   static Future<List<AppProgram>> fetchPrograms(
@@ -1927,6 +2003,103 @@ class BackendApiService {
     return (decoded['data'] as Map<String, dynamic>? ?? {});
   }
 
+  static Future<Map<String, dynamic>> createPlazaPost({
+    required String title,
+    String? body,
+    List<String> imageUrls = const [],
+    String kind = 'article',
+    String? group,
+    List<String>? tags,
+    Map<String, dynamic>? metadata,
+  }) async {
+    final decoded = await _requestJson(
+      'POST',
+      '/api/v1/plaza/posts',
+      withAuth: true,
+      body: {
+        'title': title,
+        'body': body,
+        'image_urls': imageUrls,
+        'kind': kind,
+        if (group != null && group.trim().isNotEmpty) 'group': group.trim(),
+        if (tags != null) 'tags': tags,
+        if (metadata != null) 'metadata': metadata,
+      },
+    );
+    return (decoded['data'] as Map<String, dynamic>? ?? {});
+  }
+
+  static Future<
+      ({
+        List<Map<String, dynamic>> data,
+        int? count,
+        int limit,
+        int offset
+      })> fetchMarketplaceBag({
+    int limit = 50,
+    int offset = 0,
+    String? status,
+  }) async {
+    final decoded = await _requestJson(
+      'GET',
+      '/api/v1/marketplace/bag',
+      withAuth: true,
+      query: _params(
+        limit: limit,
+        offset: offset,
+        extra: {
+          'status': status,
+        },
+      ),
+    );
+    return _paginated(decoded, limit: limit, offset: offset);
+  }
+
+  static Future<Map<String, dynamic>> upsertMarketplaceBagItem({
+    required String listingPostId,
+    String? status,
+    bool? saved,
+    String? message,
+    String? conversationId,
+    String? orderId,
+    Map<String, dynamic>? metadata,
+  }) async {
+    final decoded = await _requestJson(
+      'POST',
+      '/api/v1/marketplace/bag',
+      withAuth: true,
+      body: {
+        'listing_post_id': listingPostId,
+        if (status != null) 'status': status,
+        if (saved != null) 'saved': saved,
+        if (message != null) 'message': message,
+        if (conversationId != null) 'conversation_id': conversationId,
+        if (orderId != null) 'order_id': orderId,
+        if (metadata != null) 'metadata': metadata,
+      },
+    );
+    return decoded['data'] as Map<String, dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> createMarketplaceOrder({
+    required String listingPostId,
+    int quantity = 1,
+    String? message,
+  }) async {
+    final decoded = await _requestJson(
+      'POST',
+      '/api/v1/marketplace/orders',
+      withAuth: true,
+      body: {
+        'listing_post_id': listingPostId,
+        'quantity': quantity,
+        if (message != null && message.trim().isNotEmpty)
+          'message': message.trim(),
+      },
+    );
+    return decoded['data'] as Map<String, dynamic>;
+  }
+
   static Future<
       ({
         List<Map<String, dynamic>> data,
@@ -2232,6 +2405,14 @@ class BackendApiService {
     if (r.statusCode != 200 || decoded['success'] != true) {
       throw Exception(decoded['error'] ?? '创建支付订单失败 ${r.statusCode}');
     }
+    return decoded['data'] as Map<String, dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> fetchPaymentProviders() async {
+    final decoded = await _requestJson(
+      'GET',
+      '/api/v1/payments/providers',
+    );
     return decoded['data'] as Map<String, dynamic>;
   }
 

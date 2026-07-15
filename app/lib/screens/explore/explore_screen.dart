@@ -6,6 +6,8 @@ import '../../utils/auth_gate.dart';
 import '../../widgets/artsee_ui.dart';
 import '../../widgets/common.dart';
 import '../community/community_post_detail_screen.dart';
+import '../events/event_feed_widgets.dart';
+import '../events/my_events_screen.dart';
 import '../forum/ask_question_screen.dart';
 import '../forum/forum_screen.dart';
 import '../profile/public_user_profile_screen.dart';
@@ -15,14 +17,12 @@ import 'package:artsee_app/theme/artsee_ui_colors.dart';
 
 class ExploreScreen extends StatefulWidget {
   final VoidCallback? onTabChanged;
-  final VoidCallback? onOpenDotChat;
-  final VoidCallback? onCreateCircle;
+  final VoidCallback? onCreateTap;
 
   const ExploreScreen({
     super.key,
     this.onTabChanged,
-    this.onOpenDotChat,
-    this.onCreateCircle,
+    this.onCreateTap,
   });
 
   @override
@@ -39,8 +39,8 @@ class ExploreScreenState extends State<ExploreScreen>
       GlobalKey<_ExhibitionTabState>();
   final GlobalKey<_CommunityFeedTabState> _feedKey =
       GlobalKey<_CommunityFeedTabState>();
-  final GlobalKey<CommunityCircleSurfaceState> _circleKey =
-      GlobalKey<CommunityCircleSurfaceState>();
+  final GlobalKey<MarketplaceSurfaceState> _marketKey =
+      GlobalKey<MarketplaceSurfaceState>();
   List<String> _searchKeywords = List.filled(
     _tabCount,
     '',
@@ -143,8 +143,16 @@ class ExploreScreenState extends State<ExploreScreen>
         0 => '搜索合作机会、艺术家、驻留、城市',
         1 => '搜索活动、展览、沙龙、讲座、城市',
         2 => '搜索作品、动态、作者、标签',
-        3 => '搜索问答、专业方向、学校社群',
+        3 => '搜索艺术品、工艺品、出版、定制',
         _ => '搜索发现资源',
+      };
+
+  String get _createTooltip => switch (_safeTabIndex) {
+        0 => '发布合作',
+        1 => '发布活动',
+        2 => '发布动态',
+        3 => '发布市集商品',
+        _ => '发布',
       };
 
   Future<void> openQuestionComposer({
@@ -178,7 +186,7 @@ class ExploreScreenState extends State<ExploreScreen>
       ),
     );
     if (!mounted || createdTitle == null) return;
-    _circleKey.currentState?.refresh();
+    _marketKey.currentState?.refresh();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('问题已发布，会推荐给相关方向用户')),
     );
@@ -274,13 +282,9 @@ class ExploreScreenState extends State<ExploreScreen>
         _feedKey.currentState?._load();
         break;
       case 3:
-        _circleKey.currentState?.refresh();
+        _marketKey.currentState?.refresh();
         break;
     }
-  }
-
-  void addCreatedCircle(Map<String, dynamic> circle) {
-    _circleKey.currentState?.addCreatedCircle(circle);
   }
 
   @override
@@ -289,47 +293,119 @@ class ExploreScreenState extends State<ExploreScreen>
     _ensureSearchKeywords();
     final bottom = mainTabBottomInset(context);
     return Scaffold(
-      backgroundColor: context.artC.porcelain,
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      backgroundColor: Colors.white,
+      body: Stack(
         children: [
-          _ExploreChannelHeader(
-            controller: _tabController,
-            selectedIndex: _safeTabIndex,
-            onTabSelected: _selectTab,
-            onCalendarTap: _openArtCalendar,
-            onSearchTap: _openSearchScreen,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _ExploreChannelHeader(
+                controller: _tabController,
+                selectedIndex: _safeTabIndex,
+                onTabSelected: _selectTab,
+                onCalendarTap: _openArtCalendar,
+                onSearchTap: _openSearchScreen,
+              ),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _CooperationTab(
+                      key: _cooperationKey,
+                      bottom: bottom,
+                      searchKeyword: _searchKeywordAt(0),
+                    ),
+                    _ExhibitionTab(
+                      key: _exhibitionKey,
+                      bottom: bottom,
+                      searchKeyword: _searchKeywordAt(1),
+                    ),
+                    _CommunityFeedTab(
+                      key: _feedKey,
+                      bottom: bottom,
+                      searchKeyword: _searchKeywordAt(2),
+                    ),
+                    MarketplaceSurface(
+                      key: _marketKey,
+                      bottom: bottom,
+                      searchKeyword: _searchKeywordAt(3),
+                      onCreateTap: widget.onCreateTap,
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _CooperationTab(
-                  key: _cooperationKey,
-                  bottom: bottom,
-                  searchKeyword: _searchKeywordAt(0),
-                ),
-                _ExhibitionTab(
-                  key: _exhibitionKey,
-                  bottom: bottom,
-                  searchKeyword: _searchKeywordAt(1),
-                ),
-                _CommunityFeedTab(
-                  key: _feedKey,
-                  bottom: bottom,
-                  searchKeyword: _searchKeywordAt(2),
-                ),
-                CommunityCircleSurface(
-                  key: _circleKey,
-                  bottom: bottom,
-                  searchKeyword: _searchKeywordAt(3),
-                  onCreateCircle: widget.onCreateCircle,
-                  onAsk: _openQuestionComposer,
-                ),
-              ],
+          if (widget.onCreateTap != null && _safeTabIndex != 2)
+            Positioned(
+              right: 20,
+              bottom: bottom + 10,
+              child: _ExploreCreateFab(
+                tooltip: _createTooltip,
+                onTap: widget.onCreateTap!,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExploreCreateFab extends StatefulWidget {
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const _ExploreCreateFab({
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  State<_ExploreCreateFab> createState() => _ExploreCreateFabState();
+}
+
+class _ExploreCreateFabState extends State<_ExploreCreateFab> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: widget.tooltip,
+      child: Semantics(
+        button: true,
+        label: widget.tooltip,
+        child: GestureDetector(
+          onTapDown: (_) => setState(() => _pressed = true),
+          onTapUp: (_) => setState(() => _pressed = false),
+          onTapCancel: () => setState(() => _pressed = false),
+          onTap: widget.onTap,
+          behavior: HitTestBehavior.opaque,
+          child: AnimatedScale(
+            scale: _pressed ? 0.92 : 1,
+            duration: const Duration(milliseconds: 120),
+            curve: Curves.easeOutCubic,
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: kCobalt,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: kCobalt.withValues(alpha: 0.22),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.add_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -488,7 +564,7 @@ class _CooperationRecommendTabState extends State<_CooperationRecommendTab> {
     );
 
     return ListView(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, widget.bottom + 88),
+      padding: EdgeInsets.fromLTRB(24, 8, 24, widget.bottom + 36),
       children: [
         if (feedItems.isEmpty)
           _EmptyPanel(
@@ -505,9 +581,9 @@ class _CooperationRecommendTabState extends State<_CooperationRecommendTab> {
             itemCount: feedItems.length,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
-              mainAxisExtent: 168,
+              crossAxisSpacing: 24,
+              mainAxisSpacing: 28,
+              mainAxisExtent: 188,
             ),
             itemBuilder: (context, index) {
               final feedItem = feedItems[index];
@@ -994,7 +1070,7 @@ class _OpportunityTabState extends State<_OpportunityTab> {
           _EmptyPanel(
             title: widget.searchKeyword.trim().isEmpty ? '暂无合作机会' : '没有匹配机会',
             subtitle: widget.searchKeyword.trim().isEmpty
-                ? '点击右上角 + 发布第一条机会。'
+                ? '点击右下角 + 发布第一条机会。'
                 : '换一个关键词，或发布新的合作机会。',
           )
         else
@@ -1121,7 +1197,7 @@ class _CommunityFeedTabState extends State<_CommunityFeedTab> {
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 crossAxisSpacing: 10,
-                mainAxisSpacing: 12,
+                mainAxisSpacing: 15,
                 mainAxisExtent: 252,
               ),
               itemBuilder: (context, index) {
@@ -1240,99 +1316,20 @@ class _CommunityFeedCard extends StatelessWidget {
             const Spacer(),
             Padding(
               padding: const EdgeInsets.fromLTRB(9, 7, 9, 9),
-              child: Row(
-                children: [
-                  _CommunityFeedAvatar(
-                    name: author,
-                    imageUrl: post.authorAvatarUrl,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      author,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: context.artC.ink.withValues(alpha: 0.48),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 5),
-                  Icon(
-                    post.likedByMe
-                        ? Icons.favorite_rounded
-                        : Icons.favorite_border_rounded,
-                    size: 13,
-                    color: post.likedByMe
-                        ? const Color(0xFFE64565)
-                        : context.artC.ink.withValues(alpha: 0.34),
-                  ),
-                  const SizedBox(width: 2),
-                  Text(
-                    _compactExploreCount(post.likeCount),
-                    style: TextStyle(
-                      color: context.artC.ink.withValues(alpha: 0.42),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
+              child: Text(
+                '$author · ${_compactExploreCount(post.likeCount)} likes',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: context.artC.ink.withValues(alpha: 0.32),
+                  fontSize: 9.5,
+                  height: 1.15,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0,
+                ),
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CommunityFeedAvatar extends StatelessWidget {
-  final String name;
-  final String? imageUrl;
-
-  const _CommunityFeedAvatar({
-    required this.name,
-    required this.imageUrl,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final initial = name.isEmpty ? '艺' : name.characters.first;
-    return ClipOval(
-      child: SizedBox(
-        width: 18,
-        height: 18,
-        child: imageUrl != null && imageUrl!.isNotEmpty
-            ? Image.network(
-                imageUrl!,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
-                    _CommunityFeedAvatarFallback(initial: initial),
-              )
-            : _CommunityFeedAvatarFallback(initial: initial),
-      ),
-    );
-  }
-}
-
-class _CommunityFeedAvatarFallback extends StatelessWidget {
-  final String initial;
-
-  const _CommunityFeedAvatarFallback({required this.initial});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: kCobalt.withValues(alpha: 0.12),
-      alignment: Alignment.center,
-      child: Text(
-        initial,
-        style: const TextStyle(
-          color: kCobalt,
-          fontSize: 10,
-          fontWeight: FontWeight.w900,
         ),
       ),
     );
@@ -1375,7 +1372,7 @@ class _CommunityFeedColorFallback extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = [
       (const Color(0xFFE7EEF8), const Color(0xFF4C6FFF)),
-      (const Color(0xFFF0ECE4), const Color(0xFF8A6F4D)),
+      (const Color(0xFFF6F8FC), const Color(0xFF001D51)),
       (const Color(0xFFE8F3EE), const Color(0xFF2F7D5E)),
       (const Color(0xFFF4E8EA), const Color(0xFFB94F68)),
     ];
@@ -1433,6 +1430,7 @@ class _ExhibitionTab extends StatefulWidget {
 
 class _ExhibitionTabState extends State<_ExhibitionTab> {
   List<Map<String, dynamic>> _items = const [];
+  List<Map<String, dynamic>> _myItems = const [];
   final Set<String> _appliedIds = {};
   String _quickFilter = '全部';
   bool _loading = true;
@@ -1454,9 +1452,32 @@ class _ExhibitionTabState extends State<_ExhibitionTab> {
         BackendApiService.fetchEvents(limit: 30),
         BackendApiService.fetchEvents(limit: 30, type: 'salon'),
       ]);
+      var myItems = <Map<String, dynamic>>[];
+      try {
+        final applications =
+            await BackendApiService.fetchMyEventApplications(limit: 30);
+        myItems = applications.data
+            .map(artseeEventFromApplication)
+            .whereType<Map<String, dynamic>>()
+            .toList();
+      } catch (_) {
+        myItems = const [];
+      }
+      final appliedIds = myItems
+          .map((event) => event['id']?.toString() ?? '')
+          .where((id) => id.isNotEmpty)
+          .toSet();
+      final events = _mergeEventLists([
+        myItems,
+        ...results.map((result) => result.data),
+      ]);
       if (!mounted) return;
       setState(() {
-        _items = _mergeEventLists(results.map((result) => result.data));
+        _items = events;
+        _myItems = myItems;
+        _appliedIds
+          ..clear()
+          ..addAll(appliedIds);
         _loading = false;
       });
     } catch (e) {
@@ -1482,7 +1503,18 @@ class _ExhibitionTabState extends State<_ExhibitionTab> {
         applyNote: '我想报名参加该活动。',
       );
       if (!mounted) return false;
-      setState(() => _appliedIds.add(id));
+      setState(() {
+        _appliedIds.add(id);
+        if (!_myItems.any((event) => event['id']?.toString() == id)) {
+          _myItems = [
+            {
+              ...item,
+              'application_status': 'pending',
+            },
+            ..._myItems,
+          ];
+        }
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('报名已提交，活动通知会进入私信/预约记录')),
       );
@@ -1597,6 +1629,16 @@ class _ExhibitionTabState extends State<_ExhibitionTab> {
     );
   }
 
+  Future<void> _openMyEvents() async {
+    if (!await ensureLoggedIn(context, message: '请先登录后查看你的活动')) {
+      return;
+    }
+    if (!mounted) return;
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => const MyEventsScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) return _LoadingState(bottom: widget.bottom);
@@ -1611,34 +1653,51 @@ class _ExhibitionTabState extends State<_ExhibitionTab> {
     final visibleItems = _filterMaps(_items, widget.searchKeyword)
         .where((item) => _matchesExhibitionQuickFilter(item, _quickFilter))
         .toList();
+    visibleItems.sort(compareArtseeEventsByStart);
+    final personalItems = _myItems.isNotEmpty
+        ? _myItems
+        : _items
+            .where((item) => _appliedIds.contains(item['id']?.toString()))
+            .toList();
+    final groups = groupArtseeEventsByDay(visibleItems);
+    const filters = ['全部', '展览', '沙龙', '讲座', '工作坊', '开放日', '说明会'];
     return ListView(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, widget.bottom + 88),
+      padding: EdgeInsets.fromLTRB(20, 2, 20, widget.bottom + 88),
       children: [
-        _FilterHintBar(
-          chips: const ['全部', '展览', '沙龙', '讲座', '工作坊', '开放日', '说明会'],
-          selected: _quickFilter,
+        ArtseeActivityPersonalSection(
+          events: personalItems,
+          onOpen: _openDetail,
+          onOpenAll: _openMyEvents,
+        ),
+        const SizedBox(height: 22),
+        ArtseeActivityRecommendationHeader(
+          filterLabel: _quickFilter == '全部' ? '附近' : _quickFilter,
+          selectedFilter: _quickFilter,
+          filters: filters,
           onSelected: (filter) => setState(() => _quickFilter = filter),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
         if (visibleItems.isEmpty)
-          _EmptyPanel(
+          ArtseeActivityFeedEmpty(
             title: widget.searchKeyword.trim().isEmpty ? '暂无展览活动' : '没有匹配活动',
             subtitle: widget.searchKeyword.trim().isEmpty
-                ? '点击右上角 + 发布展览、沙龙或工作坊。'
+                ? '点击右下角 + 发布展览、沙龙或工作坊。'
                 : '换一个关键词，或发布新的活动。',
           )
-        else
-          ...visibleItems.map(
-            (item) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _ExhibitionCard(
-                item: item,
-                applied: _appliedIds.contains(item['id'].toString()),
-                onOpen: () => _openDetail(item),
-                onApply: () => _apply(item),
-              ),
+        else ...[
+          ArtseeActivitySponsoredSlot(
+            event: visibleItems.first,
+            onOpen: () => _openDetail(visibleItems.first),
+          ),
+          const SizedBox(height: 18),
+          ...groups.map(
+            (group) => ArtseeActivityDateSection(
+              group: group,
+              appliedIds: _appliedIds,
+              onOpen: _openDetail,
             ),
           ),
+        ],
       ],
     );
   }
@@ -1850,7 +1909,7 @@ class _ExploreChannelHeader extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: context.artC.cardIconBg,
+        color: Colors.white,
         border: Border(
           bottom: BorderSide(color: dividerColor),
         ),
@@ -2158,7 +2217,7 @@ class _ArtCalendarDrawerState extends State<_ArtCalendarDrawer> {
                               const SizedBox(height: 18),
                               _CalendarSectionTitle(
                                 title:
-                                    selectedEvents.isEmpty ? '近期可参加' : '当天活动',
+                                    selectedEvents.isEmpty ? '可参加活动' : '当天安排',
                                 action: '${fallbackEvents.length} 场',
                               ),
                               const SizedBox(height: 10),
@@ -2185,7 +2244,7 @@ class _ArtCalendarDrawerState extends State<_ArtCalendarDrawer> {
                               const SizedBox(height: 10),
                               _CalendarReminderTile(
                                 icon: Icons.how_to_reg_outlined,
-                                title: '已报名待确认',
+                                title: '活动确认 / 签到',
                                 subtitle: _myEvents.isEmpty
                                     ? '报名活动后会在这里显示确认和签到提醒'
                                     : '${_myEvents.length} 场活动可查看报名状态',
@@ -2195,37 +2254,17 @@ class _ArtCalendarDrawerState extends State<_ArtCalendarDrawer> {
                                 title: '合作机会截止',
                                 subtitle: '后续会同步你收藏或申请的合作截止日期',
                               ),
-                              _CalendarReminderTile(
-                                icon: Icons.forum_outlined,
-                                title: '圈子问答回复',
-                                subtitle: '你的提问、回答和圈子活动提醒会聚合到这里',
-                              ),
                               const SizedBox(height: 24),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _CalendarBottomAction(
-                                      icon: Icons.add_rounded,
-                                      label: '发布活动',
-                                      onTap: widget.onOpenActivities,
+                              _CalendarBottomAction(
+                                icon: Icons.qr_code_scanner_rounded,
+                                label: '扫码签到',
+                                onTap: () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('活动签到会接入扫一扫'),
                                     ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: _CalendarBottomAction(
-                                      icon: Icons.qr_code_scanner_rounded,
-                                      label: '扫码签到',
-                                      onTap: () {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          const SnackBar(
-                                            content: Text('活动签到会接入扫一扫'),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                ],
+                                  );
+                                },
                               ),
                             ],
                           );
@@ -2322,9 +2361,9 @@ class _CalendarSummaryCard extends StatelessWidget {
       radius: 18,
       child: Row(
         children: [
-          _CalendarMetric(label: '今天', value: '$todayCount'),
+          _CalendarMetric(label: '今日', value: '$todayCount'),
           _CalendarMetric(label: '本周', value: '$weekCount'),
-          _CalendarMetric(label: '我的', value: '$myCount'),
+          _CalendarMetric(label: '已报名', value: '$myCount'),
         ],
       ),
     );
@@ -2616,24 +2655,28 @@ class _CalendarBottomAction extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        height: 70,
+        height: 56,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: kCobalt,
           borderRadius: BorderRadius.circular(16),
-          border:
-              Border.all(color: context.artC.silver.withValues(alpha: 0.28)),
+          boxShadow: [
+            BoxShadow(
+              color: kCobalt.withValues(alpha: 0.2),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
-        child: Column(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon,
-                color: context.artC.ink.withValues(alpha: 0.72), size: 22),
-            const SizedBox(height: 6),
+            Icon(icon, color: Colors.white, size: 20),
+            const SizedBox(width: 8),
             Text(
               label,
-              style: TextStyle(
-                color: context.artC.ink.withValues(alpha: 0.56),
-                fontSize: 11,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -2661,7 +2704,7 @@ class _CalendarEmptyPanel extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              '暂无活动，去活动页看看展览、沙龙、讲座和开放日。',
+              '暂无近期活动，去活动页看看展览、沙龙和开放日。',
               style: TextStyle(
                 color: context.artC.ink.withValues(alpha: 0.56),
                 fontSize: 12,
@@ -2736,8 +2779,8 @@ class _ExploreChannelTabs extends StatelessWidget {
     required this.onTabSelected,
   });
 
-  static const _labels = ['合作', '活动', '动态', '问答'];
-  static const _accent = Color(0xFFE64565);
+  static const _labels = ['合作', '活动', '动态', '市集'];
+  static const _accent = kCobalt;
 
   @override
   Widget build(BuildContext context) {
@@ -2841,67 +2884,80 @@ class _CompactOpportunityCard extends StatelessWidget {
       budget,
     ].where((item) => item.trim().isNotEmpty).join(' · ');
 
-    return ArtseeSurface(
-      onTap: onOpen,
-      padding: const EdgeInsets.all(12),
-      radius: 8,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onOpen,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _MiniBadge(text: typeLabel, color: kCobalt),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  deadlineText,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.right,
-                  style: TextStyle(
-                    color: _deadlineColor(deadline, context),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      typeLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: context.artC.ink.withValues(alpha: 0.46),
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0,
+                      ),
+                    ),
                   ),
+                  const SizedBox(width: 8),
+                  Text(
+                    deadlineText,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      color: _deadlineColor(deadline, context),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: Text(
+                    title,
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: context.artC.ink,
+                      fontSize: 16,
+                      height: 1.22,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                meta.isEmpty ? '详情待补充' : meta,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: context.artC.ink.withValues(alpha: 0.42),
+                  fontSize: 11,
+                  height: 1.35,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0,
                 ),
               ),
             ],
           ),
-          Expanded(
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                title,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: context.artC.ink,
-                  fontSize: 15,
-                  height: 1.18,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-          ),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
-            decoration: BoxDecoration(
-              color: context.artC.silver.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              meta.isEmpty ? '详情待补充' : meta,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: context.artC.ink.withValues(alpha: 0.42),
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -3096,177 +3152,6 @@ class _CooperationMetaLine extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _ExhibitionCard extends StatelessWidget {
-  final Map<String, dynamic> item;
-  final bool applied;
-  final VoidCallback onOpen;
-  final VoidCallback onApply;
-
-  const _ExhibitionCard({
-    required this.item,
-    required this.applied,
-    required this.onOpen,
-    required this.onApply,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final title = item['title']?.toString() ?? '未命名活动';
-    final subtitle = item['summary']?.toString() ??
-        item['venue']?.toString() ??
-        item['hotel_name']?.toString() ??
-        '艺术活动';
-    final date = DateTime.tryParse(item['start_time']?.toString() ?? '');
-    final month = date == null ? '--' : _monthLabel(date.month);
-    final day = date == null ? '--' : date.day.toString().padLeft(2, '0');
-    final city = item['city']?.toString();
-    final venue = item['venue']?.toString();
-    final fee = _formatEventFee(item['fee_amount']);
-    final typeLabel = _eventTypeLabel(item);
-    return ArtseeSurface(
-      onTap: onOpen,
-      padding: const EdgeInsets.all(15),
-      radius: 18,
-      child: Row(
-        children: [
-          Container(
-            width: 64,
-            height: 78,
-            decoration: BoxDecoration(
-              color: context.artC.silver.withOpacity(0.24),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  month,
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w900,
-                    color: context.artC.ink.withOpacity(0.38),
-                  ),
-                ),
-                Text(
-                  day,
-                  style: const TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w900,
-                    color: kCobalt,
-                    fontFamily: 'Noto Serif SC',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                    color: context.artC.ink,
-                    height: 1.25,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: context.artC.ink.withOpacity(0.36),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    _MiniBadge(text: typeLabel, color: kCobalt),
-                    const SizedBox(width: 8),
-                    Icon(Icons.location_on_outlined,
-                        size: 11, color: context.artC.ink.withOpacity(0.38)),
-                    const SizedBox(width: 3),
-                    Expanded(
-                      child: Text(
-                        [
-                          if (city != null && city.isNotEmpty) city,
-                          if (venue != null && venue.isNotEmpty) venue,
-                        ].join(' · ').isEmpty
-                            ? '待定'
-                            : [
-                                if (city != null && city.isNotEmpty) city,
-                                if (venue != null && venue.isNotEmpty) venue,
-                              ].join(' · '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: context.artC.ink.withOpacity(0.48),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        fee,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: context.artC.ink.withOpacity(0.58),
-                        ),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: applied ? onOpen : onApply,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: applied
-                              ? context.artC.silver.withOpacity(0.2)
-                              : kCobalt,
-                          borderRadius: BorderRadius.circular(999),
-                          border: applied
-                              ? Border.all(
-                                  color: context.artC.silver.withOpacity(0.6))
-                              : null,
-                        ),
-                        child: Text(
-                          applied ? '已报名' : '报名',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: applied
-                                ? context.artC.ink.withOpacity(0.65)
-                                : Colors.white,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -3501,99 +3386,101 @@ class _CompactArtistCard extends StatelessWidget {
       if ((city == null || city.isEmpty) && fields.isEmpty) handle,
     ].join(' · ');
 
-    return ArtseeSurface(
-      onTap: () => _openArtistProfile(context, artist),
-      padding: const EdgeInsets.all(12),
-      radius: 8,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Center(
-              child: Row(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _openArtistProfile(context, artist),
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const SizedBox(height: 4),
+              _ArtistAvatar(name: name, avatarUrl: avatarUrl, size: 66),
+              const SizedBox(height: 13),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _ArtistAvatar(name: name, avatarUrl: avatarUrl, size: 46),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: context.artC.ink,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ),
-                            if (isCertified) ...[
-                              const SizedBox(width: 4),
-                              const Icon(
-                                Icons.verified_rounded,
-                                color: kCobalt,
-                                size: 14,
-                              ),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          subtitle.isEmpty ? handle : subtitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: context.artC.ink.withValues(alpha: 0.42),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
+                  Flexible(
+                    child: Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: context.artC.ink,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0,
+                      ),
                     ),
                   ),
+                  if (isCertified) ...[
+                    const SizedBox(width: 4),
+                    const Icon(
+                      Icons.verified_rounded,
+                      color: kCobalt,
+                      size: 14,
+                    ),
+                  ],
                 ],
               ),
-            ),
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: _cooperationStatusColor(cooperationStatus)
-                        .withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    _cooperationStatusLabel(cooperationStatus),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: _cooperationStatusColor(cooperationStatus),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
+              const SizedBox(height: 5),
+              Text(
+                subtitle.isEmpty ? handle : subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: context.artC.ink.withValues(alpha: 0.42),
+                  fontSize: 10.5,
+                  height: 1.3,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0,
                 ),
               ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: context.artC.ink.withValues(alpha: 0.26),
-                size: 18,
-              ),
+              const Spacer(),
+              _CooperationStatusInline(status: cooperationStatus),
             ],
           ),
-        ],
+        ),
       ),
+    );
+  }
+}
+
+class _CooperationStatusInline extends StatelessWidget {
+  final String status;
+
+  const _CooperationStatusInline({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = _cooperationStatusColor(status);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(
+            color: statusColor.withValues(alpha: 0.78),
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          _cooperationStatusLabel(status),
+          style: TextStyle(
+            color: context.artC.ink.withValues(alpha: 0.46),
+            fontSize: 10.5,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -4543,6 +4430,7 @@ String _eventTypeLabel(Map<String, dynamic> item) {
     return '开放日';
   }
   if (raw.contains('info session') ||
+      raw.contains('briefing') ||
       raw.contains('application') ||
       raw.contains('说明会')) {
     return '说明会';
@@ -6119,14 +6007,14 @@ String _formatDeadlineUrgency(dynamic raw) {
 
 Color _deadlineColor(dynamic raw, BuildContext context) {
   final deadline = DateTime.tryParse(raw?.toString() ?? '');
-  if (deadline == null) return context.artC.ink.withOpacity(0.38);
+  if (deadline == null) return context.artC.ink.withValues(alpha: 0.38);
 
   final diff = deadline.difference(DateTime.now()).inDays;
 
-  if (diff < 0) return context.artC.ink.withOpacity(0.28);
-  if (diff <= 3) return const Color(0xFFEF4444);
-  if (diff <= 7) return const Color(0xFFF59E0B);
-  return context.artC.ink.withOpacity(0.48);
+  if (diff < 0) return context.artC.ink.withValues(alpha: 0.28);
+  if (diff <= 3) return const Color(0xFF8F3F36);
+  if (diff <= 7) return const Color(0xFF8A6D32);
+  return context.artC.ink.withValues(alpha: 0.48);
 }
 
 List<String> _extractOpportunityTags(String? city, String requirements) {

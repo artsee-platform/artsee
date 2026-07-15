@@ -2,10 +2,11 @@ module.exports = {
   apps: [
     {
       name: 'artsee-web',
-      script: './server.js',
+      script: './web/server.js',
       // 使用 PATH 中的 node（Ubuntu apt / NodeSource 与旧机 node24 均可）
       interpreter: 'node',
-      cwd: '/root/website/artsee',
+      // 使用当前目录，支持 root 和 ubuntu 用户
+      cwd: process.cwd(),
       instances: 1,
       exec_mode: 'fork',
       env: {

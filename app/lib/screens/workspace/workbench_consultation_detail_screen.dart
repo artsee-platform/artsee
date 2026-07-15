@@ -21,6 +21,7 @@ class _WorkbenchConsultationDetailScreenState
     extends State<WorkbenchConsultationDetailScreen> {
   late Map<String, dynamic> _consultation;
   final _input = TextEditingController();
+  final _inputFocus = FocusNode();
   final _scroll = ScrollController();
   List<Map<String, dynamic>> _messages = [];
   Map<String, dynamic>? _assessment;
@@ -44,6 +45,7 @@ class _WorkbenchConsultationDetailScreenState
   @override
   void dispose() {
     _input.dispose();
+    _inputFocus.dispose();
     _scroll.dispose();
     super.dispose();
   }
@@ -320,6 +322,14 @@ class _WorkbenchConsultationDetailScreenState
     });
   }
 
+  void _focusReply() {
+    _scrollToBottom();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _inputFocus.requestFocus();
+    });
+  }
+
   List<Map<String, dynamic>> _displayMessages() {
     if (_messages.isNotEmpty) return _messages;
     final lastMessage = _consultation['last_message']?.toString();
@@ -377,6 +387,25 @@ class _WorkbenchConsultationDetailScreenState
                   controller: _scroll,
                   padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
                   children: [
+                    _WorkbenchPipelinePanel(
+                      consultation: _consultation,
+                      assessment: _assessment,
+                      recommendation: _recommendation,
+                      onReply: _focusReply,
+                      onAssign: _openAssignmentSheet,
+                      onEditAssessment: _openAssessmentSheet,
+                      onEditRecommendation: _openRecommendationSheet,
+                      onConvertOrder: _showOrderQuoteSheet,
+                      onClose: _closeConsultation,
+                      busy: _acting || _assigning,
+                    ),
+                    const SizedBox(height: 12),
+                    _StudentDossierPanel(
+                      consultation: _consultation,
+                      assessment: _assessment,
+                      recommendation: _recommendation,
+                    ),
+                    const SizedBox(height: 12),
                     _WorkbenchTeamPanel(
                       consultation: _consultation,
                       busy: _collaborating,
@@ -410,6 +439,7 @@ class _WorkbenchConsultationDetailScreenState
             ),
             _WorkbenchReplyBar(
               controller: _input,
+              focusNode: _inputFocus,
               sending: _sending,
               enabled: status != 'closed' && status != 'converted',
               onSend: _send,
@@ -417,6 +447,417 @@ class _WorkbenchConsultationDetailScreenState
           ],
         ),
       ),
+    );
+  }
+}
+
+class _WorkbenchPipelinePanel extends StatelessWidget {
+  final Map<String, dynamic> consultation;
+  final Map<String, dynamic>? assessment;
+  final Map<String, dynamic>? recommendation;
+  final VoidCallback onReply;
+  final VoidCallback onAssign;
+  final VoidCallback onEditAssessment;
+  final VoidCallback onEditRecommendation;
+  final VoidCallback onConvertOrder;
+  final VoidCallback onClose;
+  final bool busy;
+
+  const _WorkbenchPipelinePanel({
+    required this.consultation,
+    required this.assessment,
+    required this.recommendation,
+    required this.onReply,
+    required this.onAssign,
+    required this.onEditAssessment,
+    required this.onEditRecommendation,
+    required this.onConvertOrder,
+    required this.onClose,
+    required this.busy,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final phase = _consultationPhase(
+      consultation,
+      assessment: assessment,
+      recommendation: recommendation,
+    );
+    final actions = _pipelineActions(
+      phase,
+      onReply: onReply,
+      onAssign: onAssign,
+      onEditAssessment: onEditAssessment,
+      onEditRecommendation: onEditRecommendation,
+      onConvertOrder: onConvertOrder,
+      onClose: onClose,
+    );
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: _detailPanelDecoration(context),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '线索阶段',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: context.artC.ink,
+                  ),
+                ),
+              ),
+              _WorkbenchStatusChip(label: phase.currentLabel),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _PipelineTimeline(currentIndex: phase.index),
+          const SizedBox(height: 13),
+          Text(
+            phase.nextHint,
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.42,
+              fontWeight: FontWeight.w700,
+              color: context.artC.ink.withValues(alpha: 0.58),
+            ),
+          ),
+          if (actions.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 8,
+              children: actions
+                  .map(
+                    (action) => _PipelineActionButton(
+                      label: action.label,
+                      onTap: busy ? null : action.onTap,
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PipelineTimeline extends StatelessWidget {
+  final int currentIndex;
+
+  const _PipelineTimeline({required this.currentIndex});
+
+  static const _labels = [
+    '新线索',
+    '已联系',
+    '需求确认',
+    '方案制定',
+    '已报价',
+    '成交/流失',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        for (var i = 0; i < _labels.length; i++) ...[
+          Expanded(
+            child: _PipelineStep(
+              label: _labels[i],
+              done: i <= currentIndex,
+              current: i == currentIndex,
+            ),
+          ),
+          if (i != _labels.length - 1)
+            Container(
+              width: 14,
+              height: 1,
+              margin: const EdgeInsets.only(bottom: 18),
+              color: i < currentIndex
+                  ? context.artC.ink.withValues(alpha: 0.36)
+                  : context.artC.silver.withValues(alpha: 0.3),
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+class _PipelineStep extends StatelessWidget {
+  final String label;
+  final bool done;
+  final bool current;
+
+  const _PipelineStep({
+    required this.label,
+    required this.done,
+    required this.current,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          width: current ? 14 : 11,
+          height: current ? 14 : 11,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: done ? context.artC.ink : Colors.transparent,
+            border: Border.all(
+              color: done
+                  ? context.artC.ink
+                  : context.artC.silver.withValues(alpha: 0.52),
+              width: 1,
+            ),
+          ),
+        ),
+        const SizedBox(height: 7),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 9.5,
+            height: 1.1,
+            fontWeight: current ? FontWeight.w800 : FontWeight.w500,
+            color: context.artC.ink.withValues(alpha: current ? 0.72 : 0.36),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PipelineActionButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onTap;
+
+  const _PipelineActionButton({
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: context.artC.ink,
+        side: BorderSide(color: context.artC.silver.withValues(alpha: 0.36)),
+        visualDensity: VisualDensity.compact,
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+        textStyle: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      onPressed: onTap,
+      child: Text(label),
+    );
+  }
+}
+
+class _StudentDossierPanel extends StatelessWidget {
+  final Map<String, dynamic> consultation;
+  final Map<String, dynamic>? assessment;
+  final Map<String, dynamic>? recommendation;
+
+  const _StudentDossierPanel({
+    required this.consultation,
+    required this.assessment,
+    required this.recommendation,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final metadata = _mapValue(consultation['metadata']);
+    final facts = [
+      _DossierFact('咨询对象', _studentDisplayName(consultation)),
+      _DossierFact('目标', _firstCleanText(consultation['target_name'])),
+      _DossierFact(
+        '专业',
+        _firstCleanText(
+          consultation['target_major'],
+          metadata['target_major'],
+          metadata['major'],
+          metadata['intended_major'],
+        ),
+      ),
+      _DossierFact(
+        '国家',
+        _firstCleanText(
+          metadata['target_country'],
+          metadata['country'],
+          metadata['destination'],
+        ),
+      ),
+      _DossierFact('预算', _budgetLabel(metadata)),
+      _DossierFact(
+        '时间',
+        _firstCleanText(consultation['intake'], metadata['intake']),
+      ),
+      _DossierFact(
+        '阶段',
+        _firstCleanText(consultation['stage'], metadata['stage']),
+      ),
+      _DossierFact('来源', _sourceLabel(consultation['source']?.toString())),
+    ].where((fact) => fact.value.isNotEmpty).toList();
+    final background = assessment?['background_summary']?.toString().trim();
+    final notes = assessment?['notes']?.toString().trim();
+    final schools = _jsonItemLabels(recommendation?['school_list']);
+    final timeline = recommendation?['timeline']?.toString().trim();
+    final services = _jsonItemLabels(recommendation?['recommended_services']);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: _detailPanelDecoration(context),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '学生档案',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+              color: context.artC.ink,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (facts.isEmpty)
+            Text(
+              '学生目标与背景尚未补充。',
+              style: TextStyle(
+                fontSize: 12.5,
+                height: 1.4,
+                fontWeight: FontWeight.w600,
+                color: context.artC.ink.withValues(alpha: 0.48),
+              ),
+            )
+          else
+            _DossierFactGrid(facts: facts),
+          if (_notBlank(background) || _notBlank(notes)) ...[
+            const SizedBox(height: 13),
+            _DossierTextSection(
+              title: '背景资料',
+              text: [
+                if (_notBlank(background)) background!,
+                if (_notBlank(notes)) notes!,
+              ].join('\n'),
+            ),
+          ],
+          if (schools.isNotEmpty ||
+              _notBlank(timeline) ||
+              services.isNotEmpty) ...[
+            const SizedBox(height: 13),
+            _DossierTextSection(
+              title: '当前方案',
+              text: [
+                if (schools.isNotEmpty) '院校：${schools.join('、')}',
+                if (_notBlank(timeline)) '时间线：$timeline',
+                if (services.isNotEmpty) '服务：${services.join('、')}',
+              ].join('\n'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DossierFactGrid extends StatelessWidget {
+  final List<_DossierFact> facts;
+
+  const _DossierFactGrid({required this.facts});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final itemWidth = constraints.maxWidth >= 260
+            ? (constraints.maxWidth - 10) / 2
+            : constraints.maxWidth;
+        return Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: facts
+              .map(
+                (fact) => SizedBox(
+                  width: itemWidth,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        fact.label,
+                        style: TextStyle(
+                          fontSize: 10,
+                          height: 1.15,
+                          fontWeight: FontWeight.w500,
+                          color: context.artC.ink.withValues(alpha: 0.36),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        fact.value,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          height: 1.25,
+                          fontWeight: FontWeight.w800,
+                          color: context.artC.ink.withValues(alpha: 0.78),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+              .toList(),
+        );
+      },
+    );
+  }
+}
+
+class _DossierTextSection extends StatelessWidget {
+  final String title;
+  final String text;
+
+  const _DossierTextSection({
+    required this.title,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            color: context.artC.ink.withValues(alpha: 0.56),
+          ),
+        ),
+        const SizedBox(height: 5),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 12.5,
+            height: 1.45,
+            fontWeight: FontWeight.w600,
+            color: context.artC.ink.withValues(alpha: 0.68),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1946,12 +2387,14 @@ class _OrderQuoteSheetState extends State<_OrderQuoteSheet> {
 
 class _WorkbenchReplyBar extends StatelessWidget {
   final TextEditingController controller;
+  final FocusNode focusNode;
   final bool sending;
   final bool enabled;
   final VoidCallback onSend;
 
   const _WorkbenchReplyBar({
     required this.controller,
+    required this.focusNode,
     required this.sending,
     required this.enabled,
     required this.onSend,
@@ -1976,6 +2419,7 @@ class _WorkbenchReplyBar extends StatelessWidget {
               Expanded(
                 child: TextField(
                   controller: controller,
+                  focusNode: focusNode,
                   enabled: enabled && !sending,
                   minLines: 1,
                   maxLines: 4,
@@ -2092,6 +2536,219 @@ class _WorkbenchStatusChip extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ConsultationPhase {
+  final int index;
+  final String currentLabel;
+  final String nextHint;
+
+  const _ConsultationPhase({
+    required this.index,
+    required this.currentLabel,
+    required this.nextHint,
+  });
+}
+
+class _PipelineAction {
+  final String label;
+  final VoidCallback onTap;
+
+  const _PipelineAction(this.label, this.onTap);
+}
+
+class _DossierFact {
+  final String label;
+  final String value;
+
+  const _DossierFact(this.label, this.value);
+}
+
+_ConsultationPhase _consultationPhase(
+  Map<String, dynamic> consultation, {
+  required Map<String, dynamic>? assessment,
+  required Map<String, dynamic>? recommendation,
+}) {
+  final status = consultation['status']?.toString() ?? 'new';
+  final conversion = _conversionType(consultation);
+  if (status == 'closed') {
+    return const _ConsultationPhase(
+      index: 5,
+      currentLabel: '已流失',
+      nextHint: '这条咨询已关闭，可保留记录用于复盘来源与流失原因。',
+    );
+  }
+  if (status == 'converted') {
+    return _ConsultationPhase(
+      index: conversion == 'order' ? 4 : 5,
+      currentLabel: conversion == 'order' ? '已报价' : '已转预约',
+      nextHint: conversion == 'order'
+          ? '订单已创建，下一步关注学生支付与服务启动。'
+          : '预约已创建，下一步确认时间并准备短咨询。',
+    );
+  }
+  if (recommendation != null) {
+    return const _ConsultationPhase(
+      index: 3,
+      currentLabel: '方案制定',
+      nextHint: '方案已形成，可以根据服务范围创建报价或继续补充院校组合。',
+    );
+  }
+  if (assessment != null || status == 'active') {
+    return const _ConsultationPhase(
+      index: 2,
+      currentLabel: '需求确认',
+      nextHint: '先沉淀学生背景、目标、风险点，再输出申请方案。',
+    );
+  }
+  if (status == 'pending') {
+    return const _ConsultationPhase(
+      index: 1,
+      currentLabel: '已联系',
+      nextHint: '已经进入跟进状态，建议尽快回复学生并确认申请目标。',
+    );
+  }
+  return const _ConsultationPhase(
+    index: 0,
+    currentLabel: '新线索',
+    nextHint: '先分配负责顾问或立即回复，避免新咨询停留太久。',
+  );
+}
+
+List<_PipelineAction> _pipelineActions(
+  _ConsultationPhase phase, {
+  required VoidCallback onReply,
+  required VoidCallback onAssign,
+  required VoidCallback onEditAssessment,
+  required VoidCallback onEditRecommendation,
+  required VoidCallback onConvertOrder,
+  required VoidCallback onClose,
+}) {
+  return switch (phase.index) {
+    0 => [
+        _PipelineAction('立即回复', onReply),
+        _PipelineAction('分配顾问', onAssign),
+        _PipelineAction('关闭', onClose),
+      ],
+    1 => [
+        _PipelineAction('回复学生', onReply),
+        _PipelineAction('填写背景', onEditAssessment),
+        _PipelineAction('关闭', onClose),
+      ],
+    2 => [
+        _PipelineAction('填写背景', onEditAssessment),
+        _PipelineAction('做方案', onEditRecommendation),
+        _PipelineAction('回复学生', onReply),
+      ],
+    3 => [
+        _PipelineAction('更新方案', onEditRecommendation),
+        _PipelineAction('创建报价', onConvertOrder),
+        _PipelineAction('回复学生', onReply),
+      ],
+    4 => const [],
+    _ => const [],
+  };
+}
+
+String? _conversionType(Map<String, dynamic> consultation) {
+  final metadata = consultation['metadata'];
+  if (metadata is! Map) return null;
+  final conversion = metadata['conversion'];
+  if (conversion is! Map) return null;
+  return conversion['type']?.toString();
+}
+
+String _studentDisplayName(Map<String, dynamic> consultation) {
+  final metadata = _mapValue(consultation['metadata']);
+  final profile = _mapValue(consultation['profile']);
+  final value = _firstCleanText(
+    metadata['student_name'],
+    metadata['student_nickname'],
+    metadata['nickname'],
+    metadata['display_name'],
+    profile['nickname'],
+    profile['display_name'],
+    consultation['student_name'],
+    consultation['target_name'],
+  );
+  return value.isEmpty ? '未命名咨询' : value;
+}
+
+String _budgetLabel(Map<String, dynamic> metadata) {
+  final direct = _firstCleanText(
+    metadata['budget'],
+    metadata['budget_label'],
+    metadata['target_budget'],
+  );
+  if (direct.isNotEmpty) return direct;
+  final min = _cleanText(metadata['budget_min']);
+  final max = _cleanText(metadata['budget_max']);
+  if (min.isEmpty && max.isEmpty) return '';
+  if (min.isNotEmpty && max.isNotEmpty) return '$min-$max';
+  if (min.isNotEmpty) return '$min 起';
+  return '$max 内';
+}
+
+String _sourceLabel(String? source) {
+  switch (source) {
+    case 'school_detail':
+      return '院校页';
+    case 'organization':
+    case 'organization_detail':
+      return '机构主页';
+    case 'plaza':
+      return '广场';
+    case 'ai':
+      return 'AI 咨询';
+    default:
+      return source == null || source.trim().isEmpty ? '' : source;
+  }
+}
+
+String _cleanText(dynamic value) {
+  return value?.toString().trim() ?? '';
+}
+
+String _firstCleanText(
+  dynamic first, [
+  dynamic second,
+  dynamic third,
+  dynamic fourth,
+  dynamic fifth,
+  dynamic sixth,
+  dynamic seventh,
+  dynamic eighth,
+]) {
+  for (final value in [
+    first,
+    second,
+    third,
+    fourth,
+    fifth,
+    sixth,
+    seventh,
+    eighth,
+  ]) {
+    final text = _cleanText(value);
+    if (text.isNotEmpty) return text;
+  }
+  return '';
+}
+
+Map<String, dynamic> _mapValue(dynamic value) {
+  if (value is Map<String, dynamic>) return value;
+  if (value is Map) return Map<String, dynamic>.from(value);
+  return const {};
+}
+
+BoxDecoration _detailPanelDecoration(BuildContext context) {
+  return BoxDecoration(
+    color: context.artC.cardIconBg,
+    borderRadius: BorderRadius.circular(18),
+    border: Border.all(
+      color: context.artC.silver.withValues(alpha: 0.28),
+    ),
+  );
 }
 
 String _memberDisplayName(Map<String, dynamic> member) {

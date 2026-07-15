@@ -88,7 +88,7 @@ class _PublishExhibitionScreenState extends State<PublishExhibitionScreen> {
   }
 
   Future<void> _submit() async {
-    if (!await ensureLoggedIn(context, message: '请先登录后发布展览活动')) return;
+    if (!await ensureLoggedIn(context, message: '请先登录后发布活动')) return;
     if (!mounted) return;
     if (!_formKey.currentState!.validate() || _submitting) return;
 
@@ -143,7 +143,7 @@ class _PublishExhibitionScreenState extends State<PublishExhibitionScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text(
-          '发布展览活动',
+          '发布活动',
           style: TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w900,
@@ -188,11 +188,14 @@ class _PublishExhibitionScreenState extends State<PublishExhibitionScreen> {
               value: _eventType,
               items: const [
                 ('exhibition', '展览'),
+                ('salon', '沙龙'),
                 ('workshop', '工作坊'),
                 ('lecture', '讲座/分享会'),
+                ('open_day', '开放日'),
+                ('briefing', '说明会'),
                 ('tour', '导览'),
                 ('fair', '艺博会'),
-                ('online', '线上展厅'),
+                ('online', '线上活动'),
               ],
               onChanged: (val) => setState(() => _eventType = val!),
             ),

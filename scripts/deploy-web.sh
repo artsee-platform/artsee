@@ -24,8 +24,12 @@ REMOTE_DIR="${REMOTE_DIR:-~/website/artsee}"
 ARCHIVE_NAME="${ARCHIVE_NAME:-artsee-web.tar.gz}"
 ARCHIVE_PATH="${REPO_ROOT}/${ARCHIVE_NAME}"
 PRESERVE_REMOTE_ENV="${PRESERVE_REMOTE_ENV:-1}"
+SSH_KEY_FILE="${SSH_KEY_FILE:-}"
 
-SSH_OPTS=(-o BatchMode=yes -o StrictHostKeyChecking=accept-new)
+SSH_OPTS=(-o StrictHostKeyChecking=no -o ConnectTimeout=30 -o ServerAliveInterval=60)
+if [[ -n "${SSH_KEY_FILE}" ]]; then
+  SSH_OPTS+=(-i "${SSH_KEY_FILE}")
+fi
 
 log() { printf '%s\n' "$*"; }
 
@@ -74,7 +78,15 @@ log "确保远程目录存在..."
 ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" "mkdir -p ${REMOTE_DIR}"
 
 log "上传压缩包..."
-scp "${SSH_OPTS[@]}" "${ARCHIVE_PATH}" "${SSH_TARGET}:${REMOTE_DIR}/"
+# 使用 rsync 替代 scp，更稳定且支持断点续传
+RSYNC_SSH_OPTS=""
+for opt in "${SSH_OPTS[@]}"; do
+  RSYNC_SSH_OPTS="${RSYNC_SSH_OPTS} ${opt}"
+done
+rsync -avz --progress --timeout=300 -e "ssh${RSYNC_SSH_OPTS}" "${ARCHIVE_PATH}" "${SSH_TARGET}:${REMOTE_DIR}/" || {
+  log "rsync 失败，尝试使用 scp..."
+  scp "${SSH_OPTS[@]}" "${ARCHIVE_PATH}" "${SSH_TARGET}:${REMOTE_DIR}/"
+}
 
 log "远程解压并清理旧文件..."
 ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s <<REMOTE_SCRIPT

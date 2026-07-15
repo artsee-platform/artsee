@@ -2318,9 +2318,12 @@ class _OfflineContactSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = org['name']?.toString() ?? '机构';
-    final address = org['address']?.toString();
-    final phone = org['phone']?.toString();
-    final qr = org['wechat_qr_url']?.toString();
+    final address = _organizationAddress(org);
+    final phone = _metadataText(org, ['phone', 'telephone', 'mobile']);
+    final qr = _metadataText(org, ['wechat_qr_url', 'wechatQrUrl']);
+    final canOpenMap = _organizationMapQuery(org).isNotEmpty ||
+        (_numberValue(org['latitude']) != null &&
+            _numberValue(org['longitude']) != null);
     return _SheetShell(
       title: '线下见面',
       subtitle: name,
@@ -2330,15 +2333,41 @@ class _OfflineContactSheet extends StatelessWidget {
           _ContactRow(
             icon: Icons.place_outlined,
             label: '机构地址',
-            value: address?.isNotEmpty == true ? address! : '机构尚未填写地址',
+            value: address.isNotEmpty ? address : '机构尚未填写地址',
           ),
+          if (canOpenMap) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                style: TextButton.styleFrom(
+                  foregroundColor: kCobalt,
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  textStyle: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                onPressed: () async {
+                  final opened = await _openOrganizationMap(org);
+                  if (!opened && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('暂时无法打开地图')),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.map_outlined, size: 17),
+                label: const Text('在地图中打开'),
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
           _ContactRow(
             icon: Icons.call_outlined,
             label: '联系电话',
-            value: phone?.isNotEmpty == true ? phone! : '机构尚未填写电话',
+            value: phone.isNotEmpty ? phone : '机构尚未填写电话',
           ),
-          if (qr != null && qr.isNotEmpty) ...[
+          if (qr.isNotEmpty) ...[
             const SizedBox(height: 16),
             ClipRRect(
               borderRadius: BorderRadius.circular(18),
@@ -2855,6 +2884,13 @@ Map<String, dynamic> _objectMap(Object? value) {
   return const {};
 }
 
+double? _numberValue(Object? value) {
+  if (value is num) return value.toDouble();
+  final text = value?.toString().trim();
+  if (text == null || text.isEmpty) return null;
+  return double.tryParse(text);
+}
+
 String _metadataText(
   Map<String, dynamic> org,
   List<String> keys, {
@@ -2867,6 +2903,69 @@ String _metadataText(
     if (text != null && text.isNotEmpty) return text;
   }
   return fallback;
+}
+
+String _organizationAddress(Map<String, dynamic> org) {
+  final address = _metadataText(
+    org,
+    ['address', 'offline_address', 'offlineAddress', 'location'],
+  );
+  if (address.isNotEmpty) return address;
+  final province = org['province']?.toString().trim() ?? '';
+  final city = org['city']?.toString().trim() ?? '';
+  return [
+    if (province.isNotEmpty && province != city) province,
+    if (city.isNotEmpty) city,
+  ].join(' ');
+}
+
+String _organizationMapQuery(Map<String, dynamic> org) {
+  final name = org['name']?.toString().trim() ?? '';
+  final address = _organizationAddress(org);
+  return [
+    if (address.isNotEmpty) address,
+    if (name.isNotEmpty) name,
+  ].join(' ');
+}
+
+Future<bool> _openOrganizationMap(Map<String, dynamic> org) async {
+  final name = org['name']?.toString().trim() ?? '机构';
+  final lat = _numberValue(org['latitude']);
+  final lon = _numberValue(org['longitude']);
+  final query = _organizationMapQuery(org);
+  final urls = <Uri>[];
+
+  if (lat != null && lon != null) {
+    final encodedName = Uri.encodeComponent(name);
+    urls.add(Uri.parse('geo:$lat,$lon?q=$lat,$lon($encodedName)'));
+    urls.add(Uri.https('maps.apple.com', '/', {
+      'll': '$lat,$lon',
+      'q': name,
+    }));
+    urls.add(Uri.https('www.google.com', '/maps/search/', {
+      'api': '1',
+      'query': '$lat,$lon',
+    }));
+  }
+
+  if (query.isNotEmpty) {
+    urls.add(Uri.https('maps.apple.com', '/', {'q': query}));
+    urls.add(Uri.https('www.google.com', '/maps/search/', {
+      'api': '1',
+      'query': query,
+    }));
+  }
+
+  for (final uri in urls) {
+    try {
+      final opened = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (opened) return true;
+    } catch (_) {}
+  }
+  return false;
 }
 
 List<Map<String, dynamic>> _metadataCards(

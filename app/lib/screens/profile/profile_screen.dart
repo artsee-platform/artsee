@@ -25,6 +25,12 @@ import 'team_invitations_screen.dart';
 import 'package:artsee_app/theme/artsee_theme_controller.dart';
 import 'package:artsee_app/theme/artsee_ui_colors.dart';
 
+const _profileCanvas = Color(0xFFFFFFFF);
+const _profileSoftCanvas = Color(0xFFF7F8FB);
+const _profileLine = Color(0xFFECEFF4);
+const _profileInk = Color(0xFF111827);
+const _profileMuted = Color(0xFF8A8F98);
+
 /// ═══════════════════════════════════════════════════════════════
 /// 我的页 — 完全对齐 _artist_ref ProfileView，接入真实用户数据
 /// ═══════════════════════════════════════════════════════════════
@@ -204,44 +210,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         (_isBusinessUser ? '机构 / 商家入驻' : '个人用户');
   }
 
-  String get _stageLabel {
-    final raw = _profile?['portfolio_status']?.toString() ??
-        _profile?['current_education_stage']?.toString() ??
-        '';
-    const stages = {
-      'exploring': '刚开始了解',
-      'target_ready': '已有目标国家 / 学校',
-      'portfolio_preparing': '正在准备作品集',
-      'works_ready': '已有部分作品',
-      'applying': '正在申请中',
-      'admitted': '已录取 / 已在读',
-      'pending_business_review': '入驻待审核',
-      'just_learning': '刚开始了解',
-      'child_has_interest': '孩子已有艺术方向',
-      'target_country': '已有目标国家 / 院校',
-      'application_planning': '正在规划申请',
-    };
-    return stages[raw] ??
-        (raw.isEmpty ? (_isBusinessUser ? '未认证' : '待补全') : raw);
-  }
-
-  String get _stageShortLabel {
-    final label = _stageLabel;
-    const shortLabels = {
-      '刚开始了解': '探索中',
-      '已有目标国家 / 学校': '定校中',
-      '正在准备作品集': '作品集中',
-      '已有部分作品': '作品中',
-      '正在申请中': '申请中',
-      '已录取 / 已在读': '已录取',
-      '孩子已有艺术方向': '定方向',
-      '已有目标国家 / 院校': '定校中',
-      '正在规划申请': '规划中',
-      '待补全': '待完善',
-    };
-    return shortLabels[label] ?? label;
-  }
-
   String get _cityLabel {
     final city = _profile?['city_preference']?.toString();
     final location = _profile?['location']?.toString();
@@ -302,6 +270,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int get _followingCount => _profileInt(
         ['following_count', 'followings_count'],
         28 + _savedSchoolCount,
+      );
+
+  int get _profileViewsCount => _profileInt(
+        ['profile_views_count', 'views_count', 'view_count'],
+        _isBusinessUser
+            ? 38000
+            : _roleKey == 'artist'
+                ? 24000
+                : 8300,
+      );
+
+  int get _worksCount => _profileInt(
+        ['works_count', 'post_count', 'posts_count', 'portfolio_count'],
+        _profileShowcasePosts.length,
       );
 
   String get _businessName {
@@ -451,10 +433,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildProfileView() {
-    final bottomSpacer = MediaQuery.of(context).padding.bottom + 200;
+    final bottomSpacer = MediaQuery.of(context).padding.bottom + 148;
 
     return Scaffold(
-      backgroundColor: context.artC.porcelain,
+      backgroundColor: _profileCanvas,
       drawerScrimColor: Colors.black.withValues(alpha: 0.36),
       drawer: _buildProfileDrawer(),
       onDrawerChanged: widget.onDrawerChanged,
@@ -472,10 +454,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Scaffold.of(scaffoldContext).openDrawer();
                   },
                 ),
-                Transform.translate(
-                  offset: const Offset(0, -82),
-                  child: _buildProfileContentPanel(),
-                ),
+                _buildProfileShowcaseSection(),
               ],
             ),
           ),
@@ -487,70 +466,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildProfileHeader({required VoidCallback onMenuTap}) {
     final title = _isBusinessUser ? _businessName : _nickname;
     final topInset = MediaQuery.of(context).padding.top;
-    final coverUrl = _coverUrl;
-    final heroHeight = topInset + 318.0;
-    const avatarSize = 86.0;
-
-    return SizedBox(
-      height: heroHeight,
-      child: Stack(
+    return Container(
+      color: _profileCanvas,
+      padding: EdgeInsets.fromLTRB(10, topInset + 4, 10, 22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Positioned.fill(
-            child: coverUrl.isNotEmpty
-                ? Image.network(
-                    coverUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _ProfileCoverFallback(
-                      seed: _profileHandle,
-                    ),
-                  )
-                : _ProfileCoverFallback(seed: _profileHandle),
-          ),
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.38),
-              ),
-            ),
-          ),
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.08),
-                    Colors.black.withValues(alpha: 0.1),
-                    Colors.black.withValues(alpha: 0.54),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            top: topInset + 4,
-            left: 22,
-            right: 22,
+          SizedBox(
+            height: 44,
             child: Row(
               children: [
-                _HeroIconButton(
+                _ProfileTopIconButton(
                   icon: Icons.menu_rounded,
                   onTap: onMenuTap,
+                  badgeText: _unreadNotificationCount > 0
+                      ? _compactProfileNumber(_unreadNotificationCount)
+                      : null,
                 ),
                 const Spacer(),
-                _HeroEditButton(
-                  onTap: !_isBusinessUser && !_hasCompletedOnboarding
-                      ? _openOnboardingEditor
-                      : _openEditProfile,
+                _ProfileTopIconButton(
+                  icon: Icons.qr_code_2_rounded,
+                  onTap: () => _openPlaceholder('我的二维码'),
                 ),
-                const SizedBox(width: 12),
-                _HeroIconButton(
-                  icon: Icons.qr_code_scanner_rounded,
-                  onTap: () => _openPlaceholder('我的名片'),
-                ),
-                const SizedBox(width: 12),
-                _HeroIconButton(
+                const SizedBox(width: 4),
+                _ProfileTopIconButton(
                   icon: Icons.ios_share_rounded,
                   onTap: _isBusinessUser
                       ? _openBusinessPublicProfile
@@ -559,21 +498,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
           ),
-          Positioned(
-            left: 28,
-            right: 24,
-            top: topInset + 70,
+          const SizedBox(height: 23),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 _HeroProfileAvatar(
-                  size: avatarSize,
+                  size: 118,
                   imageUrl: _avatarUrl,
                   fallback: title,
                   verified: _isVerified,
                   business: _isBusinessUser,
                 ),
-                const SizedBox(width: 18),
+                const SizedBox(width: 26),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -583,46 +521,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 25,
+                          color: _profileInk,
+                          fontSize: 28,
                           fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                          height: 1.12,
+                          height: 1.05,
                         ),
                       ),
-                      const SizedBox(height: 9),
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              'Artsee ID：${_profileHandle.replaceFirst('@', '')}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 14,
-                                height: 1.15,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white.withValues(alpha: 0.68),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Icon(
-                            Icons.qr_code_2_rounded,
-                            size: 15,
-                            color: Colors.white.withValues(alpha: 0.58),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 7),
+                      const SizedBox(height: 10),
                       Text(
-                        'IP：$_cityLabel · $_stageShortLabel',
+                        _profileHandle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 14,
+                        style: const TextStyle(
+                          color: _profileMuted,
+                          fontSize: 15,
                           fontWeight: FontWeight.w800,
-                          color: Colors.white.withValues(alpha: 0.62),
+                          height: 1.1,
                         ),
+                      ),
+                      const SizedBox(height: 13),
+                      _ProfileRoleBadge(
+                        label: _roleLabel,
+                        verified: _isVerified,
+                        business: _isBusinessUser,
                       ),
                     ],
                   ),
@@ -630,29 +551,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
           ),
-          Positioned(
-            left: 28,
-            right: 24,
-            top: topInset + 194,
-            child: _HeroStatsRow(
-              followers: _followersCount,
-              following: _followingCount,
-            ),
+          const SizedBox(height: 19),
+          _ProfileStatsLine(
+            followers: _followersCount,
+            views: _profileViewsCount,
+            following: _followingCount,
+            works: _worksCount,
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildProfileContentPanel() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-      decoration: BoxDecoration(
-        color: context.artC.cardIconBg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: _buildProfileShowcaseSection(),
     );
   }
 
@@ -863,15 +770,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  String get _coverUrl {
-    final raw = _profile?['cover_url']?.toString() ??
-        _profile?['banner_url']?.toString() ??
-        _profile?['background_url']?.toString() ??
-        '';
-    if (raw.trim().isNotEmpty) return raw.trim();
-    return 'https://picsum.photos/seed/artsee_profile_cover_${Uri.encodeComponent(_profileHandle)}/900/700';
-  }
-
   String _directionSummary({String fallback = '待补全'}) {
     const directionLabels = {
       'fine_art': '纯艺',
@@ -1069,20 +967,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildProfileShowcaseSection() {
     const tabs = ['动态', '收藏', '钱包'];
     final selectedTab = _profileShowcaseTab.clamp(0, tabs.length - 1).toInt();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _ProfileShowcaseTabStrip(
-          tabs: tabs,
-          selectedIndex: selectedTab,
-          onChanged: (index) => setState(() => _profileShowcaseTab = index),
-        ),
-        const SizedBox(height: 14),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 180),
-          child: _buildProfileShowcaseBody(selectedTab),
-        ),
-      ],
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _ProfileShowcaseTabStrip(
+            tabs: tabs,
+            selectedIndex: selectedTab,
+            onChanged: (index) => setState(() => _profileShowcaseTab = index),
+          ),
+          const SizedBox(height: 26),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            child: _buildProfileShowcaseBody(selectedTab),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1105,7 +1006,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           onEmptyTap: _openExploreTab,
         ),
       _ => _ProfileWalletPreview(
-          key: const ValueKey('wallet'),
           paidAmountCents: _walletPaidAmountCents,
           pendingOrderCount: _walletPendingOrderCount,
           paidOrderCount: _walletPaidOrderCount,
@@ -1226,59 +1126,16 @@ class _MenuBadge extends StatelessWidget {
   }
 }
 
-class _ProfileCoverFallback extends StatelessWidget {
-  final String seed;
-
-  const _ProfileCoverFallback({required this.seed});
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = [
-      const Color(0xFF2F3F66),
-      const Color(0xFF6E5D47),
-      const Color(0xFF465C4E),
-      const Color(0xFF5D5869),
-    ];
-    final color = colors[seed.hashCode.abs() % colors.length];
-    return DecoratedBox(
-      decoration: BoxDecoration(color: color),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -42,
-            top: -18,
-            child: Container(
-              width: 180,
-              height: 180,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.08),
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-          Positioned(
-            left: -56,
-            bottom: -80,
-            child: Container(
-              width: 240,
-              height: 240,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.06),
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeroIconButton extends StatelessWidget {
+class _ProfileTopIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
+  final String? badgeText;
 
-  const _HeroIconButton({required this.icon, required this.onTap});
+  const _ProfileTopIconButton({
+    required this.icon,
+    required this.onTap,
+    this.badgeText,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1286,55 +1143,118 @@ class _HeroIconButton extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: SizedBox(
-        width: 36,
-        height: 36,
-        child: Center(
-          child: Icon(
-            icon,
-            size: 28,
-            color: Colors.white.withValues(alpha: 0.92),
-          ),
+        width: 42,
+        height: 42,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 24,
+              color: _profileInk.withValues(alpha: 0.62),
+            ),
+            if (badgeText != null)
+              Positioned(
+                right: 2,
+                top: 3,
+                child: Container(
+                  constraints: const BoxConstraints(minWidth: 17),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE11D48),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: Colors.white, width: 1.4),
+                  ),
+                  child: Text(
+                    badgeText!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                      height: 1.1,
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _HeroEditButton extends StatelessWidget {
-  final VoidCallback onTap;
+class _ProfileRoleBadge extends StatelessWidget {
+  final String label;
+  final bool verified;
+  final bool business;
 
-  const _HeroEditButton({required this.onTap});
+  const _ProfileRoleBadge({
+    required this.label,
+    required this.verified,
+    required this.business,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 34,
-        padding: const EdgeInsets.symmetric(horizontal: 13),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.2),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.edit_outlined,
-              size: 16,
-              color: Colors.white.withValues(alpha: 0.92),
-            ),
-            const SizedBox(width: 5),
-            Text(
-              '编辑主页',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.92),
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
+    final suffix = business
+        ? '机构'
+        : verified
+            ? '已认证'
+            : null;
+    final text = suffix == null ? label : '$label · $suffix';
+    return Text(
+      text,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(
+        color: _profileMuted,
+        fontSize: 13,
+        fontWeight: FontWeight.w800,
+        height: 1.1,
+        letterSpacing: 0,
+      ),
+    );
+  }
+}
+
+class _ProfileStatsLine extends StatelessWidget {
+  final int followers;
+  final int views;
+  final int following;
+  final int works;
+
+  const _ProfileStatsLine({
+    required this.followers,
+    required this.views,
+    required this.following,
+    required this.works,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final text = [
+      '${_compactProfileNumber(followers)} 粉丝',
+      '${_compactProfileNumber(views)} 浏览',
+      '${_compactProfileNumber(following)} 关注',
+      '${_compactProfileNumber(works)} 作品',
+    ].join('  ·  ');
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Text(
+          text,
+          maxLines: 1,
+          style: const TextStyle(
+            color: _profileMuted,
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            height: 1.25,
+            letterSpacing: 0,
+          ),
         ),
       ),
     );
@@ -1421,56 +1341,6 @@ class _HeroProfileAvatar extends StatelessWidget {
           fontWeight: FontWeight.w900,
         ),
       ),
-    );
-  }
-}
-
-class _HeroStatsRow extends StatelessWidget {
-  final int followers;
-  final int following;
-
-  const _HeroStatsRow({
-    required this.followers,
-    required this.following,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final items = [
-      ('关注', following),
-      ('粉丝', followers),
-    ];
-    return Row(
-      children: items
-          .map(
-            (item) => Padding(
-              padding: const EdgeInsets.only(right: 22),
-              child: RichText(
-                text: TextSpan(
-                  children: [
-                    TextSpan(
-                      text: _compactProfileNumber(item.$2),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        height: 1.1,
-                      ),
-                    ),
-                    TextSpan(
-                      text: ' ${item.$1}',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.76),
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          )
-          .toList(),
     );
   }
 }
@@ -1637,63 +1507,46 @@ class _ProfileShowcaseTabStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 44,
+      height: 42,
       child: Row(
-        children: [
-          ...List.generate(tabs.length, (index) {
-            final active = selectedIndex == index;
-            return Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => onChanged(index),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      tabs[index],
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: active
-                            ? context.artC.ink
-                            : context.artC.ink.withValues(alpha: 0.42),
-                        fontSize: 17,
-                        fontWeight: active ? FontWeight.w900 : FontWeight.w800,
-                      ),
+        children: List.generate(tabs.length, (index) {
+          final active = selectedIndex == index;
+          return Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => onChanged(index),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    tabs[index],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: active ? _profileInk : _profileMuted,
+                      fontSize: 14,
+                      fontWeight: active ? FontWeight.w900 : FontWeight.w800,
+                      height: 1,
+                      letterSpacing: 0,
                     ),
-                    const SizedBox(height: 8),
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 160),
-                      width: active ? 28 : 0,
-                      height: 3,
-                      decoration: BoxDecoration(
-                        color: kCobalt,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
+                  ),
+                  const SizedBox(height: 8),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    curve: Curves.easeOut,
+                    width: active ? 22 : 0,
+                    height: 2,
+                    decoration: BoxDecoration(
+                      color: active ? _profileInk : Colors.transparent,
+                      borderRadius: BorderRadius.circular(999),
                     ),
-                  ],
-                ),
-              ),
-            );
-          }),
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('主页内容搜索 - 节点二待实现')),
-              );
-            },
-            child: SizedBox(
-              width: 42,
-              height: 44,
-              child: Icon(
-                Icons.search_rounded,
-                size: 28,
-                color: context.artC.ink.withValues(alpha: 0.56),
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
+          );
+        }),
       ),
     );
   }
@@ -1725,10 +1578,9 @@ class _ProfileWorksPreview extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: context.artC.cardIconBg,
+            color: Colors.white,
             borderRadius: BorderRadius.circular(8),
-            border:
-                Border.all(color: context.artC.silver.withValues(alpha: 0.34)),
+            border: Border.all(color: _profileLine),
           ),
           child: Row(
             children: [
@@ -1754,8 +1606,8 @@ class _ProfileWorksPreview extends StatelessWidget {
                       emptyTitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: context.artC.ink,
+                      style: const TextStyle(
+                        color: _profileInk,
                         fontSize: 14,
                         fontWeight: FontWeight.w900,
                       ),
@@ -1765,8 +1617,8 @@ class _ProfileWorksPreview extends StatelessWidget {
                       emptySubtitle,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: context.artC.ink.withValues(alpha: 0.56),
+                      style: const TextStyle(
+                        color: _profileMuted,
                         fontSize: 12,
                         height: 1.35,
                         fontWeight: FontWeight.w800,
@@ -1778,7 +1630,7 @@ class _ProfileWorksPreview extends StatelessWidget {
               const SizedBox(width: 8),
               Icon(
                 Icons.chevron_right_rounded,
-                color: context.artC.ink.withValues(alpha: 0.28),
+                color: _profileMuted.withValues(alpha: 0.5),
                 size: 22,
               ),
             ],
@@ -1793,10 +1645,10 @@ class _ProfileWorksPreview extends StatelessWidget {
       padding: EdgeInsets.zero,
       itemCount: posts.length,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 10,
-        mainAxisExtent: 238,
+        crossAxisCount: 3,
+        mainAxisSpacing: 6,
+        crossAxisSpacing: 6,
+        childAspectRatio: 1,
       ),
       itemBuilder: (_, index) {
         final post = posts[index];
@@ -1827,130 +1679,76 @@ class _ProfileWorkTile extends StatelessWidget {
     final coverUrl = imageUrl.isNotEmpty
         ? imageUrl
         : 'https://picsum.photos/seed/artsee_profile_${Uri.encodeComponent(post.id)}/640/760';
-    final title = post.title.trim().isNotEmpty
-        ? post.title.trim()
-        : (post.body?.trim().isNotEmpty == true ? post.body!.trim() : '作品动态');
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Container(
         clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: context.artC.cardIconBg,
-          borderRadius: BorderRadius.circular(8),
-          border:
-              Border.all(color: context.artC.silver.withValues(alpha: 0.28)),
-          boxShadow: [
-            BoxShadow(
-              color: context.artC.ink.withValues(alpha: 0.026),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
+        decoration: const BoxDecoration(
+          color: _profileSoftCanvas,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
+          fit: StackFit.expand,
           children: [
-            Expanded(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.network(
-                    coverUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        _ProfileWorkFallback(index: index),
-                  ),
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.black.withValues(alpha: 0),
-                            Colors.black.withValues(alpha: 0.18),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (post.imageUrls.length > 1)
-                    Positioned(
-                      right: 7,
-                      top: 7,
-                      child: Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.44),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: const Icon(
-                          Icons.collections_outlined,
-                          color: Colors.white,
-                          size: 14,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+            Image.network(
+              coverUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => _ProfileWorkFallback(index: index),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(9, 8, 9, 0),
-              child: Text(
-                title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: context.artC.ink,
-                  fontSize: 13,
-                  height: 1.24,
-                  fontWeight: FontWeight.w900,
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0),
+                      Colors.black.withValues(alpha: index == 0 ? 0.22 : 0.08),
+                    ],
+                  ),
                 ),
               ),
             ),
-            const Spacer(),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(9, 7, 9, 9),
-              child: Row(
-                children: [
-                  Icon(
-                    post.likedByMe
-                        ? Icons.favorite_rounded
-                        : Icons.favorite_border_rounded,
+            if (post.imageUrls.length > 1)
+              Positioned(
+                right: 7,
+                top: 7,
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.44),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Icon(
+                    Icons.collections_outlined,
+                    color: Colors.white,
                     size: 14,
-                    color: post.likedByMe
-                        ? const Color(0xFFE64565)
-                        : context.artC.ink.withValues(alpha: 0.34),
                   ),
-                  const SizedBox(width: 3),
-                  Text(
-                    _compactProfileNumber(post.likeCount),
-                    style: TextStyle(
-                      color: context.artC.ink.withValues(alpha: 0.42),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Icon(
-                    Icons.chat_bubble_outline_rounded,
-                    size: 13,
-                    color: context.artC.ink.withValues(alpha: 0.32),
-                  ),
-                  const SizedBox(width: 3),
-                  Text(
-                    _compactProfileNumber(post.commentCount),
-                    style: TextStyle(
-                      color: context.artC.ink.withValues(alpha: 0.42),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
+            if (index == 0)
+              Positioned(
+                left: 7,
+                bottom: 7,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: const Text(
+                    '代表作',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      height: 1,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -2000,7 +1798,6 @@ class _ProfileWalletPreview extends StatelessWidget {
   final VoidCallback onTransactionsTap;
 
   const _ProfileWalletPreview({
-    super.key,
     required this.paidAmountCents,
     required this.pendingOrderCount,
     required this.paidOrderCount,

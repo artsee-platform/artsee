@@ -25,6 +25,86 @@ import 'package:artsee_app/theme/artsee_ui_colors.dart';
 /// 当前主界面由院校频道 header 与各页面内入口承载导航。
 /// ═══════════════════════════════════════════════════════════════
 
+const _workspaceBusinessRoles = {
+  'study_abroad_agency',
+  'portfolio_training',
+  'gallery_exhibition',
+  'event_organizer',
+  'hotel_culture_space',
+  'brand_partner',
+  'art_media_community',
+  'other_service',
+  'institution',
+  'institution_user',
+  'advisor',
+};
+
+const _institutionWorkspaceRoles = {
+  'study_abroad_agency',
+  'portfolio_training',
+  'institution',
+  'institution_user',
+  'advisor',
+};
+
+String _profileString(Map<String, dynamic>? profile, String key) {
+  return profile?[key]?.toString() ?? '';
+}
+
+bool usesWorkspaceTabForProfile(
+  Map<String, dynamic>? profile, {
+  bool hasOrganizationMembership = false,
+}) {
+  final userType = _profileString(profile, 'user_type');
+  final userRole = _profileString(profile, 'user_role');
+  final systemRole = _profileString(profile, 'role');
+  return userType == 'business' ||
+      userType == 'institution' ||
+      hasOrganizationMembership ||
+      _workspaceBusinessRoles.contains(userRole) ||
+      systemRole == 'institution_user' ||
+      systemRole == 'advisor';
+}
+
+String workspaceRoleForProfile(Map<String, dynamic>? profile) {
+  final userRole = _profileString(profile, 'user_role');
+  if (userRole.isNotEmpty) return userRole;
+  final systemRole = _profileString(profile, 'role');
+  if (systemRole.isNotEmpty) return systemRole;
+  return _profileString(profile, 'user_type');
+}
+
+String workspaceSurfaceForProfile(
+  Map<String, dynamic>? profile, {
+  bool hasOrganizationMembership = false,
+}) {
+  if (!usesWorkspaceTabForProfile(
+    profile,
+    hasOrganizationMembership: hasOrganizationMembership,
+  )) {
+    return 'school';
+  }
+  final role = workspaceRoleForProfile(profile);
+  if (role == 'gallery_exhibition') return 'gallery_workspace';
+  if (_institutionWorkspaceRoles.contains(role)) {
+    return 'institution_workspace';
+  }
+  return 'general_business_workspace';
+}
+
+List<String> mainNavigationLabelsForProfile(
+  Map<String, dynamic>? profile, {
+  bool hasOrganizationMembership = false,
+}) {
+  if (usesWorkspaceTabForProfile(
+    profile,
+    hasOrganizationMembership: hasOrganizationMembership,
+  )) {
+    return const ['工作台', '发现', '消息', '我的'];
+  }
+  return const ['院校', '发现', '消息', '我的'];
+}
+
 class MainScaffold extends StatefulWidget {
   final Map<String, dynamic>? initialProfile;
 
@@ -125,85 +205,75 @@ class _MainScaffoldState extends State<MainScaffold> {
     setState(() => _profileDrawerOpen = open);
   }
 
-  List<_NavItem> get _navItems => [
-        _usesWorkspaceTab
-            ? const _NavItem(
-                tabIndex: 1,
-                icon: Icons.dashboard_customize_outlined,
-                activeIcon: Icons.dashboard_customize_rounded,
-                label: '工作台',
-              )
-            : const _NavItem(
-                tabIndex: 1,
-                icon: Icons.school_outlined,
-                activeIcon: Icons.school_rounded,
-                label: '院校',
-              ),
-        const _NavItem(
-          tabIndex: 2,
-          icon: Icons.explore_outlined,
-          activeIcon: Icons.explore_rounded,
-          label: '发现',
-        ),
-        const _NavItem(
-          tabIndex: 3,
-          icon: Icons.chat_bubble_outline,
-          activeIcon: Icons.chat_bubble_rounded,
-          label: '消息',
-        ),
-        const _NavItem(
-          tabIndex: 4,
-          icon: Icons.person_outline,
-          activeIcon: Icons.person_rounded,
-          label: '我的',
-        ),
-      ];
+  List<_NavItem> get _navItems => _usesWorkspaceTab
+      ? const [
+          _NavItem(
+            tabIndex: 1,
+            icon: Icons.dashboard_customize_outlined,
+            activeIcon: Icons.dashboard_customize_rounded,
+            label: '工作台',
+          ),
+          _NavItem(
+            tabIndex: 2,
+            icon: Icons.explore_outlined,
+            activeIcon: Icons.explore_rounded,
+            label: '发现',
+          ),
+          _NavItem(
+            tabIndex: 3,
+            icon: Icons.chat_bubble_outline,
+            activeIcon: Icons.chat_bubble_rounded,
+            label: '消息',
+          ),
+          _NavItem(
+            tabIndex: 4,
+            icon: Icons.person_outline,
+            activeIcon: Icons.person_rounded,
+            label: '我的',
+          ),
+        ]
+      : const [
+          _NavItem(
+            tabIndex: 1,
+            icon: Icons.school_outlined,
+            activeIcon: Icons.school_rounded,
+            label: '院校',
+          ),
+          _NavItem(
+            tabIndex: 2,
+            icon: Icons.explore_outlined,
+            activeIcon: Icons.explore_rounded,
+            label: '发现',
+          ),
+          _NavItem(
+            tabIndex: 3,
+            icon: Icons.chat_bubble_outline,
+            activeIcon: Icons.chat_bubble_rounded,
+            label: '消息',
+          ),
+          _NavItem(
+            tabIndex: 4,
+            icon: Icons.person_outline,
+            activeIcon: Icons.person_rounded,
+            label: '我的',
+          ),
+        ];
 
   bool get _usesWorkspaceTab {
-    final userType = _profile?['user_type']?.toString();
-    final userRole = _profile?['user_role']?.toString();
-    final systemRole = _profile?['role']?.toString();
-    const businessRoles = {
-      'study_abroad_agency',
-      'portfolio_training',
-      'gallery_exhibition',
-      'event_organizer',
-      'hotel_culture_space',
-      'brand_partner',
-      'art_media_community',
-      'other_service',
-      'institution',
-      'institution_user',
-      'advisor',
-    };
-    return userType == 'business' ||
-        userType == 'institution' ||
-        _hasOrganizationMembership ||
-        businessRoles.contains(userRole) ||
-        systemRole == 'institution_user' ||
-        systemRole == 'advisor';
+    return usesWorkspaceTabForProfile(
+      _profile,
+      hasOrganizationMembership: _hasOrganizationMembership,
+    );
   }
 
   bool get _shouldShowTopHeader => false;
 
   String get _workspaceRole {
-    final userRole = _profile?['user_role']?.toString();
-    if (userRole != null && userRole.isNotEmpty) return userRole;
-    final systemRole = _profile?['role']?.toString();
-    if (systemRole != null && systemRole.isNotEmpty) return systemRole;
-    final userType = _profile?['user_type']?.toString();
-    return userType ?? '';
+    return workspaceRoleForProfile(_profile);
   }
 
   bool get _usesInstitutionWorkspace {
-    const institutionRoles = {
-      'study_abroad_agency',
-      'portfolio_training',
-      'institution',
-      'institution_user',
-      'advisor',
-    };
-    return institutionRoles.contains(_workspaceRole);
+    return _institutionWorkspaceRoles.contains(_workspaceRole);
   }
 
   Widget _buildWorkspaceScreen() {
@@ -262,13 +332,13 @@ class _MainScaffoldState extends State<MainScaffold> {
     var submitting = false;
 
     final labels = switch (kind) {
-      _CommunityCreateKind.qa => (
-          '发布问答',
-          '问题标题',
-          '话题分类',
+      _CommunityCreateKind.market => (
+          '发布市集商品',
+          '商品标题',
+          '商品分类',
           '城市/地区',
-          '补充说明',
-          '预算'
+          '商品说明',
+          '价格/条件'
         ),
       _CommunityCreateKind.circle => (
           '创建圈子',
@@ -287,6 +357,9 @@ class _MainScaffoldState extends State<MainScaffold> {
           '费用'
         ),
     };
+    if (kind == _CommunityCreateKind.market) {
+      typeCtrl.text = '艺术';
+    }
 
     await showDialog<void>(
       context: context,
@@ -296,14 +369,23 @@ class _MainScaffoldState extends State<MainScaffold> {
             if (!formKey.currentState!.validate() || submitting) return;
             setDialogState(() => submitting = true);
             try {
-              if (kind == _CommunityCreateKind.qa) {
-                await BackendApiService.createCommunityPost(
+              if (kind == _CommunityCreateKind.market) {
+                final category = typeCtrl.text.trim();
+                await BackendApiService.createPlazaPost(
                   title: titleCtrl.text.trim(),
                   body: noteCtrl.text.trim(),
+                  kind: 'market',
+                  group: category.isEmpty ? '艺术' : category,
+                  tags: [
+                    if (category.isNotEmpty) category,
+                    if (cityCtrl.text.trim().isNotEmpty) cityCtrl.text.trim(),
+                  ],
                   metadata: {
-                    'kind': 'qa',
-                    'category': typeCtrl.text.trim(),
+                    'kind': 'market',
+                    'category': category.isEmpty ? '艺术' : category,
+                    'source': 'market_resource',
                     'city': cityCtrl.text.trim(),
+                    'price': amountCtrl.text.trim(),
                   },
                 );
               } else if (kind == _CommunityCreateKind.circle) {
@@ -366,11 +448,14 @@ class _MainScaffoldState extends State<MainScaffold> {
                       label: labels.$5,
                       maxLines: 3,
                     ),
-                    if (kind == _CommunityCreateKind.salon)
+                    if (kind == _CommunityCreateKind.market ||
+                        kind == _CommunityCreateKind.salon)
                       _ResourceTextField(
                         controller: amountCtrl,
                         label: labels.$6,
-                        keyboardType: TextInputType.number,
+                        keyboardType: kind == _CommunityCreateKind.salon
+                            ? TextInputType.number
+                            : TextInputType.text,
                       ),
                   ],
                 ),
@@ -459,7 +544,7 @@ class _MainScaffoldState extends State<MainScaffold> {
             final place = placeCtrl.text.trim();
             final primaryDirection = directions.first;
             try {
-              final created = await BackendApiService.createCommunityCircle({
+              await BackendApiService.createCommunityCircle({
                 'title': name,
                 'subtitle': intro,
                 'category': primaryDirection,
@@ -478,15 +563,6 @@ class _MainScaffoldState extends State<MainScaffold> {
               });
               if (!mounted || !sheetContext.mounted) return;
               Navigator.of(sheetContext).pop();
-              final localCircle = {
-                ...created,
-                'join_status': 'joined',
-                'join_type': joinType,
-                'today_post_count': 0,
-                'hot_topic': '发布第一条讨论，开启圈子交流',
-                'member_count': created['member_count'] ?? 1,
-              };
-              _exploreKey.currentState?.addCreatedCircle(localCircle);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('圈子已创建，你可以发布第一条动态或邀请同方向用户加入'),
@@ -1049,15 +1125,10 @@ class _MainScaffoldState extends State<MainScaffold> {
   }
 
   Future<void> _showCreateSheet() async {
-    if (_currentIndex == 2 &&
-        (_exploreKey.currentState?.isDynamicTabActive ?? false)) {
-      await _openCreatePost();
-      return;
-    }
     if (!await ensureLoggedIn(context, message: '请先登录后发布资源')) return;
     if (!mounted) return;
     final primarySection = _primaryCreateSection;
-    final sections = _orderedCreateSections(primarySection);
+    final sections = _orderedCreateSections();
 
     await showGeneralDialog<void>(
       context: context,
@@ -1127,9 +1198,7 @@ class _MainScaffoldState extends State<MainScaffold> {
     };
   }
 
-  List<_CreateSheetSection> _orderedCreateSections(
-    _CreateSectionKind primarySection,
-  ) {
+  List<_CreateSheetSection> _orderedCreateSections() {
     const sections = [
       _CreateSheetSection(
         kind: _CreateSectionKind.cooperation,
@@ -1137,14 +1206,8 @@ class _MainScaffoldState extends State<MainScaffold> {
           _CreateSheetAction(
             kind: _CreateActionKind.opportunity,
             icon: Icons.business_center_outlined,
-            label: '发布合作机会',
-            subtitle: '项目招募 / 展览征集 / 驻留委托',
-          ),
-          _CreateSheetAction(
-            kind: _CreateActionKind.artist,
-            icon: Icons.palette_outlined,
-            label: '艺术家入驻',
-            subtitle: '创建档案，被合作方发现',
+            label: '发布合作',
+            subtitle: '招募 / 征集 / 驻留 / 委托',
           ),
         ],
       ),
@@ -1154,14 +1217,8 @@ class _MainScaffoldState extends State<MainScaffold> {
           _CreateSheetAction(
             kind: _CreateActionKind.exhibition,
             icon: Icons.grid_view_rounded,
-            label: '发布展览活动',
-            subtitle: '展览 / 工作坊 / 开放日 / 说明会',
-          ),
-          _CreateSheetAction(
-            kind: _CreateActionKind.salon,
-            icon: Icons.groups_2_outlined,
-            label: '创建沙龙',
-            subtitle: '小型分享 / 导览 / 线上交流',
+            label: '发布活动',
+            subtitle: '展览 / 沙龙 / 工作坊 / 开放日',
           ),
         ],
       ),
@@ -1175,25 +1232,16 @@ class _MainScaffoldState extends State<MainScaffold> {
             subtitle: '作品 / 现场 / 灵感记录',
           ),
           _CreateSheetAction(
-            kind: _CreateActionKind.circle,
-            icon: Icons.bubble_chart_outlined,
-            label: '创建圈子',
-            subtitle: '院校 / 专业 / 城市 / 作品集社群',
-          ),
-          _CreateSheetAction(
             kind: _CreateActionKind.question,
-            icon: Icons.help_outline_rounded,
-            label: '发布问答',
-            subtitle: '把问题发到相关圈子讨论',
+            icon: Icons.storefront_outlined,
+            label: '发布商品',
+            subtitle: '艺术 / 工艺 / 出版 / 定制',
           ),
         ],
       ),
     ];
 
-    return [
-      ...sections.where((section) => section.kind == primarySection),
-      ...sections.where((section) => section.kind != primarySection),
-    ];
+    return sections;
   }
 
   Widget _buildCreateFloatingOptions(
@@ -1265,34 +1313,21 @@ class _MainScaffoldState extends State<MainScaffold> {
       case _CreateActionKind.opportunity:
         _openResourceDialog(_ResourceKind.opportunity);
         break;
-      case _CreateActionKind.artist:
-        _openResourceDialog(_ResourceKind.artist);
-        break;
       case _CreateActionKind.exhibition:
         _openResourceDialog(_ResourceKind.event);
         break;
-      case _CreateActionKind.salon:
-        _openCommunityDialog(_CommunityCreateKind.salon);
-        break;
-      case _CreateActionKind.circle:
-        _openCommunityDialog(_CommunityCreateKind.circle);
-        break;
       case _CreateActionKind.question:
-        _openQuestionFromCreateSheet();
+        if (_currentIndex == 2 &&
+            _exploreKey.currentState?.activeTabIndex == 3) {
+          _openCommunityDialog(_CommunityCreateKind.market);
+          break;
+        }
+        _openCreatePost();
         break;
       case _CreateActionKind.post:
         _openCreatePost();
         break;
     }
-  }
-
-  Future<void> _openQuestionFromCreateSheet() async {
-    final exploreState = _exploreKey.currentState;
-    if (exploreState != null) {
-      await exploreState.openQuestionComposer();
-      return;
-    }
-    await _openCommunityDialog(_CommunityCreateKind.qa);
   }
 
   Future<void> _openResourceDialog(_ResourceKind kind) async {
@@ -1346,15 +1381,8 @@ class _MainScaffoldState extends State<MainScaffold> {
     var submitting = false;
 
     final labels = switch (kind) {
-      _ResourceKind.opportunity => (
-          '发布合作机会',
-          '机会标题',
-          '类型',
-          '城市',
-          '需求说明',
-          '预算上限'
-        ),
-      _ResourceKind.event => ('发布展览活动', '活动标题', '类型', '城市', '地点/场馆', '费用'),
+      _ResourceKind.opportunity => ('发布合作', '机会标题', '类型', '城市', '需求说明', '预算上限'),
+      _ResourceKind.event => ('发布活动', '活动标题', '类型', '城市', '地点/场馆', '费用'),
       _ResourceKind.artist => (
           '艺术家入驻',
           '显示名称',
@@ -1611,8 +1639,7 @@ class _MainScaffoldState extends State<MainScaffold> {
             isProfileSurface
         ? 0.0
         : statusBarHeight + (showTopHeader ? _headerHeight : 0);
-    final hideFloatingNav =
-        _currentIndex == 0 || _homeNavHidden || _profileDrawerOpen;
+    final hideFloatingNav = _homeNavHidden || _profileDrawerOpen;
 
     return Scaffold(
       backgroundColor: context.artC.porcelain,
@@ -1628,18 +1655,15 @@ class _MainScaffoldState extends State<MainScaffold> {
             child: IndexedStack(
               index: _currentIndex,
               children: [
-                const HomeScreen(),
+                HomeScreen(showWorkbenchShortcut: _usesWorkspaceTab),
                 _usesWorkspaceTab
                     ? _buildWorkspaceScreen()
                     : NewsScaffold(
                         key: _newsKey,
-                        onOpenDotChat: _openDotChatRoute,
                       ),
                 ExploreScreen(
                   key: _exploreKey,
-                  onOpenDotChat: _openDotChatRoute,
-                  onCreateCircle: () =>
-                      _openCommunityDialog(_CommunityCreateKind.circle),
+                  onCreateTap: _showCreateSheet,
                   onTabChanged: () {
                     if (mounted) setState(() {});
                   },
@@ -1731,7 +1755,7 @@ class _MainScaffoldState extends State<MainScaffold> {
           ...leadingItems.map(_buildNavButtonSlot),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: _CreateNavButton(onTap: _showCreateSheet),
+            child: _AiNavButton(onTap: _openDotChatRoute),
           ),
           ...trailingItems.map(_buildNavButtonSlot),
         ],
@@ -1749,7 +1773,11 @@ class _MainScaffoldState extends State<MainScaffold> {
             _openLoginOrProfile();
             return;
           }
-          setState(() => _currentIndex = item.tabIndex);
+          setState(() {
+            _currentIndex = item.tabIndex;
+            _homeNavHidden = false;
+            if (item.tabIndex != 4) _profileDrawerOpen = false;
+          });
           if (item.tabIndex == 1 || item.tabIndex == 4) _loadProfile();
         },
       ),
@@ -1813,7 +1841,9 @@ class _MainScaffoldState extends State<MainScaffold> {
   }
 
   IconData? get _headerActionIcon {
-    if (_currentIndex == 1) return null;
+    if (_currentIndex == 1) {
+      return null;
+    }
     if (_currentIndex == 3) {
       return _forumKey.currentState?.actionIcon ?? Icons.add_rounded;
     }
@@ -2065,16 +2095,13 @@ class _TopHeaderState extends State<_TopHeader> {
 
 enum _ResourceKind { opportunity, event, artist }
 
-enum _CommunityCreateKind { qa, circle, salon }
+enum _CommunityCreateKind { market, circle, salon }
 
 enum _CreateSectionKind { cooperation, activity, circle }
 
 enum _CreateActionKind {
   opportunity,
-  artist,
   exhibition,
-  salon,
-  circle,
   question,
   post,
 }
@@ -2406,6 +2433,8 @@ class _NavButtonState extends State<_NavButton> {
     final activeColor = Theme.of(context).brightness == Brightness.dark
         ? kCobaltMuted
         : kCobalt;
+    final inactiveColor = context.artC.ink.withValues(alpha: 0.42);
+    final itemColor = widget.isSelected ? activeColor : inactiveColor;
 
     return GestureDetector(
       onTapDown: (_) => setState(() => _pressed = true),
@@ -2423,37 +2452,38 @@ class _NavButtonState extends State<_NavButton> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  widget.isSelected ? widget.item.activeIcon : widget.item.icon,
-                  size: 22,
-                  color: widget.isSelected
-                      ? activeColor
-                      : context.artC.ink.withValues(alpha: 0.34),
-                ),
-                AnimatedSwitcher(
+                AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeOutCubic,
-                  child: widget.isSelected
-                      ? Padding(
-                          key: ValueKey(widget.item.label),
-                          padding: const EdgeInsets.only(top: 5),
-                          child: Text(
-                            widget.item.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.visible,
-                            style: TextStyle(
-                              color: activeColor,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0,
-                            ),
-                          ),
-                        )
-                      : const SizedBox(
-                          key: ValueKey('empty'),
-                          height: 14,
-                        ),
+                  curve: Curves.easeOutCubic,
+                  width: 30,
+                  height: 26,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: widget.isSelected
+                        ? activeColor.withValues(alpha: 0.1)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    widget.isSelected
+                        ? widget.item.activeIcon
+                        : widget.item.icon,
+                    size: 21,
+                    color: itemColor,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  widget.item.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.visible,
+                  style: TextStyle(
+                    color: itemColor,
+                    fontSize: 9,
+                    fontWeight:
+                        widget.isSelected ? FontWeight.w900 : FontWeight.w800,
+                    letterSpacing: 0,
+                  ),
                 ),
               ],
             ),
@@ -2464,25 +2494,25 @@ class _NavButtonState extends State<_NavButton> {
   }
 }
 
-class _CreateNavButton extends StatefulWidget {
+class _AiNavButton extends StatefulWidget {
   final VoidCallback onTap;
 
-  const _CreateNavButton({required this.onTap});
+  const _AiNavButton({required this.onTap});
 
   @override
-  State<_CreateNavButton> createState() => _CreateNavButtonState();
+  State<_AiNavButton> createState() => _AiNavButtonState();
 }
 
-class _CreateNavButtonState extends State<_CreateNavButton> {
+class _AiNavButtonState extends State<_AiNavButton> {
   bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
-    const createColor = kCobalt;
+    const aiColor = kCobalt;
 
     return Semantics(
       button: true,
-      label: '发布',
+      label: 'AI 助手',
       child: GestureDetector(
         onTapDown: (_) => setState(() => _pressed = true),
         onTapUp: (_) => setState(() => _pressed = false),
@@ -2497,20 +2527,36 @@ class _CreateNavButtonState extends State<_CreateNavButton> {
             width: 70,
             height: 44,
             decoration: BoxDecoration(
-              color: createColor,
+              color: aiColor,
               borderRadius: BorderRadius.circular(15),
               boxShadow: [
                 BoxShadow(
-                  color: createColor.withValues(alpha: 0.28),
+                  color: aiColor.withValues(alpha: 0.28),
                   blurRadius: 14,
                   offset: const Offset(0, 6),
                 ),
               ],
             ),
-            child: const Icon(
-              Icons.add_rounded,
-              size: 34,
-              color: Colors.white,
+            child: const Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.auto_awesome_rounded,
+                  size: 18,
+                  color: Colors.white,
+                ),
+                SizedBox(height: 1),
+                Text(
+                  'AI',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0,
+                    height: 1,
+                  ),
+                ),
+              ],
             ),
           ),
         ),

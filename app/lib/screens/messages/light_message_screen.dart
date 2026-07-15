@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -10,6 +11,15 @@ import '../../services/supabase_service.dart';
 import '../../services/tencent_im_service.dart';
 import '../../theme/artsee_ui_colors.dart';
 import '../../widgets/common.dart';
+
+const _waGreen = kCobalt;
+const _waHeaderBlue = Colors.white;
+const _waGreenLight = kCobalt;
+const _waChatBg = Color(0xFFECE5DD);
+const _waMineBubble = Color(0xFFEAF1FF);
+const _waOtherBubble = Colors.white;
+const _waMuted = Color(0xFF667781);
+const _waInk = Color(0xFF111B21);
 
 enum LightMessagePeerKind { person, organization }
 
@@ -482,41 +492,52 @@ class _LightMessageScreenState extends State<LightMessageScreen> {
   @override
   Widget build(BuildContext context) {
     final peer = _peer;
-    return Scaffold(
-      backgroundColor: context.artC.porcelain,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _LightMessageTopBar(peer: peer, onOpenProfile: _openProfile),
-            Expanded(
-              child: _loading
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        color: kCobalt,
-                        strokeWidth: 2.5,
-                      ),
-                    )
-                  : _error != null
-                      ? _MessageErrorState(
-                          error: _error!, onRetry: _loadMessages)
-                      : ListView.builder(
-                          controller: _scroll,
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
-                          itemCount: _messages.length,
-                          itemBuilder: (_, index) => _MessageBubbleLite(
-                            message: _messages[index],
-                            peer: peer,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.dark.copyWith(
+        statusBarColor: _waHeaderBlue,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+      ),
+      child: Scaffold(
+        backgroundColor: _waHeaderBlue,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _LightMessageTopBar(peer: peer, onOpenProfile: _openProfile),
+              Expanded(
+                child: ColoredBox(
+                  color: _waChatBg,
+                  child: _loading
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            color: kCobalt,
+                            strokeWidth: 2.5,
                           ),
-                        ),
-            ),
-            _LightMessageInputBar(
-              controller: _input,
-              sending: _sending,
-              onSend: _send,
-              onPickImage: _pickAndSendImage,
-              onPickFile: _pickAndSendFile,
-            ),
-          ],
+                        )
+                      : _error != null
+                          ? _MessageErrorState(
+                              error: _error!, onRetry: _loadMessages)
+                          : ListView.builder(
+                              controller: _scroll,
+                              padding:
+                                  const EdgeInsets.fromLTRB(10, 12, 10, 18),
+                              itemCount: _messages.length,
+                              itemBuilder: (_, index) => _MessageBubbleLite(
+                                message: _messages[index],
+                                peer: peer,
+                              ),
+                            ),
+                ),
+              ),
+              _LightMessageInputBar(
+                controller: _input,
+                sending: _sending,
+                onSend: _send,
+                onPickImage: _pickAndSendImage,
+                onPickFile: _pickAndSendFile,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -579,9 +600,8 @@ Future<void> _openAttachment(String url) async {
 }
 
 String _contentTypeForFilename(String filename) {
-  final ext = filename.contains('.')
-      ? filename.split('.').last.toLowerCase()
-      : '';
+  final ext =
+      filename.contains('.') ? filename.split('.').last.toLowerCase() : '';
   return switch (ext) {
     'jpg' || 'jpeg' => 'image/jpeg',
     'png' => 'image/png',
@@ -623,20 +643,14 @@ class _LightMessageTopBar extends StatelessWidget {
       if (isOrg && peer.responseTime?.isNotEmpty == true) peer.responseTime!,
     ].join(' · ');
     return Container(
-      decoration: BoxDecoration(
-        color: context.artC.porcelain,
-        border: Border(
-          bottom:
-              BorderSide(color: context.artC.silver.withValues(alpha: 0.24)),
-        ),
-      ),
-      padding: const EdgeInsets.fromLTRB(6, 6, 8, 7),
+      color: _waHeaderBlue,
+      padding: const EdgeInsets.fromLTRB(4, 6, 8, 7),
       child: Row(
         children: [
           IconButton(
             tooltip: '返回',
             icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-            color: context.artC.ink,
+            color: _waInk,
             onPressed: () => Navigator.of(context).pop(),
           ),
           _PeerAvatar(peer: peer, size: 36),
@@ -650,7 +664,7 @@ class _LightMessageTopBar extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: context.artC.ink,
+                    color: _waInk,
                     fontSize: 16,
                     fontWeight: FontWeight.w900,
                   ),
@@ -661,7 +675,7 @@ class _LightMessageTopBar extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: context.artC.ink.withValues(alpha: 0.42),
+                    color: _waMuted,
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
                   ),
@@ -675,7 +689,7 @@ class _LightMessageTopBar extends StatelessWidget {
             icon: Icon(
               isOrg ? Icons.storefront_outlined : Icons.person_outline_rounded,
               size: 20,
-              color: kCobalt,
+              color: _waInk.withValues(alpha: 0.72),
             ),
           ),
         ],
@@ -695,7 +709,7 @@ class _PeerAvatar extends StatelessWidget {
     final url = peer.avatarUrl?.trim();
     return ClipRRect(
       borderRadius: BorderRadius.circular(
-        peer.kind == LightMessagePeerKind.organization ? 9 : size / 2,
+        size / 2,
       ),
       child: SizedBox(
         width: size,
@@ -720,12 +734,12 @@ class _PeerAvatarFallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: kCobalt.withValues(alpha: 0.08),
+      color: _waGreenLight,
       child: Center(
         child: Text(
           peer.name.isEmpty ? '艺' : peer.name.characters.first,
           style: TextStyle(
-            color: kCobalt,
+            color: Colors.white,
             fontSize: peer.kind == LightMessagePeerKind.organization ? 15 : 16,
             fontWeight: FontWeight.w900,
           ),
@@ -749,7 +763,7 @@ class _MessageBubbleLite extends StatelessWidget {
     final attachmentUrl = _attachmentUrl(message);
     if (body.isEmpty && attachmentUrl == null) return const SizedBox.shrink();
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         mainAxisAlignment:
             mine ? MainAxisAlignment.end : MainAxisAlignment.start,
@@ -761,15 +775,25 @@ class _MessageBubbleLite extends StatelessWidget {
           ],
           Flexible(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.sizeOf(context).width * 0.76,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: mine ? kCobalt : context.artC.cardIconBg,
-                borderRadius: BorderRadius.circular(8),
-                border: mine
-                    ? null
-                    : Border.all(
-                        color: context.artC.silver.withValues(alpha: 0.34),
-                      ),
+                color: mine ? _waMineBubble : _waOtherBubble,
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(12),
+                  topRight: const Radius.circular(12),
+                  bottomLeft: Radius.circular(mine ? 12 : 3),
+                  bottomRight: Radius.circular(mine ? 3 : 12),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 2,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
               ),
               child: _MessageBubbleContent(
                 message: message,
@@ -804,7 +828,7 @@ class _MessageBubbleContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textColor = mine ? Colors.white : context.artC.ink;
+    const textColor = _waInk;
     final url = attachmentUrl;
     if (type == 'image' && url != null) {
       return InkWell(
@@ -835,7 +859,8 @@ class _MessageBubbleContent extends StatelessWidget {
     }
 
     if (type == 'file' && url != null) {
-      final name = _attachmentName(message) ?? body.replaceFirst('[文件]', '').trim();
+      final name =
+          _attachmentName(message) ?? body.replaceFirst('[文件]', '').trim();
       return InkWell(
         onTap: () {
           _openAttachment(url);
@@ -867,9 +892,9 @@ class _MessageBubbleContent extends StatelessWidget {
       body,
       style: TextStyle(
         color: textColor,
-        fontSize: 13,
+        fontSize: 14,
         height: 1.45,
-        fontWeight: FontWeight.w700,
+        fontWeight: FontWeight.w600,
       ),
     );
   }
@@ -929,13 +954,8 @@ class _LightMessageInputBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        color: context.artC.porcelain,
-        border: Border(
-          top: BorderSide(color: context.artC.silver.withValues(alpha: 0.4)),
-        ),
-      ),
-      padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
+      color: _waChatBg,
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
       child: SafeArea(
         top: false,
         child: Row(
@@ -958,11 +978,8 @@ class _LightMessageInputBar extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 13),
                 decoration: BoxDecoration(
-                  color: context.artC.cardIconBg,
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: context.artC.silver.withValues(alpha: 0.52),
-                  ),
                 ),
                 child: TextField(
                   controller: controller,
@@ -974,13 +991,13 @@ class _LightMessageInputBar extends StatelessWidget {
                     hintText: '写一条消息...',
                     border: InputBorder.none,
                     hintStyle: TextStyle(
-                      color: context.artC.ink.withValues(alpha: 0.34),
+                      color: _waMuted,
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   style: TextStyle(
-                    color: context.artC.ink,
+                    color: _waInk,
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                   ),
@@ -995,7 +1012,7 @@ class _LightMessageInputBar extends StatelessWidget {
                 tooltip: '发送',
                 style: IconButton.styleFrom(
                   backgroundColor:
-                      sending ? kCobalt.withValues(alpha: 0.45) : kCobalt,
+                      sending ? _waGreen.withValues(alpha: 0.45) : _waGreen,
                   foregroundColor: Colors.white,
                 ),
                 onPressed: sending ? null : onSend,
@@ -1044,8 +1061,8 @@ class _InputIconButton extends StatelessWidget {
           icon,
           size: 20,
           color: disabled
-              ? context.artC.ink.withValues(alpha: 0.24)
-              : context.artC.ink.withValues(alpha: 0.62),
+              ? _waMuted.withValues(alpha: 0.35)
+              : kCobalt.withValues(alpha: 0.78),
         ),
       ),
     );

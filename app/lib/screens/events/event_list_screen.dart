@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../widgets/artsee_ui.dart';
 import '../../widgets/common.dart';
 import '../../services/backend_api_service.dart';
+import '../../utils/auth_gate.dart';
+import 'event_feed_widgets.dart';
+import 'my_events_screen.dart';
 import 'package:artsee_app/theme/artsee_ui_colors.dart';
 
 class EventListScreen extends StatefulWidget {
@@ -13,6 +15,8 @@ class EventListScreen extends StatefulWidget {
 
 class _EventListScreenState extends State<EventListScreen> {
   List<Map<String, dynamic>> _events = [];
+  List<Map<String, dynamic>> _myEvents = [];
+  final Set<String> _appliedIds = {};
   bool _loading = false;
 
   @override
@@ -25,7 +29,31 @@ class _EventListScreenState extends State<EventListScreen> {
     setState(() => _loading = true);
     try {
       final result = await BackendApiService.fetchEvents(limit: 30);
-      if (mounted) setState(() => _events = result.data);
+      var myEvents = <Map<String, dynamic>>[];
+      try {
+        final applications =
+            await BackendApiService.fetchMyEventApplications(limit: 30);
+        myEvents = applications.data
+            .map(artseeEventFromApplication)
+            .whereType<Map<String, dynamic>>()
+            .toList();
+      } catch (_) {
+        myEvents = const [];
+      }
+      final appliedIds = myEvents
+          .map((event) => event['id']?.toString() ?? '')
+          .where((id) => id.isNotEmpty)
+          .toSet();
+      final events = _mergeEventLists([myEvents, result.data]);
+      if (mounted) {
+        setState(() {
+          _events = events;
+          _myEvents = myEvents;
+          _appliedIds
+            ..clear()
+            ..addAll(appliedIds);
+        });
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -37,9 +65,26 @@ class _EventListScreenState extends State<EventListScreen> {
     }
   }
 
+  Future<void> _openMyEvents() async {
+    if (!await ensureLoggedIn(context, message: '请先登录后查看你的活动')) {
+      return;
+    }
+    if (!mounted) return;
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => const MyEventsScreen()),
+    );
+  }
+
+  void _openEvent(Map<String, dynamic> event) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(event['title']?.toString() ?? '活动详情')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottom = mainTabBottomInset(context);
+    final groups = groupArtseeEventsByDay(_events);
     return Scaffold(
       backgroundColor: context.artC.porcelain,
       body: SafeArea(
@@ -48,41 +93,42 @@ class _EventListScreenState extends State<EventListScreen> {
             ? const Center(child: CircularProgressIndicator())
             : RefreshIndicator(
                 onRefresh: _loadEvents,
-                child: ListView.builder(
-                  padding: EdgeInsets.fromLTRB(20, 24, 20, bottom),
-                  itemCount: _events.length + 1,
-                  itemBuilder: (context, index) {
-                    if (index == 0) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 28),
-                          Text(
-                            '活动',
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w900,
-                              color: context.artC.ink,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '顶奢酒店艺术活动中心',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: context.artC.ink.withOpacity(0.5),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                        ],
-                      );
-                    }
-                    final event = _events[index - 1];
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _EventCard(event: event),
-                    );
-                  },
+                child: ListView(
+                  padding: EdgeInsets.fromLTRB(20, 28, 20, bottom + 24),
+                  children: [
+                    ArtseeActivityPersonalSection(
+                      events: _myEvents,
+                      onOpen: _openEvent,
+                      onOpenAll: _openMyEvents,
+                    ),
+                    const SizedBox(height: 22),
+                    ArtseeActivityRecommendationHeader(
+                      filterLabel: '附近',
+                      selectedFilter: '全部',
+                      filters: const ['全部'],
+                      onSelected: (_) {},
+                    ),
+                    const SizedBox(height: 16),
+                    if (_events.isEmpty)
+                      const ArtseeActivityFeedEmpty(
+                        title: '暂无展览活动',
+                        subtitle: '点击右下角 + 发布展览、沙龙或工作坊。',
+                      )
+                    else ...[
+                      ArtseeActivitySponsoredSlot(
+                        event: _events.first,
+                        onOpen: () => _openEvent(_events.first),
+                      ),
+                      const SizedBox(height: 18),
+                      ...groups.map(
+                        (group) => ArtseeActivityDateSection(
+                          group: group,
+                          appliedIds: _appliedIds,
+                          onOpen: _openEvent,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
       ),
@@ -90,82 +136,20 @@ class _EventListScreenState extends State<EventListScreen> {
   }
 }
 
-class _EventCard extends StatelessWidget {
-  final Map<String, dynamic> event;
-
-  const _EventCard({required this.event});
-
-  @override
-  Widget build(BuildContext context) {
-    final title = event['title'] as String? ?? '活动';
-    final city = event['city'] as String? ?? '';
-    final venue = event['venue'] as String? ?? '';
-    final type = event['type'] as String? ?? '';
-
-    return ArtseeSurface(
-      onTap: () {},
-      padding: const EdgeInsets.all(16),
-      radius: 18,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: kCobalt.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  type.isNotEmpty ? type : '活动',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: kCobalt,
-                  ),
-                ),
-              ),
-              if (city.isNotEmpty) ...[
-                const SizedBox(width: 8),
-                Icon(Icons.location_on,
-                    size: 12, color: context.artC.ink.withOpacity(0.4)),
-                const SizedBox(width: 2),
-                Text(
-                  city,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: context.artC.ink.withOpacity(0.5),
-                  ),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: context.artC.ink,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          if (venue.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(
-              venue,
-              style: TextStyle(
-                fontSize: 12,
-                color: context.artC.ink.withOpacity(0.5),
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ],
-      ),
-    );
+List<Map<String, dynamic>> _mergeEventLists(
+  Iterable<List<Map<String, dynamic>>> lists,
+) {
+  final byId = <String, Map<String, dynamic>>{};
+  final fallback = <Map<String, dynamic>>[];
+  for (final list in lists) {
+    for (final item in list) {
+      final id = item['id']?.toString();
+      if (id == null || id.isEmpty) {
+        fallback.add(item);
+      } else {
+        byId[id] = {...?byId[id], ...item};
+      }
+    }
   }
+  return [...byId.values, ...fallback]..sort(compareArtseeEventsByStart);
 }

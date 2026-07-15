@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../data/school_display_aliases.dart';
 import '../../services/backend_api_service.dart';
 import '../../services/supabase_service.dart';
-import '../../widgets/artsee_ui.dart';
 import '../../widgets/common.dart';
 import '../auth/login_screen.dart';
 import '../consultation/organization_list_screen.dart';
@@ -11,7 +10,16 @@ import 'package:artsee_app/theme/artsee_ui_colors.dart';
 
 /// 院校列表 — 分页查询
 class SchoolListScreen extends StatefulWidget {
-  const SchoolListScreen({super.key});
+  final VoidCallback? onOpenCompare;
+  final VoidCallback? onOpenCompareTab;
+
+  const SchoolListScreen({
+    super.key,
+    this.onOpenCompare,
+    @Deprecated('Use onOpenCompare instead') this.onOpenCompareTab,
+  });
+
+  VoidCallback? get resolvedOpenCompare => onOpenCompare ?? onOpenCompareTab;
 
   @override
   State<SchoolListScreen> createState() => SchoolListScreenState();
@@ -222,8 +230,17 @@ class SchoolListScreenState extends State<SchoolListScreen>
           _savedSchoolIds.add(id);
         }
       });
+      final onOpenCompare = widget.resolvedOpenCompare;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(wasSaved ? '已移出目标院校池' : '已加入目标院校池')),
+        SnackBar(
+          content: Text(wasSaved ? '已移出目标院校池' : '已加入目标院校池，可去对比'),
+          action: !wasSaved && onOpenCompare != null
+              ? SnackBarAction(
+                  label: '去对比',
+                  onPressed: onOpenCompare,
+                )
+              : null,
+        ),
       );
     } catch (e) {
       if (!mounted) return;
@@ -356,12 +373,12 @@ class SchoolListScreenState extends State<SchoolListScreen>
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: context.artC.porcelain,
+      color: Colors.white,
       child: RefreshIndicator(
         color: kCobalt,
         onRefresh: _refresh,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 164),
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 164),
           children: [
             _SchoolSortBar(
               sortKey: _sortKey,
@@ -401,7 +418,7 @@ class SchoolListScreenState extends State<SchoolListScreen>
                 );
               },
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 28),
             if (_items.isEmpty && _loading)
               const Padding(
                 padding: EdgeInsets.only(top: 120),
@@ -460,14 +477,17 @@ class SchoolListScreenState extends State<SchoolListScreen>
                       if (id != null && id.isNotEmpty) {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) => SchoolDetailScreen(id: id),
+                            builder: (_) => SchoolDetailScreen(
+                              id: id,
+                              onOpenCompare: widget.resolvedOpenCompare,
+                            ),
                           ),
                         );
                       }
                     },
                   );
                 }),
-                const SizedBox(height: 10),
+                const SizedBox(height: 28),
               ],
             ],
             if (_hasMore)
@@ -509,59 +529,31 @@ class _ConsultationEntryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ArtseeSurface(
+    return GestureDetector(
       onTap: onTap,
-      elevated: true,
-      radius: 22,
-      padding: const EdgeInsets.fromLTRB(16, 15, 16, 15),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: kCobalt.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: const Icon(
-              Icons.support_agent_outlined,
-              color: kCobalt,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '开始咨询入驻机构',
-                  style: TextStyle(
-                    color: context.artC.ink,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                  ),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                '开始咨询入驻机构',
+                style: TextStyle(
+                  color: context.artC.ink.withValues(alpha: 0.62),
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  '浏览同城机构，会员可发起线上会话或查看线下联系方式',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: context.artC.ink.withValues(alpha: 0.42),
-                    fontSize: 11,
-                    height: 1.3,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-          Icon(
-            Icons.chevron_right_rounded,
-            color: context.artC.ink.withValues(alpha: 0.32),
-          ),
-        ],
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 18,
+              color: context.artC.ink.withValues(alpha: 0.28),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -584,13 +576,8 @@ class _SchoolSortBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.66),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: context.artC.silver.withValues(alpha: 0.28)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 4),
       child: Row(
         children: [
           Expanded(
@@ -604,6 +591,7 @@ class _SchoolSortBar extends StatelessWidget {
                       fontSize: 13,
                       fontWeight: FontWeight.w900,
                       color: context.artC.ink,
+                      letterSpacing: 0,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -617,8 +605,9 @@ class _SchoolSortBar extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 11,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                         color: context.artC.ink.withValues(alpha: 0.36),
+                        letterSpacing: 0,
                       ),
                     ),
                   ),
@@ -630,7 +619,7 @@ class _SchoolSortBar extends StatelessWidget {
             visualDensity: VisualDensity.compact,
             onPressed: onOpen,
             icon: const Icon(Icons.tune_rounded, size: 18),
-            color: kCobalt,
+            color: context.artC.ink.withValues(alpha: 0.66),
             tooltip: '筛选与排序',
           ),
         ],
@@ -1222,199 +1211,188 @@ class _SchoolCard extends StatelessWidget {
       disciplines: disciplines,
       city: city,
     );
-    final applicationTier = _applicationTier(qsRank);
-    final portfolioLevel = _portfolioLevel(qsRank);
+    final locationLine = [
+      if (city != null && city.isNotEmpty) city,
+      if (country != null && country.isNotEmpty) country,
+      schoolTypeLabel,
+      if (qsRank != null) 'QS 艺术 #$qsRank',
+    ].join(' · ');
+    final directionLine = [
+      if (disciplines.isNotEmpty)
+        ...disciplines.take(3).map((item) => _displayLabel(item)),
+      if (disciplines.isEmpty && featureTags.isNotEmpty)
+        ...featureTags.take(2).map((item) => _displayLabel(item)),
+    ].where((item) => item.trim().isNotEmpty).join(' · ');
 
-    return ArtseeSurface(
+    return GestureDetector(
       onTap: onTap,
-      padding: const EdgeInsets.all(15),
-      radius: 18,
-      elevated: true,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: context.artC.silver.withValues(alpha: 0.35),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: logoUrl != null && logoUrl.isNotEmpty
-                      ? Image.network(
-                          logoUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
-                              _SchoolCardLogoFallback(nameZh),
-                        )
-                      : Center(
-                          child: Text(
-                            nameZh.substring(0, 1),
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                              color: kCobalt,
-                              letterSpacing: 0,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 68,
+                  height: 68,
+                  decoration: BoxDecoration(
+                    color: context.artC.ink.withValues(alpha: 0.035),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: logoUrl != null && logoUrl.isNotEmpty
+                        ? Image.network(
+                            logoUrl,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) =>
+                                _SchoolCardLogoFallback(nameZh),
+                          )
+                        : Center(
+                            child: Text(
+                              nameZh.substring(0, 1),
+                              style: const TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w800,
+                                color: kCobalt,
+                                letterSpacing: 0,
+                              ),
                             ),
                           ),
-                        ),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      nameZh,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        color: context.artC.ink,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (nameEn != null && nameEn.isNotEmpty) ...[
-                      const SizedBox(height: 2),
+                const SizedBox(width: 15),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        nameEn,
+                        nameZh,
                         style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: context.artC.ink.withValues(alpha: 0.38),
+                          fontSize: 17,
+                          height: 1.15,
+                          fontWeight: FontWeight.w900,
+                          color: context.artC.ink,
+                          letterSpacing: 0,
                         ),
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                    ],
-                    const SizedBox(height: 6),
-                    Text(
-                      [
-                        if (city != null && city.isNotEmpty) city,
-                        if (country != null && country.isNotEmpty) country,
-                        schoolTypeLabel,
-                      ].join(' · '),
-                      style: TextStyle(
-                        fontSize: 12,
-                        height: 1.25,
-                        fontWeight: FontWeight.w700,
-                        color: context.artC.ink.withValues(alpha: 0.46),
+                      if (nameEn != null && nameEn.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          nameEn,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            height: 1.25,
+                            fontWeight: FontWeight.w600,
+                            color: context.artC.ink.withValues(alpha: 0.38),
+                            letterSpacing: 0,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      const SizedBox(height: 7),
+                      Text(
+                        locationLine,
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.32,
+                          fontWeight: FontWeight.w600,
+                          color: context.artC.ink.withValues(alpha: 0.44),
+                          letterSpacing: 0,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                      if (directionLine.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          directionLine,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            height: 1.32,
+                            fontWeight: FontWeight.w600,
+                            color: context.artC.ink.withValues(alpha: 0.30),
+                            letterSpacing: 0,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-              ),
-              if (onSaveTap != null)
-                GestureDetector(
-                  onTap: onSaveTap,
-                  behavior: HitTestBehavior.opaque,
-                  child: Container(
-                    height: 34,
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: isSaved
-                          ? kCobalt.withValues(alpha: 0.1)
-                          : context.artC.silver.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: isSaving
-                        ? const SizedBox(
-                            width: 15,
-                            height: 15,
-                            child: CircularProgressIndicator(
-                              color: kCobalt,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : Row(
-                            children: [
-                              Icon(
-                                isSaved
-                                    ? Icons.bookmark_rounded
-                                    : Icons.bookmark_add_outlined,
-                                size: 16,
-                                color: isSaved
-                                    ? kCobalt
-                                    : context.artC.ink.withValues(alpha: 0.42),
+                if (onSaveTap != null)
+                  GestureDetector(
+                    onTap: onSaveTap,
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      height: 32,
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      alignment: Alignment.center,
+                      child: isSaving
+                          ? const SizedBox(
+                              width: 15,
+                              height: 15,
+                              child: CircularProgressIndicator(
+                                color: kCobalt,
+                                strokeWidth: 2,
                               ),
-                              const SizedBox(width: 4),
-                              Text(
-                                isSaved ? '已在目标池' : '目标池',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w900,
+                            )
+                          : Row(
+                              children: [
+                                Icon(
+                                  isSaved
+                                      ? Icons.bookmark_rounded
+                                      : Icons.bookmark_add_outlined,
+                                  size: 17,
                                   color: isSaved
                                       ? kCobalt
                                       : context.artC.ink
-                                          .withValues(alpha: 0.46),
+                                          .withValues(alpha: 0.32),
                                 ),
-                              ),
-                            ],
-                          ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 7,
-            runSpacing: 7,
-            children: [
-              _MetaChip(qsRank == null ? 'QS 暂无' : 'QS 艺术 #$qsRank',
-                  highlighted: true),
-              _MetaChip(applicationTier, highlighted: applicationTier == '冲刺'),
-              _MetaChip(portfolioLevel,
-                  highlighted: portfolioLevel == '作品集要求高'),
-              if (disciplines.isNotEmpty)
-                ...disciplines
-                    .take(2)
-                    .map((item) => _MetaChip(_displayLabel(item))),
-              if (featureTags.isNotEmpty)
-                _MetaChip(_displayLabel(featureTags.first)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-            decoration: BoxDecoration(
-              color: context.artC.porcelain.withValues(alpha: 0.72),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.psychology_alt_outlined,
-                  size: 16,
-                  color: kCobalt.withValues(alpha: 0.72),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '推荐理由：${fitText.replaceFirst('适合：', '')}',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      height: 1.25,
-                      fontWeight: FontWeight.w700,
-                      color: context.artC.ink.withValues(alpha: 0.58),
+                              ],
+                            ),
                     ),
                   ),
-                ),
               ],
             ),
-          ),
-        ],
+            const SizedBox(height: 14),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    width: 1,
+                    color: context.artC.ink.withValues(alpha: 0.12),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      fitText.replaceFirst('适合：', ''),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.42,
+                        fontStyle: FontStyle.italic,
+                        fontWeight: FontWeight.w500,
+                        color: context.artC.ink.withValues(alpha: 0.48),
+                        letterSpacing: 0,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 2),
+          ],
+        ),
       ),
     );
   }
@@ -1533,20 +1511,6 @@ String _rankRangeLabel(int? maxRank) {
   return 'QS Top $maxRank';
 }
 
-String _applicationTier(int? rank) {
-  if (rank == null) return '匹配';
-  if (rank <= 20) return '冲刺';
-  if (rank <= 80) return '匹配';
-  return '保底';
-}
-
-String _portfolioLevel(int? rank) {
-  if (rank == null) return '作品集要求中';
-  if (rank <= 20) return '作品集要求高';
-  if (rank <= 80) return '作品集要求中';
-  return '作品集友好';
-}
-
 List<String> _stringList(dynamic value) {
   if (value is List) {
     return value
@@ -1611,34 +1575,4 @@ bool _rowMatchesDisplayAlias(
   ].whereType<String>().join(' ');
   if (text.contains(alias.nameZh) || text.contains(alias.nameEn)) return true;
   return alias.aliases.any((value) => schoolAliasMatches(text, value));
-}
-
-class _MetaChip extends StatelessWidget {
-  final String text;
-  final bool highlighted;
-
-  const _MetaChip(this.text, {this.highlighted = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: highlighted
-            ? kCobalt.withValues(alpha: 0.08)
-            : context.artC.silver.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: highlighted ? FontWeight.w700 : FontWeight.w500,
-          color: highlighted
-              ? kCobalt.withValues(alpha: 0.9)
-              : context.artC.ink.withValues(alpha: 0.55),
-        ),
-      ),
-    );
-  }
 }

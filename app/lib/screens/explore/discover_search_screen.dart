@@ -856,6 +856,7 @@ String _eventTypeLabel(Map<String, dynamic> item) {
     return '开放日';
   }
   if (raw.contains('info session') ||
+      raw.contains('briefing') ||
       raw.contains('application') ||
       raw.contains('说明会')) {
     return '说明会';

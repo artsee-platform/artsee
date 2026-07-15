@@ -173,19 +173,34 @@ class _CommunityPostDetailScreenState extends State<CommunityPostDetailScreen> {
     if (text.isEmpty || _sendingComment) return;
     setState(() => _sendingComment = true);
     try {
-      final comment = await BackendApiService.createCommunityComment(
-        postId: widget.postId,
-        body: text,
-      );
+      final AppCommunityComment comment;
+      final AppCommunityComment? aiReply;
+      if (_isPlazaPost) {
+        final result = await BackendApiService.createPlazaComment(
+          postId: widget.postId,
+          body: text,
+        );
+        comment = result.comment;
+        aiReply = result.aiReply;
+      } else {
+        comment = await BackendApiService.createCommunityComment(
+          postId: widget.postId,
+          body: text,
+        );
+        aiReply = null;
+      }
       if (!mounted) return;
       _commentCtrl.clear();
       setState(() {
-        _comments = [comment, ..._comments];
-        _commentCount += 1;
+        _comments = [comment, if (aiReply != null) aiReply, ..._comments];
+        _commentCount += aiReply == null ? 1 : 2;
         _sendingComment = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_isQa ? '回答已发布' : '评论已发布')),
+        SnackBar(
+          content: Text(
+              aiReply == null ? (_isQa ? '回答已发布' : '评论已发布') : '评论已发布，AI 已接上'),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
@@ -197,6 +212,13 @@ class _CommunityPostDetailScreenState extends State<CommunityPostDetailScreen> {
   }
 
   bool get _isQa => _post?.metadata['kind'] == 'qa';
+
+  bool get _isPlazaPost {
+    final metadata = _post?.metadata ?? widget.initialPost?.metadata ?? {};
+    final surface = metadata['surface']?.toString().trim().toLowerCase();
+    final source = metadata['source']?.toString().trim().toLowerCase() ?? '';
+    return surface == 'plaza' || source.startsWith('plaza_');
+  }
 
   void _openPostAuthorProfile(AppCommunityPost post) {
     final anonymous = _isQa && post.metadata['anonymous'] == true;

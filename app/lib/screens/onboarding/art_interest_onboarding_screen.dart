@@ -39,7 +39,7 @@ class _ArtInterestOnboardingScreenState
   final TextEditingController _businessChannelCtrl = TextEditingController();
   final TextEditingController _businessIntroCtrl = TextEditingController();
 
-  static const _businessReviewGoal = 'business_credential_review';
+  static const _businessReviewGoal = 'business_draft';
   static const _businessCredentialMaterial = '营业执照或机构证明';
 
   static const _cities = [
@@ -73,45 +73,30 @@ class _ArtInterestOnboardingScreenState
 
   static const _entryChoices = [
     _Choice(
-      id: 'personal',
-      title: '我是个人用户',
-      subtitle: '学生、艺术家、爱好者、收藏者、家长或看展用户',
+      id: 'student',
+      title: '学生',
+      subtitle: '申请、作品集、院校、计划',
+      icon: Icons.school_outlined,
+    ),
+    _Choice(
+      id: 'artist',
+      title: '艺术家',
+      subtitle: '作品、展览、合作、市集',
+      icon: Icons.palette_outlined,
+    ),
+    _Choice(
+      id: 'general_user',
+      title: '普通用户',
+      subtitle: '看展、评分、收藏、讨论',
       icon: Icons.person_outline_rounded,
     ),
     _Choice(
       id: 'business',
-      title: '机构 / 商家入驻',
-      subtitle: '机构、画廊、活动方、酒店文旅空间、品牌合作方',
+      title: '机构',
+      subtitle: '先创建机构草稿，资料后续补齐',
       icon: Icons.storefront_outlined,
     ),
   ];
-
-  List<_Choice> get _roleChoices => const [
-        _Choice(
-          id: 'student',
-          title: '艺术学生 / 申请者',
-          subtitle: '留学、考研、作品集、课程与实训',
-          icon: Icons.school_outlined,
-        ),
-        _Choice(
-          id: 'artist',
-          title: '专业艺术家',
-          subtitle: '展示作品、申请展览、品牌合作与联名',
-          icon: Icons.palette_outlined,
-        ),
-        _Choice(
-          id: 'collector',
-          title: '艺术爱好者 / 收藏者',
-          subtitle: '活动、鉴赏、收藏与高端艺术体验',
-          icon: Icons.diamond_outlined,
-        ),
-        _Choice(
-          id: 'parent',
-          title: '家长 / 陪同决策者',
-          subtitle: '帮孩子了解院校、费用、申请路径和作品集机构',
-          icon: Icons.family_restroom_outlined,
-        ),
-      ];
 
   List<_Choice> get _goalChoices {
     switch (_role) {
@@ -125,24 +110,14 @@ class _ArtInterestOnboardingScreenState
           _Choice(id: 'artwork_license', title: '出售作品 / 版权授权'),
           _Choice(id: 'industry_influence', title: '扩大行业影响力'),
         ];
-      case 'collector':
+      case 'general_user':
         return const [
-          _Choice(id: 'art_salon', title: '参加艺术沙龙'),
-          _Choice(id: 'private_view', title: '看展览 / 私享会'),
-          _Choice(id: 'collect_artworks', title: '收藏艺术作品'),
-          _Choice(id: 'meet_artists', title: '认识艺术家'),
-          _Choice(id: 'art_market', title: '了解艺术市场'),
-          _Choice(id: 'art_appreciation', title: '学习艺术鉴赏'),
-          _Choice(id: 'hotel_events', title: '参加高端酒店艺术活动'),
-        ];
-      case 'parent':
-        return const [
-          _Choice(id: 'art_abroad', title: '了解艺术留学'),
-          _Choice(id: 'school_selection', title: '帮孩子选学校'),
-          _Choice(id: 'portfolio_agency', title: '找作品集机构'),
-          _Choice(id: 'application_timeline', title: '了解申请时间线'),
-          _Choice(id: 'cost_career', title: '看费用和就业方向'),
-          _Choice(id: 'book_consultation', title: '预约咨询'),
+          _Choice(id: 'browse_plaza', title: '看讨论'),
+          _Choice(id: 'rate_items', title: '参与评分'),
+          _Choice(id: 'private_view', title: '看展览 / 活动'),
+          _Choice(id: 'collect_artworks', title: '收藏艺术品'),
+          _Choice(id: 'art_market', title: '逛市集'),
+          _Choice(id: 'art_appreciation', title: '学习鉴赏'),
         ];
       default:
         return const [
@@ -168,22 +143,13 @@ class _ArtInterestOnboardingScreenState
           _Choice(id: 'stable_sales', title: '有稳定收藏 / 销售记录'),
           _Choice(id: 'mature_artist', title: '已有成熟艺术家履历'),
         ];
-      case 'collector':
+      case 'general_user':
         return const [
-          _Choice(id: 'beginner', title: '刚开始了解艺术'),
+          _Choice(id: 'beginner', title: '刚开始逛'),
           _Choice(id: 'frequent_exhibition', title: '经常看展'),
-          _Choice(id: 'event_experience', title: '参加过艺术活动'),
+          _Choice(id: 'active_discussion', title: '喜欢讨论 / 评分'),
           _Choice(id: 'collection_experience', title: '有收藏经验'),
-          _Choice(id: 'market_focus', title: '关注艺术市场'),
-          _Choice(id: 'high_end_circle', title: '希望进入高端艺术圈层'),
-        ];
-      case 'parent':
-        return const [
-          _Choice(id: 'just_learning', title: '刚开始了解'),
-          _Choice(id: 'child_has_interest', title: '孩子已有艺术方向'),
-          _Choice(id: 'target_country', title: '已有目标国家 / 院校'),
-          _Choice(id: 'portfolio_preparing', title: '正在准备作品集'),
-          _Choice(id: 'application_planning', title: '正在规划申请'),
+          _Choice(id: 'market_focus', title: '关注市集 / 艺术市场'),
         ];
       default:
         return const [
@@ -233,7 +199,7 @@ class _ArtInterestOnboardingScreenState
       ];
 
   bool get _isBusiness => _entryType == 'business';
-  int get _totalSteps => 4;
+  int get _totalSteps => _isBusiness ? 2 : 3;
   bool get _isLastStep => _step == _totalSteps - 1;
 
   List<String> get _businessProofFiles {
@@ -244,28 +210,34 @@ class _ArtInterestOnboardingScreenState
   bool get _canContinue {
     switch (_step) {
       case 0:
-        return _entryType != null;
+        return _entryType != null && (_isBusiness || _role != null);
       case 1:
-        return _isBusiness ? _businessType != null : _role != null;
+        return _isBusiness
+            ? _businessType != null && _businessNameCtrl.text.trim().isNotEmpty
+            : true;
       case 2:
-        return _isBusiness
-            ? _businessNameCtrl.text.trim().isNotEmpty &&
-                _businessCityCtrl.text.trim().isNotEmpty &&
-                _businessContactCtrl.text.trim().isNotEmpty
-            : _goals.isNotEmpty && _stage != null;
-      case 3:
-        return _isBusiness
-            ? _businessProofFiles.isNotEmpty && !_uploadingBusinessCredential
-            : _directions.isNotEmpty;
+        return _isBusiness ? !_uploadingBusinessCredential : true;
       default:
         return false;
     }
   }
 
+  String get _continueBlockerMessage {
+    if (_step == 0) return '先选择一个身份，再继续建立画像';
+    if (_isBusiness && _step == 1) {
+      if (_businessType == null) return '先选择机构类型';
+      if (_businessNameCtrl.text.trim().isEmpty) return '请填写机构名称，用来创建机构草稿';
+    }
+    if (_isBusiness && _step == 2 && _uploadingBusinessCredential) {
+      return '资质文件还在上传，稍等一下';
+    }
+    return '先完成这一项，再继续建立画像';
+  }
+
   void _next() {
     if (!_canContinue) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('先完成这一项，再继续建立画像')),
+        SnackBar(content: Text(_continueBlockerMessage)),
       );
       return;
     }
@@ -311,15 +283,16 @@ class _ArtInterestOnboardingScreenState
       final userId = SupabaseService.currentUser?.id;
       if (userId == null) throw Exception('用户未登录');
       final businessProofFiles = _businessProofFiles;
-      final businessMaterials =
-          _isBusiness ? const [_businessCredentialMaterial] : const <String>[];
+      final businessMaterials = _isBusiness && businessProofFiles.isNotEmpty
+          ? const [_businessCredentialMaterial]
+          : const <String>[];
       final interestedCategories = _isBusiness
           ? [
               'business_onboarding',
               if (_businessType != null) _businessType!,
-              _businessCredentialMaterial,
+              if (businessProofFiles.isNotEmpty) _businessCredentialMaterial,
             ]
-          : [..._directions, ..._goals];
+          : [if (_role != null) _role!, ..._directions, ..._goals];
       final businessSummary = [
         if (_businessNameCtrl.text.trim().isNotEmpty)
           '机构名称：${_businessNameCtrl.text.trim()}',
@@ -349,15 +322,14 @@ class _ArtInterestOnboardingScreenState
             ? [_businessCityCtrl.text.trim()]
             : (_city == null ? const [] : [_city!]),
         eventPreferences: _isBusiness ? const [] : const [],
-        currentStage: _isBusiness ? 'pending_business_review' : _stage,
-        verificationIntent: _isBusiness ? 'business_review' : 'later',
+        currentStage: _isBusiness ? 'business_draft_created' : _stage,
+        verificationIntent: _isBusiness ? 'business_draft' : 'later',
         businessName: _isBusiness ? _businessNameCtrl.text.trim() : null,
         businessCity: _isBusiness ? _businessCityCtrl.text.trim() : null,
         businessContact: _isBusiness ? _businessContactCtrl.text.trim() : null,
         businessChannel: _isBusiness ? _businessChannelCtrl.text.trim() : null,
         businessIntro: _isBusiness ? _businessIntroCtrl.text.trim() : null,
-        businessMaterials:
-            _isBusiness ? const [_businessCredentialMaterial] : const [],
+        businessMaterials: _isBusiness ? businessMaterials : const [],
         businessProofFiles: _isBusiness ? businessProofFiles : const [],
       );
       widget.onCompleted();
@@ -371,7 +343,7 @@ class _ArtInterestOnboardingScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: context.artC.porcelain,
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
           children: [
@@ -400,7 +372,6 @@ class _ArtInterestOnboardingScreenState
               isLast: _isLastStep,
               isBusiness: _isBusiness,
               saving: _saving,
-              canContinue: _canContinue,
               onSkip: widget.onCompleted,
               onContinue: _next,
             ),
@@ -415,14 +386,16 @@ class _ArtInterestOnboardingScreenState
       case 0:
         return _QuestionStep(
           eyebrow: 'Start',
-          title: '你希望以什么身份使用 ArtSee？',
-          subtitle: '个人用户快速建立初始画像；机构 / 商家会进入入驻申请流程。',
+          title: '先选一个身份',
+          subtitle: '只用来决定首页和推荐逻辑，其他资料都可以之后再补。',
           child: _ChoiceList(
             choices: _entryChoices,
-            selected: _entryType == null ? const {} : {_entryType!},
+            selected: _isBusiness
+                ? const {'business'}
+                : (_role == null ? const {} : {_role!}),
             onTap: (id) => setState(() {
-              _entryType = id;
-              _role = null;
+              _entryType = id == 'business' ? 'business' : 'personal';
+              _role = id == 'business' ? null : id;
               _businessType = null;
               _goals.clear();
               _directions.clear();
@@ -434,13 +407,9 @@ class _ArtInterestOnboardingScreenState
         );
       case 1:
         return _isBusiness
-            ? _buildBusinessTypeStep()
-            : _buildPersonalRoleStep();
-      case 2:
-        return _isBusiness
-            ? _buildBusinessBasicsStep()
+            ? _buildBusinessDraftStep()
             : _buildPersonalIntentStep();
-      case 3:
+      case 2:
         return _isBusiness
             ? _buildBusinessMaterialsStep()
             : _buildPersonalDirectionStep();
@@ -449,28 +418,11 @@ class _ArtInterestOnboardingScreenState
     }
   }
 
-  Widget _buildPersonalRoleStep() {
-    return _QuestionStep(
-      eyebrow: 'Identity',
-      title: '选择你的艺术身份',
-      subtitle: '只需要判断推荐路径，不会在这里要求你完成认证。',
-      child: _ChoiceList(
-        choices: _roleChoices,
-        selected: _role == null ? const {} : {_role!},
-        onTap: (id) => setState(() {
-          _role = id;
-          _goals.clear();
-          _stage = null;
-        }),
-      ),
-    );
-  }
-
   Widget _buildPersonalIntentStep() {
     return _QuestionStep(
       eyebrow: 'Intent',
       title: '你现在最想解决什么？',
-      subtitle: '上半部分最多选 3 个目标；下半部分选择当前阶段。',
+      subtitle: '可选。选得越少越干净，用到 AI 计划时也可以再补。',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -504,7 +456,7 @@ class _ArtInterestOnboardingScreenState
     return _QuestionStep(
       eyebrow: 'Direction',
       title: '你关注哪些艺术方向？',
-      subtitle: '选择 3 个以内。城市可选，后续点活动频道时也可以再补。',
+      subtitle: '可选。先进入产品，方向和城市都可以之后慢慢完善。',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -535,39 +487,34 @@ class _ArtInterestOnboardingScreenState
     );
   }
 
-  Widget _buildBusinessTypeStep() {
+  Widget _buildBusinessDraftStep() {
     return _QuestionStep(
       eyebrow: 'Settlement',
-      title: '请选择机构 / 商家类型',
-      subtitle: '类型会决定后续材料要求和 AI 展示页的生成方向。',
-      child: _ChoiceList(
-        choices: _businessTypeChoices,
-        selected: _businessType == null ? const {} : {_businessType!},
-        onTap: (id) => setState(() => _businessType = id),
-      ),
-    );
-  }
-
-  Widget _buildBusinessBasicsStep() {
-    return _QuestionStep(
-      eyebrow: 'Profile',
-      title: '填写基础资料',
-      subtitle: 'AI 会根据这些信息生成你的入驻展示页初稿。',
+      title: '创建机构草稿',
+      subtitle: '先填最少信息。认证、服务、案例和价格进入工作台后再补。',
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _ChoiceList(
+            choices: _businessTypeChoices,
+            selected: _businessType == null ? const {} : {_businessType!},
+            compact: true,
+            onTap: (id) => setState(() => _businessType = id),
+          ),
+          const SizedBox(height: 12),
           _TextInputField(
             controller: _businessNameCtrl,
-            label: '机构 / 商家名称',
+            label: '机构名称',
             onChanged: () => setState(() {}),
           ),
           _TextInputField(
             controller: _businessCityCtrl,
-            label: '所在城市',
+            label: '所在城市，可选',
             onChanged: () => setState(() {}),
           ),
           _TextInputField(
             controller: _businessContactCtrl,
-            label: '联系人 / 手机 / 邮箱',
+            label: '联系人 / 手机 / 邮箱，可选',
             onChanged: () => setState(() {}),
           ),
           _TextInputField(
@@ -637,8 +584,8 @@ class _ArtInterestOnboardingScreenState
   Widget _buildBusinessMaterialsStep() {
     return _QuestionStep(
       eyebrow: 'Materials',
-      title: '上传资质',
-      subtitle: '机构用户先上传营业执照或机构证明即可，课程、案例和合作材料后续再补充。',
+      title: '资质可以后补',
+      subtitle: '现在上传会更快进入审核；也可以先完成注册，稍后在工作台补齐。',
       child: _BusinessCredentialUploadCard(
         fileName: _businessCredentialFileName,
         uploadedUrl: _businessCredentialUrl,
@@ -881,14 +828,9 @@ class _BusinessCredentialUploadCard extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: _hasFile
-            ? kCobalt.withValues(alpha: 0.08)
-            : context.artC.cardIconBg,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: _hasFile
-              ? kCobalt.withValues(alpha: 0.28)
-              : context.artC.silver.withValues(alpha: 0.5),
-        ),
+            ? kCobalt.withValues(alpha: 0.055)
+            : context.artC.cardIconBg.withValues(alpha: 0.58),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1029,24 +971,9 @@ class _SelectableCard extends StatelessWidget {
         padding: EdgeInsets.all(compact ? 14 : 18),
         decoration: BoxDecoration(
           color: selected
-              ? kCobalt.withValues(alpha: 0.08)
-              : context.artC.cardIconBg,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: selected
-                ? kCobalt.withValues(alpha: 0.28)
-                : context.artC.silver.withValues(alpha: 0.5),
-            width: 1,
-          ),
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: context.artC.ink.withValues(alpha: 0.026),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : null,
+              ? kCobalt.withValues(alpha: 0.055)
+              : context.artC.cardIconBg.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(14),
         ),
         child: Row(
           children: [
@@ -1056,9 +983,9 @@ class _SelectableCard extends StatelessWidget {
                 height: 42,
                 decoration: BoxDecoration(
                   color: selected
-                      ? kCobalt.withValues(alpha: 0.08)
-                      : context.artC.porcelain,
-                  borderRadius: BorderRadius.circular(14),
+                      ? kCobalt.withValues(alpha: 0.075)
+                      : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   icon,
@@ -1096,7 +1023,8 @@ class _SelectableCard extends StatelessWidget {
             ),
             Icon(
               selected ? Icons.check_circle : Icons.circle_outlined,
-              color: selected ? kCobalt : context.artC.silver,
+              color:
+                  selected ? kCobalt : context.artC.ink.withValues(alpha: 0.18),
               size: 21,
             ),
           ],
@@ -1126,22 +1054,18 @@ class _Pill extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: selected
-              ? kCobalt.withValues(alpha: 0.08)
-              : context.artC.cardIconBg,
+              ? kCobalt.withValues(alpha: 0.055)
+              : context.artC.cardIconBg.withValues(alpha: 0.52),
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: selected
-                ? kCobalt.withValues(alpha: 0.28)
-                : context.artC.silver.withValues(alpha: 0.55),
-          ),
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w800,
-            color:
-                selected ? kCobalt : context.artC.ink.withValues(alpha: 0.72),
+            color: selected
+                ? context.artC.ink
+                : context.artC.ink.withValues(alpha: 0.46),
           ),
         ),
       ),
@@ -1177,23 +1101,19 @@ class _TextInputField extends StatelessWidget {
             color: context.artC.ink.withValues(alpha: 0.34),
             fontWeight: FontWeight.w700,
           ),
-          filled: true,
-          fillColor: context.artC.cardIconBg,
+          filled: false,
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
+              const EdgeInsets.symmetric(horizontal: 0, vertical: 13),
+          border: UnderlineInputBorder(
             borderSide:
-                BorderSide(color: context.artC.silver.withValues(alpha: 0.38)),
+                BorderSide(color: context.artC.silver.withValues(alpha: 0.34)),
           ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
+          enabledBorder: UnderlineInputBorder(
             borderSide:
-                BorderSide(color: context.artC.silver.withValues(alpha: 0.38)),
+                BorderSide(color: context.artC.silver.withValues(alpha: 0.34)),
           ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(color: kCobalt, width: 1.4),
+          focusedBorder: const UnderlineInputBorder(
+            borderSide: BorderSide(color: kCobalt, width: 1.2),
           ),
         ),
         style: TextStyle(
@@ -1211,7 +1131,6 @@ class _BottomActions extends StatelessWidget {
   final bool isLast;
   final bool isBusiness;
   final bool saving;
-  final bool canContinue;
   final VoidCallback onSkip;
   final VoidCallback onContinue;
 
@@ -1220,7 +1139,6 @@ class _BottomActions extends StatelessWidget {
     required this.isLast,
     required this.isBusiness,
     required this.saving,
-    required this.canContinue,
     required this.onSkip,
     required this.onContinue,
   });
@@ -1230,7 +1148,7 @@ class _BottomActions extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(22, 12, 22, 18),
       decoration: BoxDecoration(
-        color: context.artC.porcelain.withValues(alpha: 0.94),
+        color: Colors.white.withValues(alpha: 0.96),
         border: Border(
             top:
                 BorderSide(color: context.artC.silver.withValues(alpha: 0.35))),
@@ -1246,7 +1164,7 @@ class _BottomActions extends StatelessWidget {
                   : isLast
                       ? (isBusiness ? '提交入驻申请' : '进入首页')
                       : '继续',
-              onPressed: saving || !canContinue ? null : onContinue,
+              onPressed: saving ? null : onContinue,
             ),
             const SizedBox(height: 8),
             _GhostButton(

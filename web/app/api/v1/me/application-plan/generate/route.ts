@@ -66,13 +66,27 @@ function schoolName(school: Record<string, unknown>) {
 }
 
 function buildTasks(targetNames: string[]) {
+  const firstTarget = targetNames[0];
+  if (targetNames.length === 0) {
+    return [
+      ["第1周", "确认申请方向、预算、城市偏好和大致入学时间"],
+      ["第1周", "列出 6-8 个候选项目，并标出冲刺、匹配和保底"],
+      ["第2周", "整理成绩单、语言成绩、推荐人和经历清单"],
+      ["第2周", "确定作品集主题、项目顺序和需要补做的内容"],
+      ["第3周", "核对候选项目的截止日期、作品集要求和文书要求"],
+      ["第4周", "完成第一版个人陈述大纲和作品集目录"],
+      ["第2个月", "完成第一版作品集，并找老师或机构做一次反馈"],
+      ["第3个月", "按批次提交申请，并记录账号、费用和材料状态"],
+    ];
+  }
+
   const targetText = targetNames.slice(0, 3).join(" / ");
   return [
     ["6月", `确认目标院校池：${targetText}`],
     ["6月", "逐校核对项目方向、截止日期和作品集要求"],
     ["6月", "整理语言成绩、成绩单和推荐人清单"],
     ["7月", "完成第一版作品集结构和项目排序"],
-    ["7月", `为 ${targetNames[0] ?? "第一目标院校"} 准备定制文书素材`],
+    ["7月", `为 ${firstTarget} 准备定制文书素材`],
     ["7月", "联系推荐人并确认推荐信提交方式"],
     ["8月", "投递第一批优先项目并记录账号状态"],
     ["8月", "复查申请材料、费用和奖学金入口"],
@@ -96,12 +110,11 @@ export async function POST(req: NextRequest) {
 
     const { savedSchools, count: savedSchoolCount } =
       await fetchSavedSchoolsWithDetails(supabase, user.id);
-    if ((savedSchoolCount ?? 0) < 1) {
-      return NextResponse.json({ success: false, code: "NO_SCHOOLS", error: "请先添加目标院校" }, { status: 400 });
-    }
-
     const targetNames = savedSchools.map(schoolName);
-    const summary = `根据你的画像和 ${targetNames.join("、")} 生成的申请时间线。`;
+    const summary =
+      targetNames.length > 0
+        ? `根据你的 onboarding 信息，并参考 ${targetNames.join("、")} 生成的申请计划。`
+        : "根据你的 onboarding 信息生成的申请计划。";
 
     const { data: plan, error: planError } = await supabase
       .from("application_plans")

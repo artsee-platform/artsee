@@ -68,7 +68,7 @@ class _PublishOpportunityScreenState extends State<PublishOpportunityScreen> {
   }
 
   Future<void> _submit() async {
-    if (!await ensureLoggedIn(context, message: '请先登录后发布合作机会')) return;
+    if (!await ensureLoggedIn(context, message: '请先登录后发布合作')) return;
     if (!mounted) return;
     if (!_formKey.currentState!.validate() || _submitting) return;
 
@@ -133,7 +133,7 @@ class _PublishOpportunityScreenState extends State<PublishOpportunityScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text(
-          '发布合作机会',
+          '发布合作',
           style: TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w900,
