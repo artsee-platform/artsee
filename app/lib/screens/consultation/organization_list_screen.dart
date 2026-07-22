@@ -183,7 +183,7 @@ class _OrganizationListScreenState extends State<OrganizationListScreen> {
   }
 
   Future<bool> _ensureMember() async {
-    if (!await ensureLoggedIn(context, message: '请先登录后联系机构')) {
+    if (!await ensureLoggedIn(context, message: '请先登录后联系官方组织')) {
       return false;
     }
     if (_membership == null) await _loadMembership();
@@ -197,10 +197,10 @@ class _OrganizationListScreenState extends State<OrganizationListScreen> {
     if (!await _ensureMember()) return;
     final orgId = org['id']?.toString();
     if (orgId == null || orgId.isEmpty) return;
-    final orgName = org['name']?.toString() ?? '机构';
+    final orgName = org['name']?.toString() ?? '官方组织';
     final targetName = widget.schoolName?.trim().isNotEmpty == true
         ? widget.schoolName!.trim()
-        : '留学申请咨询';
+        : '艺术申请咨询';
     try {
       final consultation = await BackendApiService.createConsultation(
         targetType: _hasSchoolContext ? 'school' : 'organization',
@@ -211,7 +211,7 @@ class _OrganizationListScreenState extends State<OrganizationListScreen> {
             : 'organization_list',
         organizationId: orgId,
         channel: 'online',
-        message: '我想咨询 $targetName，请 $orgName 的老师帮我看一下适合的申请路径。',
+        message: '我想咨询 $targetName，请 $orgName 的相关负责人帮我确认官方信息和申请路径。',
         metadata: {
           'entry': _hasSchoolContext ? 'school_detail' : 'organization_list',
           'organization_name': orgName,
@@ -379,7 +379,7 @@ class _OrganizationListScreenState extends State<OrganizationListScreen> {
               else if (_error != null)
                 _StatePanel(
                   icon: Icons.cloud_off_outlined,
-                  title: '机构加载失败',
+                  title: '官方组织加载失败',
                   subtitle: _error!,
                   action: '重试',
                   onTap: _loadOrganizations,
@@ -387,7 +387,7 @@ class _OrganizationListScreenState extends State<OrganizationListScreen> {
               else if (_items.isEmpty)
                 _StatePanel(
                   icon: Icons.domain_disabled_outlined,
-                  title: '暂无匹配机构',
+                  title: '暂无匹配官方组织',
                   subtitle: '换一个城市、领域或服务方式再试试。',
                   action: '清空筛选',
                   onTap: () async {
@@ -463,7 +463,7 @@ class _Header extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  hasSchool ? '优先匹配擅长 $schoolName 的入驻机构' : '按城市、评分和专注领域找到合适机构',
+                  hasSchool ? '优先展示与 $schoolName 相关的官方组织' : '按城市、领域和官方认证找到合适组织',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -501,10 +501,10 @@ class _MembershipBanner extends StatelessWidget {
         ? '正在确认会员状态'
         : isMember
             ? '会员权益已开启'
-            : '升级会员后可联系机构';
+            : '升级会员后可联系官方组织';
     final subtitle = isMember
         ? '线上会话与线下联系方式均已解锁${expiresAt == null ? '' : ' · 到期 $expiresAt'}'
-        : '非会员可浏览机构信息，发起会话和查看联系方式需开通会员。';
+        : '非会员可浏览官方组织信息，发起会话和查看联系方式需开通会员。';
     return ArtseeSurface(
       onTap: onTap,
       elevated: true,
@@ -737,7 +737,7 @@ class _OrganizationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = org['name']?.toString() ?? '未命名机构';
+    final name = org['name']?.toString() ?? '未命名官方组织';
     final city = org['city']?.toString();
     final province = org['province']?.toString();
     final distance = org['distance_km'];
@@ -819,7 +819,7 @@ class _OrganizationCard extends StatelessWidget {
               ),
               if (contractCount > 0)
                 _MiniTag(
-                    label: '$contractCount 份合同存档',
+                    label: '$contractCount 条记录',
                     color: const Color(0xFF047857)),
             ],
           ),
@@ -995,7 +995,7 @@ class _OrganizationDetailScreenState extends State<OrganizationDetailScreen> {
   }
 
   Future<bool> _ensureMember() async {
-    if (!await ensureLoggedIn(context, message: '请先登录后联系机构')) {
+    if (!await ensureLoggedIn(context, message: '请先登录后联系官方组织')) {
       return false;
     }
     if (_membership == null) await _loadMembership();
@@ -1061,14 +1061,14 @@ class _OrganizationDetailScreenState extends State<OrganizationDetailScreen> {
     if (orgId == null || orgId.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('机构资料创建后可接收咨询')),
+        const SnackBar(content: Text('官方组织资料创建后可接收咨询')),
       );
       return;
     }
-    final orgName = _org['name']?.toString() ?? '机构';
+    final orgName = _org['name']?.toString() ?? '官方组织';
     final targetName = widget.schoolName?.trim().isNotEmpty == true
         ? widget.schoolName!.trim()
-        : '留学申请咨询';
+        : '艺术申请咨询';
     try {
       final consultation = await BackendApiService.createConsultation(
         targetType: _hasSchoolContext ? 'school' : 'organization',
@@ -1079,7 +1079,7 @@ class _OrganizationDetailScreenState extends State<OrganizationDetailScreen> {
             : 'organization_detail',
         organizationId: orgId,
         channel: 'online',
-        message: '我想咨询 $targetName，请 $orgName 的老师帮我看一下适合的申请路径。',
+        message: '我想咨询 $targetName，请 $orgName 的相关负责人帮我确认官方信息和申请路径。',
         metadata: {
           'entry': _hasSchoolContext ? 'school_detail' : 'organization_detail',
           'organization_name': orgName,
@@ -1129,7 +1129,7 @@ class _OrganizationDetailScreenState extends State<OrganizationDetailScreen> {
     if (orgId == null || orgId.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('机构资料创建后可接收消息')),
+        const SnackBar(content: Text('官方组织资料创建后可接收消息')),
       );
       return;
     }
@@ -1159,7 +1159,7 @@ class _OrganizationDetailScreenState extends State<OrganizationDetailScreen> {
             peer: LightMessagePeer.organization(
               name: name,
               avatarUrl: avatarUrl,
-              identityLabel: '机构群聊',
+              identityLabel: '官方组织群聊',
               serviceStatus: '服务中',
               responseTime: responseSpeed,
               profileBuilder: (_) => OrganizationDetailScreen(
@@ -1168,7 +1168,7 @@ class _OrganizationDetailScreenState extends State<OrganizationDetailScreen> {
                 schoolName: widget.schoolName,
               ),
             ),
-            initialMessage: '你好，可以先说说想咨询的方向、预算或合作需求。',
+            initialMessage: '你好，可以先说说想咨询的方向、申请阶段或合作需求。',
           ),
         ),
       );
@@ -1180,14 +1180,14 @@ class _OrganizationDetailScreenState extends State<OrganizationDetailScreen> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('打开机构群聊失败：$e')),
+        SnackBar(content: Text('打开官方组织群聊失败：$e')),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final name = _org['name']?.toString() ?? '未命名机构';
+    final name = _org['name']?.toString() ?? '未命名官方组织';
     final city = _org['city']?.toString();
     final province = _org['province']?.toString();
     final summary = _org['summary']?.toString();
@@ -1391,7 +1391,7 @@ class _OrganizationPublicHeader extends StatelessWidget {
                       runSpacing: 7,
                       children: [
                         _MiniTag(
-                            label: verified ? '认证机构' : '入驻机构', color: kCobalt),
+                            label: verified ? '官方认证' : '官方组织', color: kCobalt),
                         _MiniTag(
                             label: typeLabel, color: const Color(0xFF047857)),
                       ],
@@ -1748,28 +1748,28 @@ class _OrganizationTabContent extends StatelessWidget {
             key: const ValueKey('services'),
             items: services,
             emptyTitle: '暂无服务',
-            emptyText: '机构完善服务后会在这里展示可咨询项目。',
+            emptyText: '官方组织完善资料后会在这里展示可咨询项目。',
             itemBuilder: (item) => _OrganizationServiceCard(item: item),
           ),
         1 => _OrganizationListPanel(
             key: const ValueKey('cases'),
             items: cases,
             emptyTitle: '暂无案例',
-            emptyText: '案例会用于判断机构擅长方向和服务人群。',
+            emptyText: '案例会用于判断组织擅长方向和服务人群。',
             itemBuilder: (item) => _OrganizationCaseCard(item: item),
           ),
         2 => _OrganizationListPanel(
             key: const ValueKey('team'),
             items: team,
             emptyTitle: '暂无团队信息',
-            emptyText: '顾问、老师和合作艺术家会在这里展示。',
+            emptyText: '联系人、项目负责人和合作艺术家会在这里展示。',
             itemBuilder: (item) => _OrganizationTeamCard(item: item),
           ),
         3 => _OrganizationListPanel(
             key: const ValueKey('activities'),
             items: activities,
             emptyTitle: '暂无动态',
-            emptyText: '课程、活动、展览和机构更新会沉淀在这里。',
+            emptyText: '课程、活动、展览和官方更新会沉淀在这里。',
             itemBuilder: (item) => _OrganizationTextCard(item: item),
           ),
         4 => reviews.isEmpty
@@ -1786,7 +1786,7 @@ class _OrganizationTabContent extends StatelessWidget {
             key: const ValueKey('qa'),
             items: qas,
             emptyTitle: '暂无问答',
-            emptyText: '用户常问问题和机构回答会在这里展示。',
+            emptyText: '用户常问问题和官方组织回答会在这里展示。',
             itemBuilder: (item) => _OrganizationQaCard(item: item),
           ),
       },
@@ -1884,7 +1884,7 @@ class _OrganizationServiceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final title = _itemText(item, ['title', 'name'], '服务项目');
     final subtitle = _itemText(item, ['subtitle', 'description', 'summary'],
-        '适合需要明确路径、作品集节奏或申请判断的用户。');
+        '适合需要确认官方信息、活动资源或申请节点的用户。');
     final meta = _itemText(item, ['meta', 'mode', 'delivery'], '线上 / 线下可咨询');
     return _OrganizationInfoCard(
       icon: Icons.design_services_outlined,
@@ -1904,7 +1904,7 @@ class _OrganizationCaseCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final title = _itemText(item, ['title', 'name'], '服务案例');
     final subtitle = _itemText(
-        item, ['subtitle', 'description', 'summary'], '展示申请背景、服务过程和阶段结果。');
+        item, ['subtitle', 'description', 'summary'], '展示官方项目、活动参与和资源对接结果。');
     final result = _itemText(item, ['result', 'tag', 'school'], '案例');
     return _OrganizationInfoCard(
       icon: Icons.collections_bookmark_outlined,
@@ -1923,9 +1923,9 @@ class _OrganizationTeamCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = _itemText(item, ['name', 'title'], '团队成员');
-    final role = _itemText(item, ['role', 'position'], '顾问 / 艺术家');
-    final bio =
-        _itemText(item, ['bio', 'description', 'summary'], '负责作品集、院校判断或合作项目。');
+    final role = _itemText(item, ['role', 'position'], '负责人 / 艺术家');
+    final bio = _itemText(
+        item, ['bio', 'description', 'summary'], '负责官方信息确认、资源对接或合作项目。');
     return _OrganizationInfoCard(
       icon: Icons.groups_2_outlined,
       title: name,
@@ -1942,9 +1942,9 @@ class _OrganizationTextCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = _itemText(item, ['title', 'name'], '机构动态');
+    final title = _itemText(item, ['title', 'name'], '官方动态');
     final text = _itemText(
-        item, ['body', 'description', 'summary'], '课程、案例、活动和团队动态会在这里更新。');
+        item, ['body', 'description', 'summary'], '活动、项目、资讯和团队动态会在这里更新。');
     return _OrganizationInfoCard(
       icon: Icons.campaign_outlined,
       title: title,
@@ -1963,7 +1963,7 @@ class _OrganizationQaCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final question = _itemText(item, ['question', 'title'], '常见问题');
     final answer = _itemText(
-        item, ['answer', 'body', 'description'], '机构会在这里回答用户关心的服务、费用和合作方式。');
+        item, ['answer', 'body', 'description'], '官方组织会在这里回答用户关心的信息、活动和合作方式。');
     return _OrganizationInfoCard(
       icon: Icons.live_help_outlined,
       title: question,
@@ -2317,7 +2317,7 @@ class _OfflineContactSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = org['name']?.toString() ?? '机构';
+    final name = org['name']?.toString() ?? '官方组织';
     final address = _organizationAddress(org);
     final phone = _metadataText(org, ['phone', 'telephone', 'mobile']);
     final qr = _metadataText(org, ['wechat_qr_url', 'wechatQrUrl']);
@@ -2332,8 +2332,8 @@ class _OfflineContactSheet extends StatelessWidget {
         children: [
           _ContactRow(
             icon: Icons.place_outlined,
-            label: '机构地址',
-            value: address.isNotEmpty ? address : '机构尚未填写地址',
+            label: '组织地址',
+            value: address.isNotEmpty ? address : '官方组织尚未填写地址',
           ),
           if (canOpenMap) ...[
             const SizedBox(height: 8),
@@ -2365,7 +2365,7 @@ class _OfflineContactSheet extends StatelessWidget {
           _ContactRow(
             icon: Icons.call_outlined,
             label: '联系电话',
-            value: phone.isNotEmpty ? phone : '机构尚未填写电话',
+            value: phone.isNotEmpty ? phone : '官方组织尚未填写电话',
           ),
           if (qr.isNotEmpty) ...[
             const SizedBox(height: 16),
@@ -2382,7 +2382,7 @@ class _OfflineContactSheet extends StatelessWidget {
           ],
           const SizedBox(height: 16),
           Text(
-            '线下服务由用户与机构自行沟通、签约和交付。平台仅提供机构信息与后续合同存档。',
+            '线下沟通由用户与官方组织自行确认。平台仅提供组织信息与必要记录入口。',
             style: TextStyle(
               color: context.artC.ink.withValues(alpha: 0.42),
               fontSize: 11,
@@ -2503,18 +2503,18 @@ class _MembershipUpgradeSheetState extends State<_MembershipUpgradeSheet> {
     final busy = widget.loading || _submittingPlan != null;
     return _SheetShell(
       title: '升级会员',
-      subtitle: '解锁机构咨询权限',
+      subtitle: '解锁官方组织咨询权限',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const _BenefitRow(
-              icon: Icons.chat_bubble_outline_rounded, label: '向入驻机构发起线上会话'),
+              icon: Icons.chat_bubble_outline_rounded, label: '向官方组织发起线上会话'),
           const SizedBox(height: 10),
           const _BenefitRow(
-              icon: Icons.storefront_outlined, label: '查看线下地址、电话和企业微信'),
+              icon: Icons.storefront_outlined, label: '查看线下地址、电话和联系二维码'),
           const SizedBox(height: 10),
           const _BenefitRow(
-              icon: Icons.description_outlined, label: '签约后可上传合同存档'),
+              icon: Icons.description_outlined, label: '保留必要沟通与资料记录'),
           const SizedBox(height: 18),
           Row(
             children: [
@@ -2577,7 +2577,7 @@ class _MembershipUpgradeSheetState extends State<_MembershipUpgradeSheet> {
           ),
           const SizedBox(height: 10),
           Text(
-            '平台只做信息撮合与记录存档，不参与用户与机构之间的合同、收费或服务交付。',
+            '平台只做信息连接与记录，不代替官方组织作出录取、认证或服务承诺。',
             style: TextStyle(
               color: context.artC.ink.withValues(alpha: 0.42),
               fontSize: 11,
@@ -2929,7 +2929,7 @@ String _organizationMapQuery(Map<String, dynamic> org) {
 }
 
 Future<bool> _openOrganizationMap(Map<String, dynamic> org) async {
-  final name = org['name']?.toString().trim() ?? '机构';
+  final name = org['name']?.toString().trim() ?? '官方组织';
   final lat = _numberValue(org['latitude']);
   final lon = _numberValue(org['longitude']);
   final query = _organizationMapQuery(org);
@@ -3000,8 +3000,14 @@ bool _organizationVerified(Map<String, dynamic> org) {
 
 String _organizationTypeLabel(String? value) {
   const labels = {
-    'study_abroad_agency': '艺术留学机构',
-    'portfolio_training': '作品集机构',
+    'official_association': '官方协会 / 行业组织',
+    'industry_association': '行业协会',
+    'academic_association': '学术协会',
+    'school_official': '院校官方 / 招生部门',
+    'official_partner': '官方合作组织',
+    'public_institution': '公共机构',
+    'study_abroad_agency': '留学服务（已下线）',
+    'portfolio_training': '作品集服务（已下线）',
     'gallery_exhibition': '画廊 / 展览机构',
     'event_organizer': '活动主办方',
     'hotel_culture_space': '文旅空间',
@@ -3010,7 +3016,7 @@ String _organizationTypeLabel(String? value) {
     'other_service': '艺术服务商',
   };
   final key = value?.trim();
-  if (key == null || key.isEmpty) return '机构 / 商家';
+  if (key == null || key.isEmpty) return '官方组织';
   return labels[key] ?? key;
 }
 
@@ -3030,26 +3036,26 @@ List<Map<String, dynamic>> _organizationServices(Map<String, dynamic> org) {
   final focus = _stringList(org['focus_areas']);
   final service = <Map<String, dynamic>>[
     {
-      'title': '作品集初诊',
-      'description': '梳理作品集现状、申请阶段和下一步修改重点。',
+      'title': '官方信息咨询',
+      'description': '确认院校、活动、协会资源或申请节点的公开信息。',
       'mode': org['supports_online'] != false ? '线上咨询' : '线下沟通',
     },
     {
-      'title': '院校申请路径规划',
-      'description': '结合目标国家、专业方向和时间线，拆解申请准备节奏。',
-      'mode': '规划服务',
+      'title': '项目与活动对接',
+      'description': '了解公开项目、活动报名、合作资源和下一步联系路径。',
+      'mode': '官方资源',
     },
   ];
   if (focus.contains('portfolio') || focus.contains('service_design')) {
     service.add({
-      'title': '项目叙事与案例打磨',
-      'description': '帮助学生把调研、过程和最终呈现整理成可讲述的作品集项目。',
-      'mode': '作品集辅导',
+      'title': '作品与项目展示建议',
+      'description': '围绕官方项目要求，确认作品材料、展示节奏和提交注意事项。',
+      'mode': '材料建议',
     });
   } else {
     service.add({
-      'title': '顾问答疑',
-      'description': '围绕学校选择、服务匹配和申请风险进行轻量咨询。',
+      'title': '负责人答疑',
+      'description': '围绕官方信息、活动参与和资源匹配进行轻量咨询。',
       'mode': '快速咨询',
     });
   }
@@ -3066,14 +3072,14 @@ List<Map<String, dynamic>> _organizationCases(
       schoolName?.trim().isNotEmpty == true ? schoolName!.trim() : '目标院校';
   return [
     {
-      'title': '$school 申请路径复盘',
-      'description': '展示学生背景、作品集调整方向和申请过程中的关键节点。',
-      'result': '申请案例',
+      'title': '$school 官方信息整理',
+      'description': '整理公开申请节点、项目资源和常见问题。',
+      'result': '信息档案',
     },
     {
-      'title': '作品集项目叙事优化',
-      'description': '从调研线索、材料实验和最终排版三个层面梳理案例表达。',
-      'result': '作品集案例',
+      'title': '活动与资源对接记录',
+      'description': '沉淀活动报名、协会资源和合作沟通中的关键节点。',
+      'result': '资源记录',
     },
   ];
 }
@@ -3084,14 +3090,14 @@ List<Map<String, dynamic>> _organizationTeam(Map<String, dynamic> org) {
   final type = _organizationTypeLabel(org['type']?.toString());
   return [
     {
-      'name': '主理顾问',
+      'name': '项目负责人',
       'role': type,
-      'bio': '负责前期评估、服务匹配和申请路径判断。',
+      'bio': '负责官方信息确认、资源匹配和联系路径判断。',
     },
     {
-      'name': '作品集导师',
-      'role': '合作导师',
-      'bio': '负责作品集项目拆解、视觉呈现和面试表达训练。',
+      'name': '合作联系人',
+      'role': '项目联络',
+      'bio': '负责活动、项目或合作资源的沟通与跟进。',
     },
   ];
 }
@@ -3101,13 +3107,13 @@ List<Map<String, dynamic>> _organizationActivities(Map<String, dynamic> org) {
   if (fromMetadata.isNotEmpty) return fromMetadata;
   return [
     {
-      'title': '机构主页已开放',
-      'description': '服务、案例、团队和评价会持续更新，用户可从这里发起咨询。',
+      'title': '官方组织主页已开放',
+      'description': '服务、活动、团队和常见问题会持续更新，用户可从这里发起咨询。',
       'date': '最近更新',
     },
     {
-      'title': '案例资料整理中',
-      'description': '后续将补充更多已完成服务案例和合作艺术家信息。',
+      'title': '资源资料整理中',
+      'description': '后续将补充更多官方活动、项目资源和合作艺术家信息。',
       'date': '动态',
     },
   ];
@@ -3119,11 +3125,11 @@ List<Map<String, dynamic>> _organizationQas(Map<String, dynamic> org) {
   return const [
     {
       'question': '适合什么阶段的学生咨询？',
-      'answer': '从刚开始了解院校、作品集准备中到临近申请，都可以先发起一次轻咨询确认路径。',
+      'answer': '从刚开始了解院校、活动项目到临近申请，都可以先发起一次轻咨询确认官方信息。',
     },
     {
       'question': '咨询后会直接进入交易吗？',
-      'answer': '不会。机构页先提供信息展示与轻沟通，是否签约由用户和机构自行确认。',
+      'answer': '不会。官方组织页先提供信息展示与轻沟通，后续合作由双方自行确认。',
     },
   ];
 }
@@ -3149,9 +3155,9 @@ String? _formatReviewDate(String? value) {
 
 String _focusLabel(String value) {
   const labels = {
-    'uk': '英国留学',
-    'us': '美国留学',
-    'portfolio': '作品集辅导',
+    'uk': '英国院校',
+    'us': '美国院校',
+    'portfolio': '作品材料',
     'rca': 'RCA',
     'service_design': '服务设计',
   };

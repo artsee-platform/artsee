@@ -584,9 +584,10 @@ const _typeOptions = {
 };
 
 const _businessRoleOptions = {
-  'study_abroad_agency': '艺术留学机构',
-  'portfolio_training': '作品集机构',
-  'gallery_exhibition': '画廊展览',
+  'gallery_exhibition': '画廊 / 美术馆 / 展览机构',
+  'official_association': '官方协会 / 行业组织',
+  'school_official': '院校官方 / 招生部门',
+  'official_partner': '官方合作组织',
   'event_organizer': '活动主办方',
   'hotel_culture_space': '文旅空间',
   'brand_partner': '品牌合作方',
@@ -601,7 +602,7 @@ String _normalizeType(String? value) {
 
 String _normalizeBusinessRole(String? value) {
   if (value != null && _businessRoleOptions.containsKey(value)) return value;
-  return 'study_abroad_agency';
+  return 'gallery_exhibition';
 }
 
 String _text(Object? value, {String fallback = ''}) {

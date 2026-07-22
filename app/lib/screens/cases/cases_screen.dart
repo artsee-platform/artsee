@@ -120,6 +120,47 @@ class _CasesScreenState extends State<CasesScreen> {
   }
 }
 
+class _CasePressable extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final double pressedScale;
+
+  const _CasePressable({
+    required this.child,
+    required this.onTap,
+    this.pressedScale = 0.97,
+  });
+
+  @override
+  State<_CasePressable> createState() => _CasePressableState();
+}
+
+class _CasePressableState extends State<_CasePressable> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value || widget.onTap == null) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onTap,
+      onTapDown: (_) => _setPressed(true),
+      onTapCancel: () => _setPressed(false),
+      onTapUp: (_) => _setPressed(false),
+      child: AnimatedScale(
+        scale: _pressed ? widget.pressedScale : 1,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOutCubic,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
 class _CasesHeader extends StatelessWidget {
   const _CasesHeader();
 
@@ -146,7 +187,7 @@ class _CasesHeader extends StatelessWidget {
             style: TextStyle(
               fontSize: 13,
               height: 1.45,
-              color: context.artC.ink.withOpacity(0.42),
+              color: context.artC.ink.withValues(alpha: 0.42),
             ),
           ),
         ],
@@ -197,7 +238,8 @@ class _CaseCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final excerpt = (item.excerpt ?? item.content ?? '').trim();
-    return GestureDetector(
+    return _CasePressable(
+      pressedScale: 0.985,
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute<void>(
@@ -207,12 +249,13 @@ class _CaseCard extends StatelessWidget {
       },
       child: Container(
         decoration: BoxDecoration(
-          color: context.artC.cardIconBg,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: context.artC.silver.withOpacity(0.55)),
+          color: context.artC.cardIconBg.withValues(alpha: 0.84),
+          borderRadius: BorderRadius.circular(8),
+          border:
+              Border.all(color: context.artC.silver.withValues(alpha: 0.28)),
           boxShadow: [
             BoxShadow(
-              color: context.artC.ink.withValues(alpha: 0.035),
+              color: context.artC.ink.withValues(alpha: 0.02),
               blurRadius: 14,
               offset: const Offset(0, 6),
             ),
@@ -227,7 +270,7 @@ class _CaseCard extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: resultGradient(item.result),
                 borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(18),
+                  top: Radius.circular(8),
                 ),
               ),
               child: Column(
@@ -241,8 +284,8 @@ class _CaseCard extends StatelessWidget {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.22),
-                          borderRadius: BorderRadius.circular(999),
+                          color: Colors.white.withValues(alpha: 0.22),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
                           resultLabel(item.result),
@@ -257,7 +300,7 @@ class _CaseCard extends StatelessWidget {
                       Text(
                         item.year ?? timeAgo(item.createdAt),
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.78),
+                          color: Colors.white.withValues(alpha: 0.78),
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                         ),
@@ -283,7 +326,7 @@ class _CaseCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.78),
+                      color: Colors.white.withValues(alpha: 0.78),
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                     ),
@@ -322,7 +365,7 @@ class _CaseCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         height: 1.55,
-                        color: context.artC.ink.withOpacity(0.52),
+                        color: context.artC.ink.withValues(alpha: 0.52),
                       ),
                     ),
                   ],
@@ -338,8 +381,8 @@ class _CaseCard extends StatelessWidget {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: kCobalt.withOpacity(0.06),
-                            borderRadius: BorderRadius.circular(999),
+                            color: kCobalt.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
                             tag,
@@ -371,7 +414,7 @@ class _CaseCard extends StatelessWidget {
                       Icon(
                         Icons.arrow_forward_ios,
                         size: 13,
-                        color: context.artC.ink.withOpacity(0.28),
+                        color: context.artC.ink.withValues(alpha: 0.28),
                       ),
                     ],
                   ),
@@ -396,8 +439,8 @@ class _MiniFact extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: context.artC.silver.withOpacity(0.18),
-        borderRadius: BorderRadius.circular(kRadiusSmall),
+        color: context.artC.silver.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -407,7 +450,7 @@ class _MiniFact extends StatelessWidget {
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w700,
-              color: context.artC.ink.withOpacity(0.32),
+              color: context.artC.ink.withValues(alpha: 0.32),
             ),
           ),
           const SizedBox(height: 4),
@@ -418,7 +461,7 @@ class _MiniFact extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w800,
-              color: context.artC.ink.withOpacity(0.76),
+              color: context.artC.ink.withValues(alpha: 0.76),
             ),
           ),
         ],
@@ -438,14 +481,14 @@ class _Meta extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: context.artC.ink.withOpacity(0.32)),
+        Icon(icon, size: 14, color: context.artC.ink.withValues(alpha: 0.32)),
         const SizedBox(width: 4),
         Text(
           _shortCount(value),
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w700,
-            color: context.artC.ink.withOpacity(0.45),
+            color: context.artC.ink.withValues(alpha: 0.45),
           ),
         ),
       ],
@@ -466,7 +509,7 @@ class _CasesEmpty extends StatelessWidget {
           Icon(
             Icons.folder_open_outlined,
             size: 46,
-            color: context.artC.ink.withOpacity(0.22),
+            color: context.artC.ink.withValues(alpha: 0.22),
           ),
           const SizedBox(height: 14),
           Text(
@@ -484,7 +527,7 @@ class _CasesEmpty extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               height: 1.5,
-              color: context.artC.ink.withOpacity(0.45),
+              color: context.artC.ink.withValues(alpha: 0.45),
             ),
           ),
         ],
@@ -509,7 +552,7 @@ class _CasesError extends StatelessWidget {
           Icon(
             Icons.cloud_off_outlined,
             size: 46,
-            color: context.artC.ink.withOpacity(0.22),
+            color: context.artC.ink.withValues(alpha: 0.22),
           ),
           const SizedBox(height: 14),
           Text(
@@ -527,7 +570,7 @@ class _CasesError extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               height: 1.5,
-              color: context.artC.ink.withOpacity(0.48),
+              color: context.artC.ink.withValues(alpha: 0.48),
             ),
           ),
           const SizedBox(height: 16),

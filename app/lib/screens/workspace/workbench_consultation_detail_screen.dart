@@ -2695,7 +2695,7 @@ String _sourceLabel(String? source) {
       return '院校页';
     case 'organization':
     case 'organization_detail':
-      return '机构主页';
+      return '组织主页';
     case 'plaza':
       return '广场';
     case 'ai':

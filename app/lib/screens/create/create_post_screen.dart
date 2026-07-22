@@ -146,53 +146,54 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       backgroundColor: context.artC.porcelain,
       appBar: AppBar(
         backgroundColor: context.artC.porcelain,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, color: context.artC.ink, size: 20),
-          onPressed: () => Navigator.of(context).pop(),
+        leadingWidth: 56,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 10),
+          child: _CreateIconButton(
+            icon: Icons.arrow_back_ios_new_rounded,
+            onTap: () => Navigator.of(context).pop(),
+            tooltip: '返回',
+          ),
         ),
         title: Text(
           '发布动态',
           style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: context.artC.ink),
+            fontSize: 17,
+            fontWeight: FontWeight.w900,
+            color: context.artC.ink,
+            letterSpacing: 0,
+          ),
         ),
         actions: [
-          TextButton(
-            onPressed: _publishing ? null : _publish,
-            child: _publishing
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: kCobalt),
-                  )
-                : Text(
-                    '发布',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: kCobalt,
-                    ),
-                  ),
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: _CreatePublishButton(
+              publishing: _publishing,
+              onTap: _publishing ? null : _publish,
+            ),
           ),
-          const SizedBox(width: 4),
         ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(18, 10, 18, 28),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 图片选择区
+              const _CreateSectionLabel(title: '类型'),
               _PostTypeSelector(
                 value: _postType,
                 onChanged: (value) => setState(() => _postType = value),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
+              _CreateSectionLabel(
+                title: '素材',
+                trailing: _images.isEmpty ? '可选' : '${_images.length} 张',
+              ),
+              const SizedBox(height: 10),
               SizedBox(
                 height: 110,
                 child: ListView.separated(
@@ -210,8 +211,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   },
                 ),
               ),
-              const SizedBox(height: 20),
-              // 标题
+              const SizedBox(height: 22),
+              const _CreateSectionLabel(title: '内容'),
+              const SizedBox(height: 10),
               _EditorTextField(
                 controller: _titleCtrl,
                 hint: _titleHint(_postType),
@@ -220,7 +222,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 maxLines: 2,
               ),
               const SizedBox(height: 12),
-              // 正文
               _EditorTextField(
                 controller: _contentCtrl,
                 hint: _bodyHint(_postType),
@@ -228,13 +229,15 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 maxLines: null,
               ),
               const SizedBox(height: 14),
+              const _CreateSectionLabel(title: '标签'),
+              const SizedBox(height: 10),
               _EditorTextField(
                 controller: _tagCtrl,
                 hint: '添加标签，例如：作品集、RCA、插画',
                 minLines: 1,
                 maxLines: 2,
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
               _VisibilityRow(
                 visibility: _visibility,
                 syncToPortfolio: _syncToPortfolio,
@@ -276,19 +279,221 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Widget _buildAddImageBox() {
-    return GestureDetector(
+    return _CreatePressable(
       onTap: _pickImages,
       child: Container(
         width: 110,
         height: 110,
         decoration: BoxDecoration(
-          color: context.artC.silver.withOpacity(0.25),
-          borderRadius: BorderRadius.circular(kRadiusMedium),
-          border:
-              Border.all(color: context.artC.silver.withOpacity(0.6), width: 1),
+          color: context.artC.cardIconBg,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: context.artC.silver.withValues(alpha: 0.34),
+            width: 1,
+          ),
         ),
-        child: Icon(Icons.add_photo_alternate_outlined,
-            color: kCobaltMuted, size: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.add_photo_alternate_outlined,
+              color: kCobaltMuted,
+              size: 28,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '添加图片',
+              style: TextStyle(
+                color: context.artC.ink.withValues(alpha: 0.42),
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CreatePressable extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final double pressedScale;
+
+  const _CreatePressable({
+    required this.child,
+    required this.onTap,
+    this.pressedScale = 0.97,
+  });
+
+  @override
+  State<_CreatePressable> createState() => _CreatePressableState();
+}
+
+class _CreatePressableState extends State<_CreatePressable> {
+  bool _pressed = false;
+
+  void _setPressed(bool pressed) {
+    if (_pressed == pressed || widget.onTap == null) return;
+    setState(() => _pressed = pressed);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => _setPressed(true),
+      onTapUp: (_) => _setPressed(false),
+      onTapCancel: () => _setPressed(false),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        scale: _pressed ? widget.pressedScale : 1,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOutCubic,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+class _CreateIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final String tooltip;
+
+  const _CreateIconButton({
+    required this.icon,
+    required this.onTap,
+    required this.tooltip,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: _CreatePressable(
+        onTap: onTap,
+        pressedScale: 0.95,
+        child: SizedBox(
+          width: 42,
+          height: 42,
+          child: Icon(icon, color: context.artC.ink, size: 20),
+        ),
+      ),
+    );
+  }
+}
+
+class _CreatePublishButton extends StatelessWidget {
+  final bool publishing;
+  final VoidCallback? onTap;
+
+  const _CreatePublishButton({
+    required this.publishing,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return _CreatePressable(
+      onTap: onTap,
+      pressedScale: 0.98,
+      child: AnimatedContainer(
+        height: 36,
+        width: 66,
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
+          color: enabled ? kCobalt : context.artC.silver.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: enabled
+              ? [
+                  BoxShadow(
+                    color: kCobalt.withValues(alpha: 0.16),
+                    blurRadius: 14,
+                    offset: const Offset(0, 7),
+                  ),
+                ]
+              : null,
+        ),
+        alignment: Alignment.center,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 160),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeOutCubic,
+          transitionBuilder: (child, animation) => FadeTransition(
+            opacity: animation,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.97, end: 1).animate(animation),
+              child: child,
+            ),
+          ),
+          child: publishing
+              ? const SizedBox(
+                  key: ValueKey('publishing'),
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text(
+                  '发布',
+                  key: ValueKey('publish'),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CreateSectionLabel extends StatelessWidget {
+  final String title;
+  final String? trailing;
+
+  const _CreateSectionLabel({
+    required this.title,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(2, 0, 2, 9),
+      child: Row(
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              color: context.artC.ink,
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+              height: 1,
+            ),
+          ),
+          if (trailing != null) ...[
+            const Spacer(),
+            Text(
+              trailing!,
+              style: TextStyle(
+                color: context.artC.ink.withValues(alpha: 0.4),
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                height: 1,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -306,7 +511,7 @@ class _ImageThumb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(kRadiusMedium),
+      borderRadius: BorderRadius.circular(8),
       child: Stack(
         children: [
           FutureBuilder(
@@ -316,7 +521,7 @@ class _ImageThumb extends StatelessWidget {
                 return Container(
                   width: 110,
                   height: 110,
-                  color: context.artC.silver.withOpacity(0.25),
+                  color: context.artC.silver.withValues(alpha: 0.25),
                   child: const Center(
                     child: SizedBox(
                       width: 18,
@@ -334,7 +539,7 @@ class _ImageThumb extends StatelessWidget {
                 errorBuilder: (_, __, ___) => Container(
                   width: 110,
                   height: 110,
-                  color: context.artC.silver.withOpacity(0.35),
+                  color: context.artC.silver.withValues(alpha: 0.35),
                   child: Icon(Icons.broken_image_outlined,
                       color: context.artC.silver),
                 ),
@@ -344,12 +549,14 @@ class _ImageThumb extends StatelessWidget {
           Positioned(
             top: 4,
             right: 4,
-            child: GestureDetector(
+            child: _CreatePressable(
               onTap: onRemove,
+              pressedScale: 0.92,
               child: Container(
-                padding: const EdgeInsets.all(2),
-                decoration: const BoxDecoration(
-                  color: Colors.black45,
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.5),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.close, size: 14, color: Colors.white),
@@ -383,27 +590,31 @@ class _PostTypeSelector extends StatelessWidget {
       runSpacing: 8,
       children: items.map((item) {
         final selected = value == item.$1;
-        return GestureDetector(
+        return _CreatePressable(
           onTap: () => onChanged(item.$1),
+          pressedScale: 0.98,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
             decoration: BoxDecoration(
               color: selected
-                  ? kCobalt.withOpacity(0.08)
+                  ? kCobalt.withValues(alpha: 0.08)
                   : context.artC.cardIconBg,
-              borderRadius: BorderRadius.circular(999),
+              borderRadius: BorderRadius.circular(8),
               border: Border.all(
                 color: selected
-                    ? kCobalt.withOpacity(0.28)
-                    : context.artC.silver.withOpacity(0.42),
+                    ? kCobalt.withValues(alpha: 0.28)
+                    : context.artC.silver.withValues(alpha: 0.34),
               ),
             ),
             child: Text(
               item.$2,
               style: TextStyle(
-                color: selected ? kCobalt : context.artC.ink.withOpacity(0.68),
+                color: selected
+                    ? kCobalt
+                    : context.artC.ink.withValues(alpha: 0.68),
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
+                height: 1,
               ),
             ),
           ),
@@ -433,8 +644,9 @@ class _EditorTextField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ArtseeSurface(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      radius: 16,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      radius: 8,
+      color: context.artC.cardIconBg.withValues(alpha: 0.78),
       child: TextField(
         controller: controller,
         minLines: minLines,
@@ -449,7 +661,7 @@ class _EditorTextField extends StatelessWidget {
           hintText: hint,
           hintStyle: TextStyle(
             fontSize: fontSize,
-            color: context.artC.ink.withOpacity(0.42),
+            color: context.artC.ink.withValues(alpha: 0.42),
             fontWeight: fontWeight,
           ),
           border: InputBorder.none,
@@ -476,10 +688,17 @@ class _VisibilityRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const visibilityItems = [
+      ('public', '公开'),
+      ('followers', '关注者'),
+      ('private', '仅自己'),
+    ];
     return ArtseeSurface(
       padding: const EdgeInsets.all(14),
-      radius: 16,
+      radius: 8,
+      color: context.artC.cardIconBg.withValues(alpha: 0.78),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
@@ -491,35 +710,126 @@ class _VisibilityRow extends StatelessWidget {
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              const Spacer(),
-              DropdownButton<String>(
-                value: visibility,
-                underline: const SizedBox.shrink(),
-                items: const [
-                  DropdownMenuItem(value: 'public', child: Text('公开')),
-                  DropdownMenuItem(value: 'followers', child: Text('关注者')),
-                  DropdownMenuItem(value: 'private', child: Text('仅自己')),
-                ],
-                onChanged: (value) {
-                  if (value != null) onVisibilityChanged(value);
-                },
+              const SizedBox(width: 8),
+              Text(
+                '发布后可修改',
+                style: TextStyle(
+                  color: context.artC.ink.withValues(alpha: 0.36),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  height: 1,
+                ),
               ),
             ],
           ),
-          Material(
-            type: MaterialType.transparency,
-            child: SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              value: syncToPortfolio,
-              onChanged: onSyncChanged,
-              title: const Text(
-                '同步到作品集',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: visibilityItems.map((item) {
+              return _VisibilityChip(
+                label: item.$2,
+                selected: visibility == item.$1,
+                onTap: () => onVisibilityChanged(item.$1),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 12),
+          _CreatePressable(
+            onTap: () => onSyncChanged(!syncToPortfolio),
+            pressedScale: 0.98,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(12, 11, 10, 11),
+              decoration: BoxDecoration(
+                color: syncToPortfolio
+                    ? kCobalt.withValues(alpha: 0.06)
+                    : context.artC.silver.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: syncToPortfolio
+                      ? kCobalt.withValues(alpha: 0.22)
+                      : context.artC.silver.withValues(alpha: 0.24),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    syncToPortfolio
+                        ? Icons.check_circle_rounded
+                        : Icons.circle_outlined,
+                    size: 18,
+                    color: syncToPortfolio
+                        ? kCobalt
+                        : context.artC.ink.withValues(alpha: 0.28),
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Text(
+                      '同步到作品集',
+                      style: TextStyle(
+                        color: context.artC.ink,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        height: 1,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    syncToPortfolio ? '已开启' : '未开启',
+                    style: TextStyle(
+                      color: context.artC.ink.withValues(alpha: 0.4),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      height: 1,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _VisibilityChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _VisibilityChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _CreatePressable(
+      onTap: onTap,
+      pressedScale: 0.98,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: selected ? kCobalt : context.artC.cardIconBg,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color:
+                selected ? kCobalt : context.artC.silver.withValues(alpha: 0.3),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.white : context.artC.ink,
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
+            height: 1,
+          ),
+        ),
       ),
     );
   }

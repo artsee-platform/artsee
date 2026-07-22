@@ -199,9 +199,32 @@ class _DiscoverSearchScreenState extends State<DiscoverSearchScreen> {
           ),
           if (widget.initialKeyword.trim().isNotEmpty) ...[
             const SizedBox(height: 22),
-            OutlinedButton(
-              onPressed: _clearKeyword,
-              child: const Text('清空发现页筛选'),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: _DiscoverSearchPressable(
+                onTap: _clearKeyword,
+                pressedScale: 0.96,
+                child: Container(
+                  height: 36,
+                  padding: const EdgeInsets.symmetric(horizontal: 13),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: context.artC.cardIconBg.withValues(alpha: 0.82),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: context.artC.silver.withValues(alpha: 0.28),
+                    ),
+                  ),
+                  child: Text(
+                    '清空发现页筛选',
+                    style: TextStyle(
+                      color: context.artC.ink.withValues(alpha: 0.62),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
             ),
           ],
         ],
@@ -274,26 +297,51 @@ class _DiscoverSearchScreenState extends State<DiscoverSearchScreen> {
                 ),
               ),
             ),
-            TextButton(
-              onPressed: _clearKeyword,
-              style: TextButton.styleFrom(
-                foregroundColor: context.artC.ink.withValues(alpha: 0.46),
-                visualDensity: VisualDensity.compact,
-              ),
-              child: const Text(
-                '清空',
-                style: TextStyle(fontWeight: FontWeight.w900),
+            _DiscoverSearchPressable(
+              onTap: _clearKeyword,
+              pressedScale: 0.96,
+              child: Container(
+                height: 32,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: context.artC.cardIconBg.withValues(alpha: 0.76),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: context.artC.silver.withValues(alpha: 0.24),
+                  ),
+                ),
+                child: Text(
+                  '清空',
+                  style: TextStyle(
+                    color: context.artC.ink.withValues(alpha: 0.52),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               ),
             ),
-            TextButton(
-              onPressed: _applyKeyword,
-              style: TextButton.styleFrom(
-                foregroundColor: kCobalt,
-                visualDensity: VisualDensity.compact,
-              ),
-              child: const Text(
-                '应用到发现页',
-                style: TextStyle(fontWeight: FontWeight.w900),
+            const SizedBox(width: 8),
+            _DiscoverSearchPressable(
+              onTap: _applyKeyword,
+              pressedScale: 0.96,
+              child: Container(
+                height: 32,
+                padding: const EdgeInsets.symmetric(horizontal: 11),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: kCobalt.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: kCobalt.withValues(alpha: 0.18)),
+                ),
+                child: const Text(
+                  '应用到发现页',
+                  style: TextStyle(
+                    color: kCobalt,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               ),
             ),
           ],
@@ -305,6 +353,48 @@ class _DiscoverSearchScreenState extends State<DiscoverSearchScreen> {
             const SizedBox(height: 16),
           ],
       ],
+    );
+  }
+}
+
+class _DiscoverSearchPressable extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final double pressedScale;
+
+  const _DiscoverSearchPressable({
+    required this.child,
+    required this.onTap,
+    this.pressedScale = 0.97,
+  });
+
+  @override
+  State<_DiscoverSearchPressable> createState() =>
+      _DiscoverSearchPressableState();
+}
+
+class _DiscoverSearchPressableState extends State<_DiscoverSearchPressable> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value || widget.onTap == null) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onTap,
+      onTapDown: (_) => _setPressed(true),
+      onTapCancel: () => _setPressed(false),
+      onTapUp: (_) => _setPressed(false),
+      child: AnimatedScale(
+        scale: _pressed ? widget.pressedScale : 1,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOutCubic,
+        child: widget.child,
+      ),
     );
   }
 }
@@ -346,11 +436,14 @@ class _DiscoverSearchHeader extends StatelessWidget {
           ),
           Expanded(
             child: Container(
-              height: 40,
+              height: 42,
               padding: const EdgeInsets.only(left: 13, right: 4),
               decoration: BoxDecoration(
-                color: context.artC.silver.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(999),
+                color: context.artC.cardIconBg.withValues(alpha: 0.8),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: context.artC.silver.withValues(alpha: 0.28),
+                ),
               ),
               child: Row(
                 children: [
@@ -385,8 +478,7 @@ class _DiscoverSearchHeader extends StatelessWidget {
                       if (value.text.isEmpty) {
                         return const SizedBox(width: 2);
                       }
-                      return GestureDetector(
-                        behavior: HitTestBehavior.opaque,
+                      return _DiscoverSearchPressable(
                         onTap: () {
                           controller.clear();
                           focusNode.requestFocus();
@@ -408,19 +500,41 @@ class _DiscoverSearchHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          TextButton(
-            onPressed: loading ? null : () => onSubmit(controller.text),
-            style: TextButton.styleFrom(
-              foregroundColor: kCobalt,
-              disabledForegroundColor: kCobalt.withValues(alpha: 0.36),
-              visualDensity: VisualDensity.compact,
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-            ),
-            child: Text(
-              loading ? '搜索中' : '搜索',
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
+          _DiscoverSearchPressable(
+            onTap: loading ? null : () => onSubmit(controller.text),
+            pressedScale: 0.95,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOutCubic,
+              height: 42,
+              padding: const EdgeInsets.symmetric(horizontal: 13),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: loading ? kCobalt.withValues(alpha: 0.52) : kCobalt,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: loading
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: kCobalt.withValues(alpha: 0.14),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+              ),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 140),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeOutCubic,
+                child: Text(
+                  loading ? '搜索中' : '搜索',
+                  key: ValueKey(loading),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               ),
             ),
           ),
@@ -471,19 +585,21 @@ class _DiscoverResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 160),
+      curve: Curves.easeOutCubic,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: context.artC.cardIconBg,
-        borderRadius: BorderRadius.circular(18),
+        color: context.artC.cardIconBg.withValues(alpha: 0.84),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: context.artC.silver.withValues(alpha: 0.32),
+          color: context.artC.silver.withValues(alpha: 0.26),
         ),
         boxShadow: [
           BoxShadow(
-            color: context.artC.ink.withValues(alpha: 0.035),
-            blurRadius: 12,
-            offset: const Offset(0, 5),
+            color: context.artC.ink.withValues(alpha: 0.02),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -494,7 +610,7 @@ class _DiscoverResultCard extends StatelessWidget {
             height: 46,
             decoration: BoxDecoration(
               color: item.color.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(15),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(item.icon, color: item.color, size: 22),
           ),
@@ -572,7 +688,7 @@ class _DiscoverTypeBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: color.withValues(alpha: 0.12)),
       ),
       child: Text(
@@ -598,27 +714,26 @@ class _DiscoverQuickChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-          decoration: BoxDecoration(
-            color: context.artC.cardIconBg,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: context.artC.silver.withValues(alpha: 0.34),
-            ),
+    return _DiscoverSearchPressable(
+      onTap: onTap,
+      pressedScale: 0.96,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+        decoration: BoxDecoration(
+          color: context.artC.cardIconBg.withValues(alpha: 0.82),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: context.artC.silver.withValues(alpha: 0.28),
           ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: context.artC.ink.withValues(alpha: 0.7),
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: context.artC.ink.withValues(alpha: 0.7),
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
           ),
         ),
       ),
@@ -672,9 +787,32 @@ class _DiscoverSearchStateView extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            FilledButton(
-              onPressed: onAction,
-              child: Text(actionLabel),
+            _DiscoverSearchPressable(
+              onTap: onAction,
+              pressedScale: 0.95,
+              child: Container(
+                height: 38,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: kCobalt,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: kCobalt.withValues(alpha: 0.14),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  actionLabel,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
             ),
           ],
         ),

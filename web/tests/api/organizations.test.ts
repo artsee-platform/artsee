@@ -5,6 +5,7 @@ import { PATCH } from "@/app/api/v1/me/organizations/[id]/route";
 
 const ORG_ID = "50000000-0000-4000-8000-000000000001";
 let lastOrganizationUpdate: Record<string, unknown> | null = null;
+let lastOrganizationInsert: Record<string, unknown> | null = null;
 
 vi.mock("@/lib/api/auth-user", () => ({
   getUserFromBearer: async (req: NextRequest) => {
@@ -67,14 +68,15 @@ vi.mock("@/lib/api/supabase-service", () => ({
         query.select = () => query;
         query.eq = () => query;
         query.order = () => query;
-        query.range = async () => ({
+        const result = {
           data: [
             {
               role: "owner",
               status: "active",
               organization: {
                 id: ORG_ID,
-                name: "艺见留学",
+                name: "艺见美术馆",
+                type: "gallery_exhibition",
                 subscription_status: "active",
                 subscription_expires_at: "2020-01-01T00:00:00.000Z",
               },
@@ -82,28 +84,37 @@ vi.mock("@/lib/api/supabase-service", () => ({
           ],
           count: 1,
           error: null,
-        });
+        };
+        query.range = async () => result;
+        query.then = (
+          onfulfilled?: (value: typeof result) => unknown,
+          onrejected?: (reason: unknown) => unknown
+        ) => Promise.resolve(result).then(onfulfilled, onrejected);
         query.insert = () => ({ error: null });
         return query;
       }
       if (table === "organizations") {
         const current = {
           id: ORG_ID,
-          name: "艺见留学",
+          name: "艺见美术馆",
+          type: "gallery_exhibition",
           metadata: {
             logo_url: "https://cdn.example.test/logo.png",
             summary: "旧简介",
           },
         };
         const query: any = {};
-        query.insert = () => ({
-          select: () => ({
-            single: async () => ({
-              data: { id: "org-123", name: "艺见留学" },
-              error: null,
+        query.insert = (payload: Record<string, unknown>) => {
+          lastOrganizationInsert = payload;
+          return {
+            select: () => ({
+              single: async () => ({
+                data: { id: "org-123", name: "艺见美术馆", ...payload },
+                error: null,
+              }),
             }),
-          }),
-        });
+          };
+        };
         query.select = () => query;
         query.eq = () => query;
         query.maybeSingle = async () => ({ data: current, error: null });
@@ -167,10 +178,11 @@ describe("POST /api/v1/me/organizations", () => {
   });
 
   it("创建机构后返回 owner membership", async () => {
+    lastOrganizationInsert = null;
     const req = new NextRequest("http://localhost/api/v1/me/organizations", {
       method: "POST",
       headers: { authorization: "Bearer valid-token" },
-      body: JSON.stringify({ name: "艺见留学" }),
+      body: JSON.stringify({ name: "艺见美术馆", type: "gallery_exhibition" }),
     });
     const res = await POST(req);
     const body = await res.json();
@@ -178,6 +190,19 @@ describe("POST /api/v1/me/organizations", () => {
     expect(body.success).toBe(true);
     expect(body.data.role).toBe("owner");
     expect(body.data.organization.id).toBe("org-123");
+    expect(lastOrganizationInsert?.type).toBe("gallery_exhibition");
+  });
+
+  it("不再允许创建旧留学机构类型", async () => {
+    const req = new NextRequest("http://localhost/api/v1/me/organizations", {
+      method: "POST",
+      headers: { authorization: "Bearer valid-token" },
+      body: JSON.stringify({ name: "旧留学机构", type: "study_abroad_agency" }),
+    });
+    const res = await POST(req);
+    const body = await res.json();
+    expect(res.status).toBe(400);
+    expect(body.error).toBe("该机构类型已下线");
   });
 });
 
@@ -236,5 +261,17 @@ describe("PATCH /api/v1/me/organizations/:id", () => {
       address: "上海市静安区 88 号",
       phone: "021-0000",
     });
+  });
+
+  it("不再允许把机构改成旧留学机构类型", async () => {
+    const req = new NextRequest(`http://localhost/api/v1/me/organizations/${ORG_ID}`, {
+      method: "PATCH",
+      headers: { authorization: "Bearer owner-token" },
+      body: JSON.stringify({ type: "portfolio_training" }),
+    });
+    const res = await PATCH(req, ctx());
+    const body = await res.json();
+    expect(res.status).toBe(400);
+    expect(body.error).toBe("该机构类型已下线");
   });
 });

@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getUserFromBearer } from '@/lib/api/auth-user';
+import { isRetiredCommercialAgencyType } from "@/lib/api/organization-visibility";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+function optionalString(value: unknown) {
+  if (typeof value !== "string") return undefined;
+  const text = value.trim();
+  return text.length > 0 ? text : undefined;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -21,7 +28,16 @@ export async function POST(req: NextRequest) {
     console.log('📥 收到的请求体:', JSON.stringify(requestBody, null, 2));
     
     // 支持驼峰和下划线命名，优先使用下划线命名
-    const userRole = requestBody.user_role ?? requestBody.userRole;
+    const userRole = optionalString(requestBody.user_role ?? requestBody.userRole);
+    if (isRetiredCommercialAgencyType(userRole)) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "该机构类型已下线，请选择画廊、美术馆、协会或其他机构类型",
+        },
+        { status: 400 }
+      );
+    }
     const targetDegree = requestBody.target_degree ?? requestBody.targetDegree;
     const currentEducationStage = requestBody.current_education_stage ?? requestBody.currentEducationStage;
     const targetDirections = requestBody.target_directions ?? requestBody.targetDirections;

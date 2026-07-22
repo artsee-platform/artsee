@@ -429,7 +429,7 @@ class _InstitutionWorkspaceScreenState
       _WorkbenchTodoItem(
         label: '待回复',
         count: _countStatus('pending'),
-        caption: '等待机构响应',
+        caption: '等待组织响应',
         onTap: () => _openLeadList(_WorkbenchListMode.leads),
       ),
       _WorkbenchTodoItem(
@@ -4056,7 +4056,7 @@ class _OrganizationProfileSheet extends StatefulWidget {
 class _OrganizationProfileSheetState extends State<_OrganizationProfileSheet> {
   final _name = TextEditingController();
   Map<String, dynamic>? _updatedOrganization;
-  String _type = 'study_abroad_agency';
+  String _type = 'gallery_exhibition';
   bool _creating = false;
   String? _error;
 
@@ -4428,7 +4428,7 @@ class _OrganizationSummary extends StatelessWidget {
           ],
           const SizedBox(height: 14),
           Text(
-            '维护城市、专注领域与联系方式后，机构会出现在咨询列表和线下联系入口中。',
+            '维护城市、专注领域与联系方式后，机构会出现在对应机构后台和线下联系入口中。',
             style: TextStyle(
               fontSize: 12.5,
               height: 1.5,
@@ -4510,7 +4510,7 @@ class _OrganizationEditSheetState extends State<_OrganizationEditSheet> {
     _contactNote =
         TextEditingController(text: _cleanText(metadata['contact_note']));
     _type = _cleanText(org['type']).isEmpty
-        ? 'study_abroad_agency'
+        ? 'gallery_exhibition'
         : _cleanText(org['type']);
     _supportsOnline = org['supports_online'] != false;
     _supportsOffline = org['supports_offline'] == true;
@@ -4638,7 +4638,7 @@ class _OrganizationEditSheetState extends State<_OrganizationEditSheet> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '这些信息会用于机构列表排序、筛选和会员线下联系入口。',
+                      '这些信息会用于机构后台资料、筛选和线下联系入口。',
                       style: TextStyle(
                         color: context.artC.ink.withValues(alpha: 0.52),
                         fontSize: 12,
@@ -5309,10 +5309,13 @@ Map<String, dynamic> _organizationPreviewPayload(
 }
 
 const _organizationTypes = {
-  'study_abroad_agency': '留学机构',
-  'portfolio_training': '作品集机构',
+  'gallery_exhibition': '画廊 / 美术馆',
+  'official_association': '官方协会',
+  'school_official': '院校官方',
+  'official_partner': '官方合作',
+  'study_abroad_agency': '留学服务（已下线）',
+  'portfolio_training': '作品集服务（已下线）',
   'event_organizer': '活动主办',
-  'gallery_exhibition': '画廊展览',
   'other_service': '其他服务',
 };
 

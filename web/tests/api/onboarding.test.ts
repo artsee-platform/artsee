@@ -144,25 +144,25 @@ function req(body: Row, token: keyof typeof userIds | null = "business") {
 describe("POST /api/v1/auth/complete-onboarding", () => {
   beforeEach(resetDb);
 
-  it("creates a pending organization verification while completing business onboarding", async () => {
+  it("creates a pending gallery verification while completing business onboarding", async () => {
     const res = await completeOnboarding(
       req({
         userId: userIds.business,
         userType: "business",
-        userRole: "study_abroad_agency",
+        userRole: "gallery_exhibition",
         primaryGoal: "receive_leads",
         goals: ["receive_leads", "create_profile"],
-        targetDirections: ["business_settlement", "study_abroad_agency"],
+        targetDirections: ["business_settlement", "gallery_exhibition"],
         targetMajors: ["营业执照或机构证明", "成功案例"],
         cityPreference: "上海",
         activityCities: ["上海"],
         currentStage: "pending_business_review",
         verificationIntent: "business_review",
-        businessName: "艺见留学中心",
+        businessName: "艺见美术馆",
         businessCity: "上海",
         businessContact: "ops@example.com",
-        businessChannel: "公众号：艺见留学",
-        businessIntro: "专注英国艺术院校申请",
+        businessChannel: "公众号：艺见美术馆",
+        businessIntro: "专注青年艺术展览与公共教育",
         businessMaterials: ["营业执照或机构证明", "成功案例"],
         businessProofFiles: ["https://example.com/license.pdf"],
       })
@@ -174,22 +174,22 @@ describe("POST /api/v1/auth/complete-onboarding", () => {
     expect(db.user_profiles[0]).toMatchObject({
       id: userIds.business,
       user_type: "business",
-      user_role: "study_abroad_agency",
+      user_role: "gallery_exhibition",
       has_completed_onboarding: true,
     });
     expect(db.organizations[0]).toMatchObject({
       id: "organizations-1",
       owner_user_id: userIds.business,
-      name: "艺见留学中心",
-      type: "study_abroad_agency",
+      name: "艺见美术馆",
+      type: "gallery_exhibition",
       status: "active",
       verification_status: "pending",
       metadata: {
         source: "onboarding",
         city: "上海",
         contact: "ops@example.com",
-        channel: "公众号：艺见留学",
-        summary: "专注英国艺术院校申请",
+        channel: "公众号：艺见美术馆",
+        summary: "专注青年艺术展览与公共教育",
         needs: ["receive_leads", "create_profile"],
         materials: ["营业执照或机构证明", "成功案例"],
         proof_files: ["https://example.com/license.pdf"],
@@ -208,14 +208,14 @@ describe("POST /api/v1/auth/complete-onboarding", () => {
       materials: {
         source: "onboarding",
         organization_id: "organizations-1",
-        organization_name: "艺见留学中心",
-        company_name: "艺见留学中心",
-        requested_role: "study_abroad_agency",
-        user_role: "study_abroad_agency",
+        organization_name: "艺见美术馆",
+        company_name: "艺见美术馆",
+        requested_role: "gallery_exhibition",
+        user_role: "gallery_exhibition",
         city: "上海",
         contact: "ops@example.com",
-        channel: "公众号：艺见留学",
-        note: "专注英国艺术院校申请",
+        channel: "公众号：艺见美术馆",
+        note: "专注青年艺术展览与公共教育",
         business_needs: ["receive_leads", "create_profile"],
         business_materials: ["营业执照或机构证明", "成功案例"],
         business_proof_files: ["https://example.com/license.pdf"],
@@ -223,5 +223,25 @@ describe("POST /api/v1/auth/complete-onboarding", () => {
     });
     expect(body.businessReview.organization.id).toBe("organizations-1");
     expect(body.businessReview.verification.id).toBe("verifications-1");
+  });
+
+  it("rejects retired commercial agency roles during onboarding", async () => {
+    const res = await completeOnboarding(
+      req({
+        userId: userIds.business,
+        userType: "business",
+        userRole: "study_abroad_agency",
+        businessName: "旧留学机构",
+        verificationIntent: "business_review",
+      })
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.success).toBe(false);
+    expect(body.error).toContain("已下线");
+    expect(db.user_profiles).toHaveLength(0);
+    expect(db.organizations).toHaveLength(0);
+    expect(db.verifications).toHaveLength(0);
   });
 });

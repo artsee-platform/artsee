@@ -246,9 +246,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       'parent': '家长 / 陪同决策者',
     };
     const business = {
-      'study_abroad_agency': '艺术留学机构',
-      'portfolio_training': '艺术培训 / 作品集机构',
-      'gallery_exhibition': '画廊 / 展览机构',
+      'official_association': '官方协会 / 行业组织',
+      'school_official': '院校官方 / 招生部门',
+      'official_partner': '官方合作组织',
+      'study_abroad_agency': '留学服务（已下线）',
+      'portfolio_training': '作品集服务（已下线）',
+      'gallery_exhibition': '画廊 / 美术馆 / 展览机构',
       'event_organizer': '艺术活动主办方',
       'hotel_culture_space': '酒店 / 文旅空间',
       'brand_partner': '品牌合作方',
@@ -340,6 +343,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (item.startsWith('机构名称：')) {
         return item.replaceFirst('机构名称：', '').trim();
       }
+      if (item.startsWith('组织名称：')) {
+        return item.replaceFirst('组织名称：', '').trim();
+      }
     }
     return _nickname;
   }
@@ -389,94 +395,197 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildGuestView() {
+    final topInset = MediaQuery.paddingOf(context).top;
     return Scaffold(
       backgroundColor: context.artC.porcelain,
-      body: SafeArea(
-        top: false,
-        child: Stack(
-          children: [
-            Positioned(
-              top: 4,
-              right: 8,
-              child: ListenableBuilder(
-                listenable: ArtseeThemeController.instance,
-                builder: (context, _) {
-                  final dark = ArtseeThemeController.instance.isDark;
-                  return IconButton(
-                    onPressed: () => ArtseeThemeController.instance.toggle(),
-                    icon: Icon(
-                      dark ? Icons.wb_sunny_outlined : Icons.nightlight_round,
-                      color: context.artC.ink.withValues(alpha: 0.55),
-                    ),
-                  );
-                },
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: ListView(
+              padding: EdgeInsets.fromLTRB(
+                22,
+                topInset + 54,
+                22,
+                mainTabBottomInset(context) + 24,
               ),
-            ),
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 88,
-                      height: 88,
-                      decoration: BoxDecoration(
-                        color: context.artC.silver.withValues(alpha: 0.35),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Center(
-                        child: Text(
-                          '艺',
-                          style: TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.w700,
-                              color: kCobalt),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      '登录后解锁全部功能',
-                      style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: context.artC.ink),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '申请追踪 · 案例分享 · 论坛互动',
-                      style: TextStyle(
-                          fontSize: 13,
-                          color: context.artC.ink.withValues(alpha: 0.45)),
-                    ),
-                    const SizedBox(height: 24),
-                    GestureDetector(
-                      onTap: _openLogin,
-                      child: Container(
-                        width: double.infinity,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: kCobalt,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: const Center(
-                          child: Text(
-                            '登录 / 注册',
-                            style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+              children: [
+                Text(
+                  '我的',
+                  style: TextStyle(
+                    color: context.artC.ink,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                    letterSpacing: 0,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 18),
+                Container(
+                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 17),
+                  decoration: BoxDecoration(
+                    color: context.artC.cardIconBg,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: context.artC.silver.withValues(alpha: 0.26),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: context.artC.ink.withValues(alpha: 0.055),
+                        blurRadius: 28,
+                        offset: const Offset(0, 14),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: kCobalt.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Center(
+                              child: Text(
+                                '艺',
+                                style: TextStyle(
+                                  color: kCobalt,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w900,
+                                  height: 1,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '艺见心账户',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: context.artC.ink,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w900,
+                                    height: 1,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  '申请、作品集、合作关系放在一起',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: context.artC.ink
+                                        .withValues(alpha: 0.46),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    height: 1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        '登录后继续管理你的艺术申请和内容关系',
+                        style: TextStyle(
+                          color: context.artC.ink,
+                          fontSize: 25,
+                          fontWeight: FontWeight.w900,
+                          height: 1.12,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        '目标院校、AI 计划、收藏、私信和发布记录会同步到你的账号。',
+                        style: TextStyle(
+                          color: context.artC.ink.withValues(alpha: 0.52),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          height: 1.48,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+                      _ProfileGuestPrimaryButton(onTap: _openLogin),
+                      const SizedBox(height: 18),
+                      Row(
+                        children: const [
+                          Expanded(
+                            child: _ProfileGuestSignal(
+                              value: 'AI',
+                              label: '申请计划',
+                            ),
+                          ),
+                          _ProfileGuestSignalDivider(),
+                          Expanded(
+                            child: _ProfileGuestSignal(
+                              value: '同步',
+                              label: '收藏目标池',
+                            ),
+                          ),
+                          _ProfileGuestSignalDivider(),
+                          Expanded(
+                            child: _ProfileGuestSignal(
+                              value: '私信',
+                              label: '合作沟通',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                _ProfileGuestBenefit(
+                  icon: Icons.track_changes_rounded,
+                  title: '申请节奏',
+                  subtitle: '把目标院校、作品集阶段和提醒收进一条线。',
+                  onTap: () => widget.onOpenMainTab?.call(1),
+                ),
+                _ProfileGuestBenefit(
+                  icon: Icons.bookmark_border_rounded,
+                  title: '收藏与发布',
+                  subtitle: '保存帖子、案例、合作机会，回到账号里继续处理。',
+                  onTap: _openLogin,
+                ),
+                _ProfileGuestBenefit(
+                  icon: Icons.explore_outlined,
+                  title: '发现合作',
+                  subtitle: '先浏览活动、市集和艺术家，再登录建立联系。',
+                  onTap: () => widget.onOpenMainTab?.call(2),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          Positioned(
+            top: topInset + 2,
+            right: 8,
+            child: ListenableBuilder(
+              listenable: ArtseeThemeController.instance,
+              builder: (context, _) {
+                final dark = ArtseeThemeController.instance.isDark;
+                return IconButton(
+                  onPressed: () => ArtseeThemeController.instance.toggle(),
+                  icon: Icon(
+                    dark ? Icons.wb_sunny_outlined : Icons.nightlight_round,
+                    color: context.artC.ink.withValues(alpha: 0.55),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -843,7 +952,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _MenuAction(
                       '艺术家入驻', Icons.palette_outlined, _openArtistOnboarding),
                   _MenuAction(
-                    _isBusinessUser ? '查看机构主页' : '查看公开主页',
+                    _isBusinessUser ? '查看组织主页' : '查看公开主页',
                     Icons.open_in_new_rounded,
                     _isBusinessUser
                         ? _openBusinessPublicProfile
@@ -1330,6 +1439,241 @@ class _MenuBadge extends StatelessWidget {
           color: Colors.white,
           fontSize: 10,
           fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfilePressable extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+  final double pressedScale;
+
+  const _ProfilePressable({
+    required this.child,
+    required this.onTap,
+    this.pressedScale = 0.97,
+  });
+
+  @override
+  State<_ProfilePressable> createState() => _ProfilePressableState();
+}
+
+class _ProfilePressableState extends State<_ProfilePressable> {
+  bool _pressed = false;
+
+  void _setPressed(bool pressed) {
+    if (_pressed == pressed) return;
+    setState(() => _pressed = pressed);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => _setPressed(true),
+      onTapUp: (_) => _setPressed(false),
+      onTapCancel: () => _setPressed(false),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        scale: _pressed ? widget.pressedScale : 1,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOutCubic,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+class _ProfileGuestPrimaryButton extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _ProfileGuestPrimaryButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: '登录或注册',
+      child: _ProfilePressable(
+        onTap: onTap,
+        child: Container(
+          height: 50,
+          decoration: BoxDecoration(
+            color: kCobalt,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: [
+              BoxShadow(
+                color: kCobalt.withValues(alpha: 0.2),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.login_rounded, color: Colors.white, size: 19),
+              SizedBox(width: 8),
+              Text(
+                '登录 / 注册',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  height: 1,
+                  letterSpacing: 0,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileGuestSignal extends StatelessWidget {
+  final String value;
+  final String label;
+
+  const _ProfileGuestSignal({required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: context.artC.ink,
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+            height: 1,
+            letterSpacing: 0,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: context.artC.ink.withValues(alpha: 0.42),
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            height: 1,
+            letterSpacing: 0,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProfileGuestSignalDivider extends StatelessWidget {
+  const _ProfileGuestSignalDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 26,
+      margin: const EdgeInsets.symmetric(horizontal: 12),
+      color: context.artC.silver.withValues(alpha: 0.34),
+    );
+  }
+}
+
+class _ProfileGuestBenefit extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _ProfileGuestBenefit({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Semantics(
+        button: true,
+        label: title,
+        child: _ProfilePressable(
+          onTap: onTap,
+          pressedScale: 0.98,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(13, 12, 12, 12),
+            decoration: BoxDecoration(
+              color: context.artC.cardIconBg.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: context.artC.silver.withValues(alpha: 0.22),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: kCobalt.withValues(alpha: 0.07),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, color: kCobalt, size: 19),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: context.artC.ink,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w900,
+                          height: 1,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                      const SizedBox(height: 7),
+                      Text(
+                        subtitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: context.artC.ink.withValues(alpha: 0.45),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          height: 1.28,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 13,
+                  color: context.artC.ink.withValues(alpha: 0.24),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

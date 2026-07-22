@@ -83,9 +83,12 @@ const STATUS_META: Record<VerificationStatus, { label: string; className: string
 };
 
 const BUSINESS_ROLE_LABELS: Record<string, string> = {
-  study_abroad_agency: "艺术留学机构",
-  portfolio_training: "作品集机构",
-  gallery_exhibition: "画廊展览",
+  gallery_exhibition: "画廊 / 美术馆 / 展览机构",
+  official_association: "官方协会 / 行业组织",
+  school_official: "院校官方 / 招生部门",
+  official_partner: "官方合作组织",
+  study_abroad_agency: "留学服务（已下线）",
+  portfolio_training: "作品集服务（已下线）",
   event_organizer: "活动主办方",
   hotel_culture_space: "文旅空间",
   brand_partner: "品牌合作方",

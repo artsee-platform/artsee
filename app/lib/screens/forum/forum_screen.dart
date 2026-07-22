@@ -5487,6 +5487,7 @@ class _ChatTabState extends State<_ChatTab> {
   List<Map<String, dynamic>> _items = const [];
   bool _loading = true;
   bool _imConnecting = false;
+  bool _needsLogin = false;
   String? _error;
   String _selectedFilter = '全部';
 
@@ -5498,8 +5499,19 @@ class _ChatTabState extends State<_ChatTab> {
   }
 
   Future<void> _load() async {
+    if (!SupabaseService.isLoggedIn) {
+      setState(() {
+        _items = const [];
+        _loading = false;
+        _imConnecting = false;
+        _needsLogin = true;
+        _error = null;
+      });
+      return;
+    }
     setState(() {
       _loading = true;
+      _needsLogin = false;
       _error = null;
     });
     try {
@@ -5508,6 +5520,7 @@ class _ChatTabState extends State<_ChatTab> {
       setState(() {
         _items = result.data;
         _loading = false;
+        _needsLogin = false;
       });
     } catch (e) {
       if (!mounted) return;
@@ -5521,6 +5534,12 @@ class _ChatTabState extends State<_ChatTab> {
   Future<void> _refreshAll() async {
     unawaited(_warmTencentIm());
     await _load();
+  }
+
+  Future<void> _loginAndReload() async {
+    final ok = await ensureLoggedIn(context, message: '请先登录后查看私信');
+    if (!mounted || !ok) return;
+    await _refreshAll();
   }
 
   Future<void> _warmTencentIm() async {
@@ -5662,17 +5681,34 @@ class _ChatTabState extends State<_ChatTab> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingIndicator();
+    if (_needsLogin) {
+      return ListView(
+        padding: EdgeInsets.fromLTRB(20, 0, 20, widget.bottom + 32),
+        children: [
+          _CommunityEmptyState(
+            icon: Icons.mark_chat_unread_outlined,
+            title: '登录后查看私信',
+            subtitle: '合作邀约、圈子消息、沙龙通知和好友聊天都会汇总到这里。',
+            actionLabel: '去登录',
+            onRetry: _loginAndReload,
+          ),
+        ],
+      );
+    }
     if (_error != null) {
+      final authBlocked = _error!.contains('401') ||
+          _error!.contains('400') ||
+          _error!.contains('AuthSessionMissingException') ||
+          _error!.contains('未授权');
       return ListView(
         padding: EdgeInsets.fromLTRB(20, 0, 20, widget.bottom + 32),
         children: [
           _CommunityEmptyState(
             icon: Icons.mark_chat_unread_outlined,
             title: '私信加载失败',
-            subtitle: _error!.contains('401') || _error!.contains('未授权')
-                ? '登录后可以查看真实合作邀约、圈子消息和沙龙沟通。'
-                : _error!,
-            onRetry: _load,
+            subtitle: authBlocked ? '登录后可以查看真实合作邀约、圈子消息和沙龙沟通。' : _error!,
+            actionLabel: authBlocked ? '去登录' : '刷新',
+            onRetry: authBlocked ? _loginAndReload : _load,
           ),
         ],
       );
@@ -12064,7 +12100,10 @@ String _candidateRoleLabel(Map<String, dynamic> candidate) {
     'personal' => '个人用户',
     'business' => '机构',
     'institution' => '机构',
-    'study_abroad_agency' => '艺术留学机构',
+    'official_association' => '官方协会',
+    'school_official' => '院校官方',
+    'official_partner' => '官方合作组织',
+    'study_abroad_agency' => '留学服务（已下线）',
     _ => '可添加用户',
   };
 }

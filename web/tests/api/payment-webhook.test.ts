@@ -63,7 +63,7 @@ function resetDb() {
   db.organizations = [
     {
       id: ORG_ID,
-      name: "艺见留学",
+      name: "艺见美术馆",
       subscription_status: "inactive",
       subscription_started_at: null,
       subscription_expires_at: null,
@@ -345,7 +345,7 @@ describe("POST /api/v1/payments/webhook/:provider", () => {
       id: ORDER_ID,
       user_id: "owner-1",
       order_no: "AQ202606130003",
-      subject: "艺见留学 年度入驻服务",
+      subject: "艺见美术馆 年度入驻服务",
       item_type: "org_subscription",
       product_type: "org_subscription",
       item_id: ORG_ID,

@@ -7,8 +7,10 @@ type Row = Record<string, unknown>;
 const organizations: Row[] = [
   {
     id: "org-1",
-    name: "艺见伦敦申请中心",
+    name: "国际艺术教育协会",
+    type: "official_association",
     status: "active",
+    verification_status: "verified",
     city: "上海",
     province: "上海",
     latitude: 31.2304,
@@ -21,12 +23,14 @@ const organizations: Row[] = [
     contract_count: 6,
     subscription_status: "active",
     subscription_expires_at: "2099-01-01T00:00:00.000Z",
-    metadata: { address: "上海市静安区", phone: "021-0000" },
+    metadata: { address: "上海市静安区", phone: "021-0000", is_official: true },
   },
   {
     id: "org-2",
-    name: "北美作品集工作室",
+    name: "北美院校官方联络处",
+    type: "school_official",
     status: "active",
+    verification_status: "verified",
     city: "北京",
     province: "北京",
     latitude: 39.9042,
@@ -37,8 +41,7 @@ const organizations: Row[] = [
     rating: 4.9,
     review_count: 18,
     contract_count: 3,
-    subscription_status: "active",
-    subscription_expires_at: "2099-01-01T00:00:00.000Z",
+    subscription_status: "inactive",
     metadata: {},
   },
   {
@@ -58,6 +61,7 @@ const organizations: Row[] = [
   {
     id: "org-4",
     name: "过期机构",
+    type: "study_abroad_agency",
     status: "active",
     city: "上海",
     focus_areas: ["uk"],
@@ -72,6 +76,7 @@ const organizations: Row[] = [
   {
     id: "org-5",
     name: "未续费机构",
+    type: "portfolio_training",
     status: "active",
     city: "上海",
     focus_areas: ["uk"],
@@ -81,6 +86,36 @@ const organizations: Row[] = [
     review_count: 9,
     subscription_status: "inactive",
     metadata: {},
+  },
+  {
+    id: "org-6",
+    name: "商业留学中心",
+    type: "study_abroad_agency",
+    status: "active",
+    city: "上海",
+    focus_areas: ["uk"],
+    supports_online: true,
+    supports_offline: true,
+    rating: 5,
+    review_count: 24,
+    subscription_status: "active",
+    subscription_expires_at: "2099-01-01T00:00:00.000Z",
+    metadata: {},
+  },
+  {
+    id: "org-7",
+    name: "待认证官方协会",
+    type: "official_association",
+    status: "active",
+    verification_status: "pending",
+    city: "上海",
+    focus_areas: ["uk"],
+    supports_online: true,
+    supports_offline: true,
+    rating: 5,
+    review_count: 8,
+    subscription_status: "inactive",
+    metadata: { is_official: true },
   },
 ];
 
@@ -129,7 +164,7 @@ vi.mock("@/lib/api/supabase-service", () => ({
 }));
 
 describe("GET /api/v1/organizations/nearby", () => {
-  it("公开返回 active 机构列表", async () => {
+  it("公开只返回官方组织列表", async () => {
     const req = new NextRequest("http://localhost/api/v1/organizations/nearby");
     const res = await getNearbyOrganizations(req);
     const body = await res.json();
@@ -139,6 +174,8 @@ describe("GET /api/v1/organizations/nearby", () => {
     expect(body.data[0].status).toBe("active");
     expect(body.data.map((item: Row) => item.id)).not.toContain("org-4");
     expect(body.data.map((item: Row) => item.id)).not.toContain("org-5");
+    expect(body.data.map((item: Row) => item.id)).not.toContain("org-6");
+    expect(body.data.map((item: Row) => item.id)).not.toContain("org-7");
   });
 
   it("支持城市、领域、服务方式筛选", async () => {

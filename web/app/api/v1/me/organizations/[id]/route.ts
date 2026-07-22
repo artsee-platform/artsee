@@ -6,6 +6,7 @@ import {
   notFoundResponse,
 } from "@/lib/api/route-helpers";
 import { requireWorkbenchUser } from "@/lib/api/workbench-access";
+import { isRetiredCommercialAgencyType } from "@/lib/api/organization-visibility";
 
 type Ctx = { params: Promise<{ id: string }> };
 type Row = Record<string, unknown>;
@@ -97,7 +98,16 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       }
       update.name = name;
     }
-    if (hasOwn(body, "type")) update.type = cleanText(body.type) || null;
+    if (hasOwn(body, "type")) {
+      const type = cleanText(body.type);
+      if (isRetiredCommercialAgencyType(type)) {
+        return NextResponse.json(
+          { success: false, error: "该机构类型已下线" },
+          { status: 400 }
+        );
+      }
+      update.type = type || null;
+    }
     if (hasOwn(body, "city")) update.city = cleanText(body.city) || null;
     if (hasOwn(body, "province")) update.province = cleanText(body.province) || null;
 

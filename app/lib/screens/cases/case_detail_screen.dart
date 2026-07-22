@@ -82,8 +82,8 @@ class _CaseDetailScreenState extends State<CaseDetailScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.3),
-                              borderRadius: BorderRadius.circular(99)),
+                              color: Colors.white.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(8)),
                           child: Text(resultLabel(c.result),
                               style: const TextStyle(
                                   color: Colors.white,
@@ -111,7 +111,8 @@ class _CaseDetailScreenState extends State<CaseDetailScreen> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
               child: ArtseeSurface(
                 padding: const EdgeInsets.all(14),
-                radius: 18,
+                radius: 8,
+                color: context.artC.cardIconBg.withValues(alpha: 0.84),
                 child: Column(
                   children: [
                     Row(
@@ -146,7 +147,8 @@ class _CaseDetailScreenState extends State<CaseDetailScreen> {
                                 '${c.undergrad ?? '背景待补'} · GPA ${c.gpa ?? '—'}',
                                 style: TextStyle(
                                     fontSize: 11,
-                                    color: context.artC.ink.withOpacity(0.42))),
+                                    color: context.artC.ink
+                                        .withValues(alpha: 0.42))),
                           ],
                         )),
                       ],
@@ -180,15 +182,15 @@ class _CaseDetailScreenState extends State<CaseDetailScreen> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: kCobalt.withOpacity(0.07),
-                              border:
-                                  Border.all(color: kCobalt.withOpacity(0.12)),
-                              borderRadius: BorderRadius.circular(99),
+                              color: kCobalt.withValues(alpha: 0.07),
+                              border: Border.all(
+                                  color: kCobalt.withValues(alpha: 0.12)),
+                              borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text('#$t',
                                 style: TextStyle(
                                   fontSize: 10,
-                                  color: kCobalt.withOpacity(0.9),
+                                  color: kCobalt.withValues(alpha: 0.9),
                                   fontWeight: FontWeight.w800,
                                 )),
                           ))
@@ -203,7 +205,8 @@ class _CaseDetailScreenState extends State<CaseDetailScreen> {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
               child: ArtseeSurface(
                 padding: const EdgeInsets.all(16),
-                radius: 18,
+                radius: 8,
+                color: context.artC.cardIconBg.withValues(alpha: 0.84),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -216,7 +219,7 @@ class _CaseDetailScreenState extends State<CaseDetailScreen> {
                     Text(c.content ?? c.excerpt ?? '暂无内容',
                         style: TextStyle(
                             fontSize: 13,
-                            color: context.artC.ink.withOpacity(0.66),
+                            color: context.artC.ink.withValues(alpha: 0.66),
                             height: 1.7)),
                   ],
                 ),
@@ -261,9 +264,10 @@ class _CaseInfoTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
         decoration: BoxDecoration(
-          color: context.artC.silver.withOpacity(0.18),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: context.artC.silver.withOpacity(0.32)),
+          color: context.artC.silver.withValues(alpha: 0.18),
+          borderRadius: BorderRadius.circular(8),
+          border:
+              Border.all(color: context.artC.silver.withValues(alpha: 0.32)),
         ),
         child: Column(
           children: [
@@ -272,7 +276,7 @@ class _CaseInfoTile extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w800,
-                color: kCobalt.withOpacity(0.9),
+                color: kCobalt.withValues(alpha: 0.9),
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -283,7 +287,7 @@ class _CaseInfoTile extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 10,
-                color: context.artC.ink.withOpacity(0.38),
+                color: context.artC.ink.withValues(alpha: 0.38),
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -311,7 +315,7 @@ class _CaseDetailError extends StatelessWidget {
             Icon(
               Icons.cloud_off_outlined,
               size: 42,
-              color: context.artC.ink.withOpacity(0.25),
+              color: context.artC.ink.withValues(alpha: 0.25),
             ),
             const SizedBox(height: 12),
             Text(
@@ -329,7 +333,7 @@ class _CaseDetailError extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 height: 1.5,
-                color: context.artC.ink.withOpacity(0.58),
+                color: context.artC.ink.withValues(alpha: 0.58),
               ),
             ),
             const SizedBox(height: 16),
@@ -354,18 +358,19 @@ class _ActionBtn extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
           color: context.artC.cardIconBg,
-          border: Border.all(color: context.artC.silver.withOpacity(0.42)),
-          borderRadius: BorderRadius.circular(14),
+          border:
+              Border.all(color: context.artC.silver.withValues(alpha: 0.28)),
+          borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 14, color: kCobalt.withOpacity(0.72)),
+            Icon(icon, size: 14, color: kCobalt.withValues(alpha: 0.72)),
             const SizedBox(width: 4),
             Text(label,
                 style: TextStyle(
                   fontSize: 11,
-                  color: context.artC.ink.withOpacity(0.56),
+                  color: context.artC.ink.withValues(alpha: 0.56),
                   fontWeight: FontWeight.w700,
                 )),
           ],

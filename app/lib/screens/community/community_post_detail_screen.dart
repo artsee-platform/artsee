@@ -630,7 +630,7 @@ class _PostBody extends StatelessWidget {
               style: TextStyle(
                 fontSize: 15,
                 height: 1.62,
-                color: context.artC.ink.withOpacity(0.78),
+                color: context.artC.ink.withValues(alpha: 0.78),
               ),
             ),
           ],
@@ -692,7 +692,7 @@ class _Avatar extends StatelessWidget {
     final avatar = post.authorAvatarUrl;
     return CircleAvatar(
       radius: radius,
-      backgroundColor: kCobalt.withOpacity(0.09),
+      backgroundColor: kCobalt.withValues(alpha: 0.09),
       child: ClipOval(
         child: !anonymous && avatar != null && avatar.isNotEmpty
             ? Image.network(
@@ -740,18 +740,18 @@ class _DetailBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
       decoration: BoxDecoration(
-        color: dark ? kCobalt.withOpacity(0.08) : context.artC.cardIconBg,
-        borderRadius: BorderRadius.circular(999),
+        color: dark ? kCobalt.withValues(alpha: 0.08) : context.artC.cardIconBg,
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: dark
-              ? kCobalt.withOpacity(0.28)
-              : context.artC.silver.withOpacity(0.55),
+              ? kCobalt.withValues(alpha: 0.28)
+              : context.artC.silver.withValues(alpha: 0.55),
         ),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: dark ? kCobalt : context.artC.ink.withOpacity(0.58),
+          color: dark ? kCobalt : context.artC.ink.withValues(alpha: 0.58),
           fontSize: 10,
           fontWeight: FontWeight.w900,
         ),
@@ -815,8 +815,8 @@ class _CommentsSection extends StatelessWidget {
           composer,
           const SizedBox(height: 18),
           if (loading)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
               child: Center(
                 child: SizedBox(
                   width: 18,
@@ -833,19 +833,19 @@ class _CommentsSection extends StatelessWidget {
               width: double.infinity,
               child: ArtseeSurface(
                 padding: const EdgeInsets.all(18),
-                radius: 16,
+                radius: 8,
                 child: Text(
                   isQa ? '还没有回答，分享你的经验或建议。' : '还没有评论，来写下第一句反馈。',
                   style: TextStyle(
                     fontSize: 13,
-                    color: context.artC.ink.withOpacity(0.42),
+                    color: context.artC.ink.withValues(alpha: 0.42),
                   ),
                 ),
               ),
             )
           else if (isQa) ...[
             if (certified.isNotEmpty) ...[
-              _AnswerGroupTitle(label: '认证回答'),
+              const _AnswerGroupTitle(label: '认证回答'),
               ...certified.map((comment) => _CommentTile(
                     comment: comment,
                     isQa: isQa,
@@ -853,9 +853,9 @@ class _CommentsSection extends StatelessWidget {
                   )),
               const SizedBox(height: 8),
             ] else
-              _InviteAnswerCard(),
+              const _InviteAnswerCard(),
             if (ordinary.isNotEmpty) ...[
-              _AnswerGroupTitle(label: '其他回答'),
+              const _AnswerGroupTitle(label: '其他回答'),
               ...ordinary.map((comment) => _CommentTile(
                     comment: comment,
                     isQa: isQa,
@@ -886,7 +886,7 @@ class _AnswerGroupTitle extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          color: context.artC.ink.withOpacity(0.48),
+          color: context.artC.ink.withValues(alpha: 0.48),
           fontSize: 11,
           fontWeight: FontWeight.w900,
           letterSpacing: 0,
@@ -897,6 +897,8 @@ class _AnswerGroupTitle extends StatelessWidget {
 }
 
 class _InviteAnswerCard extends StatelessWidget {
+  const _InviteAnswerCard();
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -905,7 +907,7 @@ class _InviteAnswerCard extends StatelessWidget {
         width: double.infinity,
         child: ArtseeSurface(
           padding: const EdgeInsets.all(14),
-          radius: 16,
+          radius: 8,
           child: Row(
             children: [
               const Icon(Icons.verified_outlined, color: kCobalt, size: 18),
@@ -914,14 +916,14 @@ class _InviteAnswerCard extends StatelessWidget {
                 child: Text(
                   '暂无认证回答，可以邀请校友、导师或顾问来回答。',
                   style: TextStyle(
-                    color: context.artC.ink.withOpacity(0.52),
+                    color: context.artC.ink.withValues(alpha: 0.52),
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
               const SizedBox(width: 10),
-              Text(
+              const Text(
                 '邀请',
                 style: TextStyle(
                   color: kCobalt,
@@ -1091,6 +1093,47 @@ String _compactCount(int value) {
   return '${text.replaceAll('.0', '')}万';
 }
 
+class _DetailPressable extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final double pressedScale;
+
+  const _DetailPressable({
+    required this.child,
+    required this.onTap,
+    this.pressedScale = 0.97,
+  });
+
+  @override
+  State<_DetailPressable> createState() => _DetailPressableState();
+}
+
+class _DetailPressableState extends State<_DetailPressable> {
+  bool _pressed = false;
+
+  void _setPressed(bool pressed) {
+    if (_pressed == pressed || widget.onTap == null) return;
+    setState(() => _pressed = pressed);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => _setPressed(true),
+      onTapUp: (_) => _setPressed(false),
+      onTapCancel: () => _setPressed(false),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        scale: _pressed ? widget.pressedScale : 1,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOutCubic,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
 class _CommentComposer extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
@@ -1125,8 +1168,11 @@ class _CommentComposer extends StatelessWidget {
           child: Container(
             constraints: const BoxConstraints(minHeight: 44),
             decoration: BoxDecoration(
-              color: context.artC.silver.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(999),
+              color: context.artC.cardIconBg.withValues(alpha: 0.78),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: context.artC.silver.withValues(alpha: 0.28),
+              ),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 14),
             child: Center(
@@ -1155,24 +1201,52 @@ class _CommentComposer extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 10),
-        GestureDetector(
+        _DetailPressable(
           onTap: sending ? null : onSend,
+          pressedScale: 0.95,
           child: Container(
-            width: 42,
-            height: 42,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
               color: sending ? kCobalt.withValues(alpha: 0.55) : kCobalt,
-              shape: BoxShape.circle,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: sending
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: kCobalt.withValues(alpha: 0.18),
+                        blurRadius: 14,
+                        offset: const Offset(0, 7),
+                      ),
+                    ],
             ),
-            child: sending
-                ? const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 160),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeOutCubic,
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: ScaleTransition(
+                  scale: Tween<double>(begin: 0.97, end: 1).animate(animation),
+                  child: child,
+                ),
+              ),
+              child: sending
+                  ? const Padding(
+                      key: ValueKey('sending'),
+                      padding: EdgeInsets.all(12),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(
+                      Icons.arrow_upward_rounded,
+                      key: ValueKey('send'),
                       color: Colors.white,
+                      size: 20,
                     ),
-                  )
-                : const Icon(Icons.arrow_upward, color: Colors.white, size: 20),
+            ),
           ),
         ),
       ],
@@ -1211,57 +1285,53 @@ class _DetailBottomActions extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: context.artC.cardIconBg,
+        color: context.artC.porcelain.withValues(alpha: 0.96),
         border: Border(
-          top: BorderSide(color: context.artC.silver.withValues(alpha: 0.36)),
+          top: BorderSide(color: context.artC.silver.withValues(alpha: 0.28)),
         ),
       ),
-      padding: const EdgeInsets.fromLTRB(18, 8, 18, 8),
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
       child: SafeArea(
         top: false,
         child: Row(
           children: [
             Expanded(
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.lock_outline_rounded,
-                    size: 21,
-                    color: context.artC.ink.withValues(alpha: 0.68),
+              child: Container(
+                height: 46,
+                padding: const EdgeInsets.symmetric(horizontal: 11),
+                decoration: BoxDecoration(
+                  color: context.artC.cardIconBg.withValues(alpha: 0.78),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: context.artC.silver.withValues(alpha: 0.24),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '公开可见',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            color: context.artC.ink,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '内容权限由作者设置',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: context.artC.ink.withValues(alpha: 0.42),
-                          ),
-                        ),
-                      ],
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.lock_outline_rounded,
+                      size: 18,
+                      color: context.artC.ink.withValues(alpha: 0.48),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '公开可见',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          color: context.artC.ink.withValues(alpha: 0.74),
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
+            const SizedBox(width: 10),
             _BottomActionButton(
               icon: liked ? Icons.favorite : Icons.favorite_border_rounded,
               label: _compactCount(likeCount),
@@ -1269,7 +1339,7 @@ class _DetailBottomActions extends StatelessWidget {
               busy: likeBusy,
               onTap: onLike,
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 8),
             _BottomActionButton(
               icon: saved ? Icons.star_rounded : Icons.star_border_rounded,
               label: '收藏',
@@ -1277,7 +1347,7 @@ class _DetailBottomActions extends StatelessWidget {
               busy: saveBusy,
               onTap: onSave,
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 8),
             _BottomActionButton(
               icon: isQa
                   ? Icons.question_answer_outlined
@@ -1310,25 +1380,56 @@ class _BottomActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = active ? kCobalt : context.artC.ink.withValues(alpha: 0.86);
-    return GestureDetector(
+    return _DetailPressable(
       onTap: busy ? null : onTap,
-      behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 48,
+      pressedScale: 0.96,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        width: 52,
+        height: 46,
+        decoration: BoxDecoration(
+          color: active
+              ? kCobalt.withValues(alpha: 0.08)
+              : context.artC.cardIconBg.withValues(alpha: 0.78),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: active
+                ? kCobalt.withValues(alpha: 0.24)
+                : context.artC.silver.withValues(alpha: 0.24),
+          ),
+        ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (busy)
-              const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: kCobalt,
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 140),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeOutCubic,
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: ScaleTransition(
+                  scale: Tween<double>(begin: 0.96, end: 1).animate(animation),
+                  child: child,
                 ),
-              )
-            else
-              Icon(icon, size: 28, color: color),
+              ),
+              child: busy
+                  ? const SizedBox(
+                      key: ValueKey('busy'),
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: kCobalt,
+                      ),
+                    )
+                  : Icon(
+                      icon,
+                      key: ValueKey(icon),
+                      size: 20,
+                      color: color,
+                    ),
+            ),
             const SizedBox(height: 3),
             Text(
               label,
@@ -1366,14 +1467,14 @@ class _ErrorView extends StatelessWidget {
             Icon(
               Icons.cloud_off_outlined,
               size: 42,
-              color: context.artC.ink.withOpacity(0.25),
+              color: context.artC.ink.withValues(alpha: 0.25),
             ),
             const SizedBox(height: 12),
             Text(
               message,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: context.artC.ink.withOpacity(0.58),
+                color: context.artC.ink.withValues(alpha: 0.58),
                 height: 1.5,
               ),
             ),

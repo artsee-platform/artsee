@@ -350,21 +350,21 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
                       width: 88,
                       height: 88,
                       decoration: BoxDecoration(
-                        color: context.artC.cardIconBg,
-                        borderRadius: BorderRadius.circular(20),
+                        color: context.artC.cardIconBg.withValues(alpha: 0.84),
+                        borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: context.artC.silver.withOpacity(0.48),
+                          color: context.artC.silver.withValues(alpha: 0.28),
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: context.artC.ink.withOpacity(0.035),
-                            blurRadius: 14,
+                            color: context.artC.ink.withValues(alpha: 0.02),
+                            blurRadius: 16,
                             offset: const Offset(0, 6),
                           ),
                         ],
                       ),
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(8),
                         child: logoUrl != null && logoUrl.isNotEmpty
                             ? Image.network(
                                 logoUrl,
@@ -405,7 +405,7 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
                               nameEn,
                               style: TextStyle(
                                 fontSize: 13,
-                                color: context.artC.ink.withOpacity(0.45),
+                                color: context.artC.ink.withValues(alpha: 0.45),
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -418,7 +418,7 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: kCobalt.withOpacity(0.08),
+                                color: kCobalt.withValues(alpha: 0.08),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
@@ -426,7 +426,7 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
-                                  color: kCobalt.withOpacity(0.9),
+                                  color: kCobalt.withValues(alpha: 0.9),
                                 ),
                               ),
                             ),
@@ -489,17 +489,17 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
                 if (campusImages.isNotEmpty) ...[
                   const SizedBox(height: 24),
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(kRadiusLarge),
+                    borderRadius: BorderRadius.circular(8),
                     child: AspectRatio(
                       aspectRatio: 16 / 9,
                       child: Image.network(
                         campusImages.first,
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Container(
-                          color: context.artC.silver.withOpacity(0.35),
+                          color: context.artC.silver.withValues(alpha: 0.35),
                           child: Icon(
                             Icons.image_not_supported_outlined,
-                            color: context.artC.ink.withOpacity(0.25),
+                            color: context.artC.ink.withValues(alpha: 0.25),
                           ),
                         ),
                       ),
@@ -521,7 +521,7 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
                           fontSize: 14,
                           height: 1.55,
                           fontWeight: FontWeight.w700,
-                          color: context.artC.ink.withOpacity(0.72),
+                          color: context.artC.ink.withValues(alpha: 0.72),
                         ),
                       ),
                     ],
@@ -581,7 +581,7 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
                           style: TextStyle(
                             fontSize: 14,
                             height: 1.65,
-                            color: context.artC.ink.withOpacity(0.74),
+                            color: context.artC.ink.withValues(alpha: 0.74),
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -589,8 +589,9 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: context.artC.porcelain.withOpacity(0.72),
-                            borderRadius: BorderRadius.circular(14),
+                            color:
+                                context.artC.porcelain.withValues(alpha: 0.72),
+                            borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
                             description.trim(),
@@ -599,7 +600,7 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
                             style: TextStyle(
                               fontSize: 12,
                               height: 1.55,
-                              color: context.artC.ink.withOpacity(0.48),
+                              color: context.artC.ink.withValues(alpha: 0.48),
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -653,7 +654,7 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
                                       height: 5,
                                       margin: const EdgeInsets.only(top: 8),
                                       decoration: BoxDecoration(
-                                        color: kCobalt.withOpacity(0.75),
+                                        color: kCobalt.withValues(alpha: 0.75),
                                         shape: BoxShape.circle,
                                       ),
                                     ),
@@ -665,8 +666,8 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
                                           fontSize: 14,
                                           height: 1.45,
                                           fontWeight: FontWeight.w600,
-                                          color: context.artC.ink.withOpacity(
-                                            0.72,
+                                          color: context.artC.ink.withValues(
+                                            alpha: 0.72,
                                           ),
                                         ),
                                       ),
@@ -727,20 +728,23 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
   }) {
     return Tooltip(
       message: tooltip,
-      child: GestureDetector(
+      child: _SchoolDetailPressable(
         onTap: onTap,
         child: Container(
           width: 40,
           height: 40,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: context.artC.silver.withOpacity(0.35),
-            shape: BoxShape.circle,
+            color: context.artC.cardIconBg.withValues(alpha: 0.78),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: context.artC.silver.withValues(alpha: 0.26),
+            ),
           ),
           child: Icon(
             icon,
             size: 18,
-            color: context.artC.ink.withOpacity(0.62),
+            color: context.artC.ink.withValues(alpha: 0.62),
           ),
         ),
       ),
@@ -765,13 +769,34 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
           Row(
             children: [
               Expanded(child: _buildSectionTitle('关于这所学校，大家在问')),
-              TextButton.icon(
-                onPressed: _openSchoolQuestion,
-                icon: const Icon(Icons.add_comment_outlined, size: 16),
-                label: const Text('提问'),
-                style: TextButton.styleFrom(
-                  foregroundColor: kCobalt,
-                  visualDensity: VisualDensity.compact,
+              _SchoolDetailPressable(
+                onTap: _openSchoolQuestion,
+                pressedScale: 0.96,
+                child: Container(
+                  height: 32,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: kCobalt.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: kCobalt.withValues(alpha: 0.18)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.add_comment_outlined,
+                          size: 15, color: kCobalt),
+                      SizedBox(width: 5),
+                      Text(
+                        '提问',
+                        style: TextStyle(
+                          color: kCobalt,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -789,7 +814,7 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
             Text(
               '还没有沉淀到这所学校的问答。可以先把具体问题发到院校广场。',
               style: TextStyle(
-                color: context.artC.ink.withOpacity(0.48),
+                color: context.artC.ink.withValues(alpha: 0.48),
                 fontSize: 12,
                 height: 1.45,
                 fontWeight: FontWeight.w600,
@@ -805,9 +830,9 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
   }
 
   Widget _buildSuggestedQuestionRow(String text) {
-    return InkWell(
+    return _SchoolDetailPressable(
       onTap: _openSchoolQuestion,
-      borderRadius: BorderRadius.circular(8),
+      pressedScale: 0.985,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
@@ -820,7 +845,7 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: context.artC.ink.withOpacity(0.74),
+                  color: context.artC.ink.withValues(alpha: 0.74),
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                 ),
@@ -828,7 +853,7 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
             ),
             Icon(
               Icons.chevron_right_rounded,
-              color: context.artC.ink.withOpacity(0.28),
+              color: context.artC.ink.withValues(alpha: 0.28),
             ),
           ],
         ),
@@ -842,7 +867,8 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
         : post.commentCount > 0
             ? '${post.commentCount} 个回答正在讨论'
             : '还在等第一条有用回答';
-    return InkWell(
+    return _SchoolDetailPressable(
+      pressedScale: 0.985,
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute<void>(
@@ -853,7 +879,6 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
           ),
         );
       },
-      borderRadius: BorderRadius.circular(8),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(
@@ -864,7 +889,7 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
               height: 24,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: kCobalt.withOpacity(0.08),
+                color: kCobalt.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Text(
@@ -897,7 +922,7 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: context.artC.ink.withOpacity(0.44),
+                      color: context.artC.ink.withValues(alpha: 0.44),
                       fontSize: 11.5,
                       fontWeight: FontWeight.w600,
                     ),
@@ -909,7 +934,7 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
             Text(
               '${post.commentCount} 回答',
               style: TextStyle(
-                color: context.artC.ink.withOpacity(0.36),
+                color: context.artC.ink.withValues(alpha: 0.36),
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
               ),
@@ -950,14 +975,14 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: context.artC.cardIconBg,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: context.artC.silver.withValues(alpha: 0.28)),
+        color: context.artC.cardIconBg.withValues(alpha: 0.84),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: context.artC.silver.withValues(alpha: 0.26)),
         boxShadow: [
           BoxShadow(
-            color: context.artC.ink.withValues(alpha: 0.026),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: context.artC.ink.withValues(alpha: 0.02),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -986,7 +1011,7 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
             label,
             style: TextStyle(
               fontSize: 13,
-              color: context.artC.ink.withOpacity(0.45),
+              color: context.artC.ink.withValues(alpha: 0.45),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -1013,16 +1038,16 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: kCobalt.withOpacity(0.07),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: kCobalt.withOpacity(0.08)),
+            color: kCobalt.withValues(alpha: 0.07),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: kCobalt.withValues(alpha: 0.08)),
           ),
           child: Text(
             _displayLabel(value),
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: kCobalt.withOpacity(0.9),
+              color: kCobalt.withValues(alpha: 0.9),
             ),
           ),
         );
@@ -1042,7 +1067,7 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w700,
-            color: dimmed ? context.artC.ink.withOpacity(0.25) : kCobalt,
+            color: dimmed ? context.artC.ink.withValues(alpha: 0.25) : kCobalt,
           ),
         ),
         const SizedBox(height: 6),
@@ -1053,11 +1078,52 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 11,
-            color: context.artC.ink.withOpacity(0.4),
+            color: context.artC.ink.withValues(alpha: 0.4),
             fontWeight: FontWeight.w500,
           ),
         ),
       ],
+    );
+  }
+}
+
+class _SchoolDetailPressable extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final double pressedScale;
+
+  const _SchoolDetailPressable({
+    required this.child,
+    required this.onTap,
+    this.pressedScale = 0.97,
+  });
+
+  @override
+  State<_SchoolDetailPressable> createState() => _SchoolDetailPressableState();
+}
+
+class _SchoolDetailPressableState extends State<_SchoolDetailPressable> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value || widget.onTap == null) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onTap,
+      onTapDown: (_) => _setPressed(true),
+      onTapCancel: () => _setPressed(false),
+      onTapUp: (_) => _setPressed(false),
+      child: AnimatedScale(
+        scale: _pressed ? widget.pressedScale : 1,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOutCubic,
+        child: widget.child,
+      ),
     );
   }
 }
@@ -1095,14 +1161,14 @@ class _DetailChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
       decoration: BoxDecoration(
-        color: context.artC.silver.withOpacity(0.26),
-        borderRadius: BorderRadius.circular(9),
-        border: Border.all(color: context.artC.ink.withOpacity(0.06)),
+        color: context.artC.silver.withValues(alpha: 0.26),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: context.artC.ink.withValues(alpha: 0.06)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 13, color: context.artC.ink.withOpacity(0.52)),
+          Icon(icon, size: 13, color: context.artC.ink.withValues(alpha: 0.52)),
           const SizedBox(width: 4),
           Flexible(
             child: Text(
@@ -1112,7 +1178,7 @@ class _DetailChip extends StatelessWidget {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
-                color: context.artC.ink.withOpacity(0.58),
+                color: context.artC.ink.withValues(alpha: 0.58),
               ),
             ),
           ),
@@ -1140,25 +1206,47 @@ class _PrimaryDecisionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fg = outlined ? kCobalt : Colors.white;
-    final bg = outlined ? context.artC.cardIconBg : kCobalt;
-    return Material(
-      color: bg,
-      borderRadius: BorderRadius.circular(13),
-      child: InkWell(
-        onTap: loading ? null : onTap,
-        borderRadius: BorderRadius.circular(13),
-        child: Container(
-          height: 46,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(13),
-            border: Border.all(
-              color: outlined ? kCobalt.withOpacity(0.18) : kCobalt,
-            ),
+    return _SchoolDetailPressable(
+      onTap: loading ? null : onTap,
+      pressedScale: 0.96,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        height: 46,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+          color: outlined
+              ? context.artC.cardIconBg.withValues(alpha: 0.82)
+              : kCobalt,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: outlined ? kCobalt.withValues(alpha: 0.18) : kCobalt,
           ),
-          child: Center(
+          boxShadow: outlined || loading
+              ? null
+              : [
+                  BoxShadow(
+                    color: kCobalt.withValues(alpha: 0.14),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+        ),
+        child: Center(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 140),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeOutCubic,
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: ScaleTransition(
+                scale: Tween<double>(begin: 0.96, end: 1).animate(animation),
+                child: child,
+              ),
+            ),
             child: loading
                 ? SizedBox(
+                    key: const ValueKey('loading'),
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(
@@ -1167,6 +1255,7 @@ class _PrimaryDecisionButton extends StatelessWidget {
                     ),
                   )
                 : Row(
+                    key: const ValueKey('label'),
                     mainAxisAlignment: MainAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1212,9 +1301,9 @@ class _FitColumn extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withOpacity(0.1)),
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1241,8 +1330,8 @@ class _FitColumn extends StatelessWidget {
               return Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.72),
-                  borderRadius: BorderRadius.circular(9),
+                  color: Colors.white.withValues(alpha: 0.72),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   item,
@@ -1250,7 +1339,7 @@ class _FitColumn extends StatelessWidget {
                     fontSize: 12,
                     height: 1.2,
                     fontWeight: FontWeight.w700,
-                    color: context.artC.ink.withOpacity(0.68),
+                    color: context.artC.ink.withValues(alpha: 0.68),
                   ),
                 ),
               );

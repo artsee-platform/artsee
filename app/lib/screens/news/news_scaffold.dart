@@ -7,6 +7,7 @@ import '../home/home_screen.dart';
 import '../schools/school_list_screen.dart';
 import '../schools/school_search_screen.dart';
 import 'package:artsee_app/theme/artsee_ui_colors.dart';
+import '../../widgets/deep_sea_ui.dart';
 import '../../services/backend_api_service.dart';
 import '../../services/supabase_service.dart';
 import '../../utils/auth_gate.dart';
@@ -245,43 +246,51 @@ class NewsScaffoldState extends State<NewsScaffold>
   Widget build(BuildContext context) {
     final bottom = mainTabBottomInset(context);
     return Scaffold(
-      backgroundColor: context.artC.porcelain,
-      body: Stack(
-        children: [
-          SafeArea(
-            top: false,
-            child: Column(
-              children: [
-                _SchoolChannelHeader(
-                  controller: _tabController,
-                  onCreateTap: _openSchoolCreateMenu,
-                  onSearchTap: _openSchoolSearch,
-                ),
-                Expanded(
-                  child: TabBarView(
+      backgroundColor: kInkWashPaper,
+      body: DeepSeaBackdrop(
+        artworkAsset: kPageArtworkAsset,
+        blurSigma: 3,
+        scrimOpacity: 0.05,
+        backgroundColor: kInkWashPaper,
+        scrimColor: Colors.white,
+        child: Stack(
+          children: [
+            SafeArea(
+              top: false,
+              child: Column(
+                children: [
+                  _SchoolChannelHeader(
                     controller: _tabController,
-                    children: [
-                      HomeScreen(
-                        compactTopChrome: true,
-                        plazaRefreshSignal: _plazaRefreshSignal,
-                        onReturnToMain: () =>
-                            _tabController.animateTo(_schoolsTabIndex),
-                      ),
-                      SchoolListScreen(
-                        key: _schoolKey,
-                        onOpenCompare: openComparePage,
-                      ),
-                      _ToolboxTab(
-                        key: _toolboxKey,
-                        bottom: bottom,
-                      ),
-                    ],
+                    onCreateTap: _openSchoolCreateMenu,
+                    onSearchTap: _openSchoolSearch,
                   ),
-                ),
-              ],
+                  Expanded(
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        HomeScreen(
+                          compactTopChrome: true,
+                          inheritDeepSeaBackdrop: true,
+                          plazaRefreshSignal: _plazaRefreshSignal,
+                          onReturnToMain: () =>
+                              _tabController.animateTo(_schoolsTabIndex),
+                        ),
+                        SchoolListScreen(
+                          key: _schoolKey,
+                          onOpenCompare: openComparePage,
+                        ),
+                        _ToolboxTab(
+                          key: _toolboxKey,
+                          bottom: bottom,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -519,43 +528,31 @@ class _SchoolChannelHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dividerColor = context.artC.silver.withValues(alpha: 0.28);
-
-    return Container(
-      decoration: BoxDecoration(
-        color: context.artC.cardIconBg,
-        border: Border(
-          bottom: BorderSide(
-            color: dividerColor,
-          ),
-        ),
-      ),
-      child: SafeArea(
-        top: true,
-        bottom: false,
-        child: SizedBox(
-          height: 62,
-          child: Row(
-            children: [
-              const SizedBox(width: 8),
-              _SchoolHeaderIconButton(
-                icon: Icons.add_box_outlined,
-                onTap: onCreateTap,
-                tooltip: '发布内容',
+    return SafeArea(
+      top: true,
+      bottom: false,
+      child: SizedBox(
+        height: 56,
+        child: Row(
+          children: [
+            const SizedBox(width: 10),
+            _SchoolHeaderIconButton(
+              icon: Icons.add_box_outlined,
+              onTap: onCreateTap,
+              tooltip: '发布内容',
+            ),
+            Expanded(
+              child: Center(
+                child: _SchoolChannelTabs(controller: controller),
               ),
-              Expanded(
-                child: Center(
-                  child: _SchoolChannelTabs(controller: controller),
-                ),
-              ),
-              _SchoolHeaderIconButton(
-                icon: Icons.search_rounded,
-                onTap: onSearchTap,
-                tooltip: '搜索院校',
-              ),
-              const SizedBox(width: 8),
-            ],
-          ),
+            ),
+            _SchoolHeaderIconButton(
+              icon: Icons.search_rounded,
+              onTap: onSearchTap,
+              tooltip: '搜索院校',
+            ),
+            const SizedBox(width: 8),
+          ],
         ),
       ),
     );
@@ -575,25 +572,13 @@ class _SchoolHeaderIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final iconColor = context.artC.ink.withValues(alpha: 0.84);
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(999),
-          child: SizedBox(
-            width: 36,
-            height: 36,
-            child: Icon(
-              icon,
-              size: 22,
-              color: iconColor,
-            ),
-          ),
-        ),
-      ),
+    return OpticalGlassIconButton(
+      icon: icon,
+      onTap: onTap,
+      tooltip: tooltip,
+      size: 36,
+      iconSize: 21,
+      iconColor: kInkWashInk.withValues(alpha: 0.78),
     );
   }
 }
@@ -604,7 +589,7 @@ class _SchoolChannelTabs extends StatelessWidget {
   const _SchoolChannelTabs({required this.controller});
 
   static const _labels = ['广场', '院校', '计划'];
-  static const _accent = kCobalt;
+  static const _accent = kInkWashAccent;
 
   @override
   Widget build(BuildContext context) {
@@ -644,39 +629,47 @@ class _SchoolChannelTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textColor =
-        selected ? context.artC.ink : context.artC.ink.withValues(alpha: 0.42);
+    final textColor = selected
+        ? kInkWashInk.withValues(alpha: 0.92)
+        : kInkWashInk.withValues(alpha: 0.44);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: SizedBox(
-        width: 58,
-        height: 62,
+        width: 56,
+        height: 56,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: textColor,
-                fontSize: 16,
+                fontSize: 15.5,
                 height: 1.08,
                 fontWeight: selected ? FontWeight.w800 : FontWeight.w400,
                 letterSpacing: 0,
               ),
             ),
-            const SizedBox(height: 7),
+            const SizedBox(height: 6),
             AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               curve: Curves.easeOutCubic,
-              width: selected ? (label.length > 2 ? 38 : 30) : 0,
-              height: 3.5,
+              width: selected ? (label.length > 2 ? 34 : 27) : 0,
+              height: 3,
               decoration: BoxDecoration(
                 color: accent,
                 borderRadius: BorderRadius.circular(999),
+                boxShadow: [
+                  BoxShadow(
+                    color: accent.withValues(alpha: 0.42),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
             ),
           ],
@@ -964,12 +957,29 @@ class _ToolboxTabState extends State<_ToolboxTab> {
               )
             else if (_needsLogin)
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 40),
+                padding: const EdgeInsets.only(top: 18),
                 child: _PlanEmptyState(
                   icon: Icons.lock_outline_rounded,
                   title: '登录后查看申请计划',
-                  body: '登录后，AI 会根据你的 onboarding 信息生成一份简单、通俗的申请计划。',
+                  body: '登录后，AI 会根据你的目标院校、预算、城市和作品集阶段，生成一份可以直接执行的申请节奏。',
                   actionLabel: '去登录 →',
+                  points: const [
+                    (
+                      icon: Icons.route_outlined,
+                      label: '时间线',
+                      text: '按月拆出选校、作品集、文书和递交节点'
+                    ),
+                    (
+                      icon: Icons.account_balance_outlined,
+                      label: '目标池',
+                      text: '把冲刺、匹配、保底院校放在同一张表里'
+                    ),
+                    (
+                      icon: Icons.auto_awesome_outlined,
+                      label: 'AI 提醒',
+                      text: '根据进度提示下一步，而不是只堆清单'
+                    ),
+                  ],
                   onAction: () => _loginAndReload(),
                 ),
               )
@@ -1322,6 +1332,7 @@ class _PlanEmptyState extends StatelessWidget {
   final String title;
   final String body;
   final String actionLabel;
+  final List<({IconData icon, String label, String text})> points;
   final VoidCallback onAction;
 
   const _PlanEmptyState({
@@ -1329,6 +1340,7 @@ class _PlanEmptyState extends StatelessWidget {
     required this.title,
     required this.body,
     required this.actionLabel,
+    this.points = const [],
     required this.onAction,
   });
 
@@ -1337,17 +1349,27 @@ class _PlanEmptyState extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: context.artC.ink.withValues(alpha: 0.44), size: 24),
-        const SizedBox(height: 12),
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: kCobalt.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: kCobalt.withValues(alpha: 0.08)),
+          ),
+          child: Icon(icon, color: kCobalt, size: 22),
+        ),
+        const SizedBox(height: 16),
         Text(
           title,
           style: TextStyle(
             color: context.artC.ink,
-            fontSize: 16,
+            fontSize: 20,
+            height: 1.2,
             fontWeight: FontWeight.w900,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         Text(
           body,
           style: TextStyle(
@@ -1357,9 +1379,78 @@ class _PlanEmptyState extends StatelessWidget {
             fontWeight: FontWeight.w700,
           ),
         ),
-        const SizedBox(height: 14),
+        if (points.isNotEmpty) ...[
+          const SizedBox(height: 18),
+          for (final point in points) ...[
+            _PlanPreviewPoint(
+              icon: point.icon,
+              label: point.label,
+              text: point.text,
+            ),
+            if (point != points.last) const SizedBox(height: 10),
+          ],
+        ],
+        const SizedBox(height: 18),
         _PlanActionButton(label: actionLabel, onTap: onAction),
       ],
+    );
+  }
+}
+
+class _PlanPreviewPoint extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String text;
+
+  const _PlanPreviewPoint({
+    required this.icon,
+    required this.label,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: context.artC.silver.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: context.artC.silver.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: kCobalt.withValues(alpha: 0.78), size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: context.artC.ink,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  text,
+                  style: TextStyle(
+                    color: context.artC.ink.withValues(alpha: 0.48),
+                    fontSize: 11.5,
+                    height: 1.36,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -2842,14 +2933,7 @@ class _FeatureArticle extends StatelessWidget {
           Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: [
-                    context.artC.ink.withOpacity(0.88),
-                    Colors.transparent
-                  ],
-                ),
+                color: context.artC.ink.withValues(alpha: 0.56),
               ),
             ),
           ),

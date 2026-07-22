@@ -230,7 +230,7 @@ class _MembershipStatusCard extends StatelessWidget {
                       ? '有效期至 ${_dateText(expiresAt)}'
                       : expired && expiresAt != null
                           ? '已于 ${_dateText(expiresAt)} 到期，可续费恢复权益'
-                          : '开通后可联系入驻机构',
+                          : '开通后可联系官方组织',
                   style: TextStyle(
                     color: context.artC.ink.withValues(alpha: 0.48),
                     fontSize: 12,
@@ -257,7 +257,7 @@ class _BenefitPanel extends StatelessWidget {
       child: const Column(
         children: [
           _BenefitRow(
-              icon: Icons.chat_bubble_outline_rounded, label: '向机构发起线上会话'),
+              icon: Icons.chat_bubble_outline_rounded, label: '向官方组织发起线上会话'),
           SizedBox(height: 10),
           _BenefitRow(icon: Icons.storefront_outlined, label: '查看线下地址、电话和企业微信'),
           SizedBox(height: 10),

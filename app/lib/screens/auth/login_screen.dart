@@ -5,7 +5,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../config/dev_test_account.dart';
 import '../../services/supabase_service.dart';
 import '../../services/backend_api_service.dart';
-import '../../widgets/artsee_ui.dart';
 import '../../widgets/common.dart';
 import 'package:artsee_app/theme/artsee_ui_colors.dart';
 
@@ -67,21 +66,10 @@ class _LoginScreenState extends State<LoginScreen> {
     _nicknameCtrl.addListener(_updateColorfulState);
     _emailOtpCtrl.addListener(_updateColorfulState);
 
-    _emailFocus.addListener(() {
-      print('📧 Email focus changed: ${_emailFocus.hasFocus}');
-      _updateColorfulState();
-    });
-    _passwordFocus.addListener(() {
-      print('🔒 Password focus changed: ${_passwordFocus.hasFocus}');
-      _updateColorfulState();
-    });
-    _nicknameFocus.addListener(() {
-      print('👤 Nickname focus changed: ${_nicknameFocus.hasFocus}');
-      _updateColorfulState();
-    });
+    _emailFocus.addListener(_updateColorfulState);
+    _passwordFocus.addListener(_updateColorfulState);
+    _nicknameFocus.addListener(_updateColorfulState);
     _emailOtpFocus.addListener(_updateColorfulState);
-
-    print('✅ LoginScreen initState completed');
   }
 
   void _updateColorfulState() {
@@ -238,8 +226,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    print(
-        '🏗️ LoginScreen build - isLogin: $_isLogin, loading: $_loading, colorful: $_isColorful');
     final size = MediaQuery.sizeOf(context);
     final imageHeight = size.height * 0.42;
 
@@ -260,19 +246,21 @@ class _LoginScreenState extends State<LoginScreen> {
                       'assets/images/login_hero.png',
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
-                          color: context.artC.silver.withOpacity(0.35)),
+                        color: context.artC.silver.withValues(alpha: 0.35),
+                      ),
                     ),
                     AnimatedOpacity(
                       opacity: _isColorful ? 0.0 : 1.0,
-                      duration: const Duration(milliseconds: 600),
-                      curve: Curves.easeOut,
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
                       child: ColorFiltered(
                         colorFilter: _greyscale,
                         child: Image.asset(
                           'assets/images/login_hero.png',
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => Container(
-                              color: context.artC.silver.withOpacity(0.35)),
+                            color: context.artC.silver.withValues(alpha: 0.35),
+                          ),
                         ),
                       ),
                     ),
@@ -280,8 +268,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            context.artC.ink.withOpacity(0.45),
-                            context.artC.ink.withOpacity(0.1),
+                            context.artC.ink.withValues(alpha: 0.45),
+                            context.artC.ink.withValues(alpha: 0.1),
                             Colors.transparent,
                           ],
                           begin: Alignment.topCenter,
@@ -300,21 +288,22 @@ class _LoginScreenState extends State<LoginScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.end,
                               children: [
-                                GestureDetector(
+                                _AuthPressable(
                                   onTap: () => Navigator.pop(context),
+                                  pressedScale: 0.95,
                                   child: Container(
                                     width: 36,
                                     height: 36,
                                     decoration: BoxDecoration(
                                       color: context.artC.porcelain
-                                          .withOpacity(0.12),
+                                          .withValues(alpha: 0.14),
                                       shape: BoxShape.circle,
                                     ),
                                     child: Icon(
                                       Icons.close,
                                       size: 20,
                                       color: context.artC.porcelain
-                                          .withOpacity(0.9),
+                                          .withValues(alpha: 0.92),
                                     ),
                                   ),
                                 ),
@@ -331,7 +320,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                 height: 1.1,
                                 shadows: [
                                   Shadow(
-                                    color: context.artC.ink.withOpacity(0.25),
+                                    color: context.artC.ink
+                                        .withValues(alpha: 0.25),
                                     blurRadius: 12,
                                     offset: const Offset(0, 2),
                                   ),
@@ -348,7 +338,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                 height: 1.4,
                                 shadows: [
                                   Shadow(
-                                    color: context.artC.ink.withOpacity(0.35),
+                                    color: context.artC.ink
+                                        .withValues(alpha: 0.35),
                                     blurRadius: 10,
                                     offset: const Offset(0, 2),
                                   ),
@@ -373,8 +364,8 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Container(
               decoration: BoxDecoration(
                 color: context.artC.porcelain,
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(32),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
                 ),
               ),
               child: SafeArea(
@@ -388,7 +379,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           if (!_isLogin)
-                            GestureDetector(
+                            _AuthPressable(
                               onTap: () => setState(() {
                                 _isLogin = true;
                                 _emailOtpHint = null;
@@ -398,21 +389,25 @@ class _LoginScreenState extends State<LoginScreen> {
                                 child: Icon(
                                   Icons.arrow_back_ios,
                                   size: 18,
-                                  color: context.artC.ink.withOpacity(0.45),
+                                  color:
+                                      context.artC.ink.withValues(alpha: 0.45),
                                 ),
                               ),
                             ),
                           if (!_isLogin) const SizedBox(width: 8),
                           AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 200),
+                            duration: const Duration(milliseconds: 190),
+                            switchOutCurve: Curves.easeOutCubic,
+                            switchInCurve: Curves.easeOutCubic,
                             transitionBuilder: (child, animation) {
+                              final scale = Tween<double>(
+                                begin: 0.97,
+                                end: 1,
+                              ).animate(animation);
                               return FadeTransition(
                                 opacity: animation,
-                                child: SlideTransition(
-                                  position: Tween<Offset>(
-                                    begin: const Offset(0, 0.08),
-                                    end: Offset.zero,
-                                  ).animate(animation),
+                                child: ScaleTransition(
+                                  scale: scale,
                                   child: child,
                                 ),
                               );
@@ -482,37 +477,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ),
                                   ),
                                   const SizedBox(width: 10),
-                                  SizedBox(
-                                    height: 56,
-                                    child: OutlinedButton(
-                                      onPressed: _sendingEmailOtp || _loading
-                                          ? null
-                                          : _sendEmailOtp,
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: kCobalt,
-                                        side: BorderSide(
-                                          color: kCobalt.withOpacity(0.38),
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(14),
-                                        ),
-                                      ),
-                                      child: _sendingEmailOtp
-                                          ? const SizedBox(
-                                              width: 16,
-                                              height: 16,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                              ),
-                                            )
-                                          : const Text(
-                                              '发送',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.w900,
-                                              ),
-                                            ),
-                                    ),
+                                  _AuthOtpButton(
+                                    loading: _sendingEmailOtp,
+                                    onTap: _sendingEmailOtp || _loading
+                                        ? null
+                                        : _sendEmailOtp,
                                   ),
                                 ],
                               ),
@@ -522,7 +491,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                   _emailOtpHint!,
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: context.artC.ink.withOpacity(0.45),
+                                    color: context.artC.ink
+                                        .withValues(alpha: 0.45),
                                     fontWeight: FontWeight.w700,
                                   ),
                                   textAlign: TextAlign.center,
@@ -533,7 +503,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               const SizedBox(height: 16),
                               Text(
                                 _error!,
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontSize: 12,
                                   color: Color(0xFFC62828),
                                   height: 1.5,
@@ -542,41 +512,23 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ],
                             const SizedBox(height: 28),
-                            SizedBox(
-                              height: 54,
-                              child: ElevatedButton(
-                                onPressed: _loading ? null : _submit,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: kCobalt,
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                ),
-                                child: _loading
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : Text(
-                                        _isLogin ? '登录' : '注册',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                              ),
+                            _AuthPrimaryButton(
+                              label: _isLogin ? '登录' : '注册',
+                              loading: _loading,
+                              onTap: _loading ? null : _submit,
                             ),
                             const SizedBox(height: 20),
-                            ArtseeSurface(
+                            Container(
                               padding: const EdgeInsets.all(14),
-                              radius: 18,
-                              color: context.artC.cardIconBg.withOpacity(0.74),
+                              decoration: BoxDecoration(
+                                color: context.artC.cardIconBg
+                                    .withValues(alpha: 0.74),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: context.artC.silver
+                                      .withValues(alpha: 0.26),
+                                ),
+                              ),
                               child: Column(
                                 children: [
                                   _AuthSecondaryAction(
@@ -596,8 +548,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                     const SizedBox(height: 10),
                                     Divider(
                                       height: 1,
-                                      color:
-                                          context.artC.silver.withOpacity(0.5),
+                                      color: context.artC.silver
+                                          .withValues(alpha: 0.38),
                                     ),
                                     const SizedBox(height: 10),
                                     _AuthSecondaryAction(
@@ -614,25 +566,41 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                             const SizedBox(height: 14),
-                            GestureDetector(
-                              onTap: () => Navigator.of(context).maybePop(),
-                              child: Container(
-                                height: 42,
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  color: context.artC.silver.withOpacity(0.24),
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                child: Text(
-                                  '先随便看看',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: context.artC.ink.withOpacity(0.48),
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 0,
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _AuthPressable(
+                                    onTap: () =>
+                                        Navigator.of(context).maybePop(),
+                                    pressedScale: 0.98,
+                                    child: Container(
+                                      height: 42,
+                                      alignment: Alignment.center,
+                                      decoration: BoxDecoration(
+                                        color: context.artC.silver
+                                            .withValues(alpha: 0.22),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        '先随便看看',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: context.artC.ink
+                                              .withValues(alpha: 0.48),
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 0,
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ),
+                                if (devLoginShortcutsEnabled) ...[
+                                  const SizedBox(width: 8),
+                                  _AuthDevLoginButton(
+                                    onTap: _loading ? null : _devQuickLogin,
+                                  ),
+                                ],
+                              ],
                             ),
                             const SizedBox(height: 30),
                           ],
@@ -644,47 +612,6 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
-          if (devLoginShortcutsEnabled)
-            Positioned(
-              bottom: 10,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: GestureDetector(
-                  onTap: _loading ? null : _devQuickLogin,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: context.artC.cardIconBg.withOpacity(0.82),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                        color: context.artC.silver.withOpacity(0.5),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.bolt_outlined,
-                          size: 14,
-                          color: context.artC.ink.withOpacity(0.42),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '开发测试登录',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: context.artC.ink.withOpacity(0.42),
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
     );
@@ -701,7 +628,6 @@ class _LoginScreenState extends State<LoginScreen> {
   }) {
     return GestureDetector(
       onTap: () {
-        print('🔵 [$hint] GestureDetector onTap triggered');
         FocusScope.of(context).requestFocus(focusNode);
       },
       child: TextFormField(
@@ -712,70 +638,276 @@ class _LoginScreenState extends State<LoginScreen> {
         textInputAction:
             obscureText ? TextInputAction.done : TextInputAction.next,
         onTap: () {
-          print('🟢 [$hint] TextFormField onTap triggered');
-          print('   - hasFocus: ${focusNode.hasFocus}');
-          print('   - text: ${controller.text}');
-
-          // 强制请求焦点并显示键盘
           if (!focusNode.hasFocus) {
             FocusScope.of(context).requestFocus(focusNode);
           }
-
-          // iOS 模拟器需要手动触发键盘
           WidgetsBinding.instance.addPostFrameCallback((_) {
             SystemChannels.textInput.invokeMethod('TextInput.show');
-            print('⌨️ [$hint] Keyboard show invoked');
           });
         },
         onFieldSubmitted: (_) {
-          print('🟡 [$hint] onFieldSubmitted');
           if (obscureText) {
             _submit();
           } else {
             FocusScope.of(context).requestFocus(_passwordFocus);
           }
         },
-        onChanged: (value) {
-          print('🟣 [$hint] onChanged: $value');
-        },
         validator: validator,
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: TextStyle(
             fontSize: 14,
-            color: context.artC.ink.withOpacity(0.35),
+            color: context.artC.ink.withValues(alpha: 0.35),
           ),
           filled: true,
-          fillColor: context.artC.cardIconBg.withOpacity(0.72),
-          prefixIcon:
-              Icon(icon, size: 20, color: context.artC.ink.withOpacity(0.38)),
+          fillColor: context.artC.cardIconBg.withValues(alpha: 0.72),
+          prefixIcon: Icon(icon,
+              size: 20, color: context.artC.ink.withValues(alpha: 0.38)),
           contentPadding: const EdgeInsets.symmetric(vertical: 18),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(8),
             borderSide:
-                BorderSide(color: context.artC.silver.withOpacity(0.36)),
+                BorderSide(color: context.artC.silver.withValues(alpha: 0.36)),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(8),
             borderSide:
-                BorderSide(color: kCobalt.withOpacity(0.45), width: 1.2),
+                BorderSide(color: kCobalt.withValues(alpha: 0.45), width: 1.2),
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(8),
             borderSide:
-                BorderSide(color: context.artC.silver.withOpacity(0.32)),
+                BorderSide(color: context.artC.silver.withValues(alpha: 0.32)),
           ),
           errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(8),
             borderSide: const BorderSide(color: Color(0xFFC62828), width: 1),
           ),
           focusedErrorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(8),
             borderSide:
-                BorderSide(color: kCobalt.withOpacity(0.45), width: 1.2),
+                BorderSide(color: kCobalt.withValues(alpha: 0.45), width: 1.2),
           ),
         ),
         style: TextStyle(fontSize: 15, color: context.artC.ink),
+      ),
+    );
+  }
+}
+
+class _AuthPressable extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final double pressedScale;
+
+  const _AuthPressable({
+    required this.child,
+    required this.onTap,
+    this.pressedScale = 0.97,
+  });
+
+  @override
+  State<_AuthPressable> createState() => _AuthPressableState();
+}
+
+class _AuthPressableState extends State<_AuthPressable> {
+  bool _pressed = false;
+
+  void _setPressed(bool pressed) {
+    if (_pressed == pressed || widget.onTap == null) return;
+    setState(() => _pressed = pressed);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => _setPressed(true),
+      onTapUp: (_) => _setPressed(false),
+      onTapCancel: () => _setPressed(false),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        scale: _pressed ? widget.pressedScale : 1,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOutCubic,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+class _AuthPrimaryButton extends StatelessWidget {
+  final String label;
+  final bool loading;
+  final VoidCallback? onTap;
+
+  const _AuthPrimaryButton({
+    required this.label,
+    required this.loading,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: label,
+      child: _AuthPressable(
+        onTap: onTap,
+        child: AnimatedContainer(
+          height: 54,
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOutCubic,
+          decoration: BoxDecoration(
+            color:
+                enabled ? kCobalt : context.artC.silver.withValues(alpha: 0.36),
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: enabled
+                ? [
+                    BoxShadow(
+                      color: kCobalt.withValues(alpha: 0.18),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ]
+                : null,
+          ),
+          alignment: Alignment.center,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 160),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeOutCubic,
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: ScaleTransition(
+                scale: Tween<double>(begin: 0.97, end: 1).animate(animation),
+                child: child,
+              ),
+            ),
+            child: loading
+                ? const SizedBox(
+                    key: ValueKey('loading'),
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : Text(
+                    label,
+                    key: ValueKey<String>(label),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      height: 1,
+                      letterSpacing: 0,
+                    ),
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AuthOtpButton extends StatelessWidget {
+  final bool loading;
+  final VoidCallback? onTap;
+
+  const _AuthOtpButton({required this.loading, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: '发送邮箱验证码',
+      child: _AuthPressable(
+        onTap: onTap,
+        pressedScale: 0.98,
+        child: AnimatedContainer(
+          width: 72,
+          height: 56,
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOutCubic,
+          decoration: BoxDecoration(
+            color: enabled
+                ? kCobalt.withValues(alpha: 0.07)
+                : context.artC.silver.withValues(alpha: 0.22),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: enabled
+                  ? kCobalt.withValues(alpha: 0.24)
+                  : context.artC.silver.withValues(alpha: 0.3),
+            ),
+          ),
+          alignment: Alignment.center,
+          child: loading
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text(
+                  '发送',
+                  style: TextStyle(
+                    color: kCobalt,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AuthDevLoginButton extends StatelessWidget {
+  final VoidCallback? onTap;
+
+  const _AuthDevLoginButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return _AuthPressable(
+      onTap: onTap,
+      pressedScale: 0.98,
+      child: Container(
+        width: 96,
+        height: 42,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: context.artC.cardIconBg.withValues(alpha: 0.82),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: context.artC.silver.withValues(alpha: 0.5),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.bolt_outlined,
+              size: 14,
+              color: context.artC.ink.withValues(alpha: 0.42),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '测试登录',
+              style: TextStyle(
+                fontSize: 10,
+                color: context.artC.ink.withValues(alpha: 0.42),
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -798,17 +930,17 @@ class _AuthSecondaryAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return _AuthPressable(
       onTap: onTap,
-      behavior: HitTestBehavior.opaque,
+      pressedScale: 0.98,
       child: Row(
         children: [
           Container(
             width: 38,
             height: 38,
             decoration: BoxDecoration(
-              color: kCobalt.withOpacity(0.06),
-              borderRadius: BorderRadius.circular(13),
+              color: kCobalt.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, size: 18, color: kCobalt),
           ),
@@ -833,7 +965,7 @@ class _AuthSecondaryAction extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
-                    color: context.artC.ink.withOpacity(0.36),
+                    color: context.artC.ink.withValues(alpha: 0.36),
                   ),
                 ),
               ],
@@ -842,13 +974,13 @@ class _AuthSecondaryAction extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
             decoration: BoxDecoration(
-              color: kCobalt.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: kCobalt.withOpacity(0.18)),
+              color: kCobalt.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: kCobalt.withValues(alpha: 0.18)),
             ),
             child: Text(
               action,
-              style: TextStyle(
+              style: const TextStyle(
                 color: kCobalt,
                 fontSize: 10,
                 fontWeight: FontWeight.w900,

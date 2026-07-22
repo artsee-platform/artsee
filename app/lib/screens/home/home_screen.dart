@@ -13,6 +13,7 @@ import '../../services/backend_api_service.dart';
 import '../../services/supabase_service.dart';
 import '../../utils/auth_gate.dart';
 import '../../widgets/common.dart';
+import '../../widgets/deep_sea_ui.dart';
 import '../../theme/artsee_ui_colors.dart';
 import '../forum/forum_screen.dart' show CircleDetailScreen;
 import '../main_scaffold.dart';
@@ -176,9 +177,9 @@ class _AiHomeProfileConfig {
       _AiPromptItem(Icons.route_outlined, '孩子适合学什么专业？'),
       _AiPromptItem(Icons.payments_outlined, '艺术留学大概要多少钱？'),
       _AiPromptItem(Icons.schedule_outlined, '什么时候开始准备作品集？'),
-      _AiPromptItem(Icons.fact_check_outlined, '怎么判断作品集机构靠不靠谱？'),
+      _AiPromptItem(Icons.fact_check_outlined, '怎么判断官方信息是否可靠？'),
     ],
-    quickChips: ['孩子适合学什么专业？', '艺术留学大概要多少钱？', '什么时候开始准备作品集？', '怎么判断机构？'],
+    quickChips: ['孩子适合学什么专业？', '艺术留学大概要多少钱？', '什么时候开始准备作品集？', '怎么核对官方信息？'],
     emptyActions: [
       _AiPromptItem(Icons.route_outlined, '专业选择'),
       _AiPromptItem(Icons.payments_outlined, '留学费用'),
@@ -189,7 +190,7 @@ class _AiHomeProfileConfig {
   static const business = _AiHomeProfileConfig(
     profileKey: 'business',
     heroTitle: '艺见心 AI 机构助手',
-    heroSubtitle: '帮你完善入驻资料、发布课程活动、提升曝光和对接用户',
+    heroSubtitle: '帮你完善机构资料、发布课程活动、提升曝光和对接用户',
     startButtonLabel: '完善机构主页',
     welcomeText:
         '你好，我是艺见心 AI 机构助手。\n\n你可以告诉我机构类型、服务内容、目标用户、活动 / 课程 / 合作需求。\n\n我会帮你整理主页介绍、优化展示文案、规划发布内容，并给出提升曝光的建议。',
@@ -234,6 +235,7 @@ class HomeScreen extends StatefulWidget {
   final bool showWorkbenchShortcut;
   final bool compactTopChrome;
   final bool institutionLeadMode;
+  final bool inheritDeepSeaBackdrop;
   final int plazaRefreshSignal;
 
   const HomeScreen({
@@ -242,6 +244,7 @@ class HomeScreen extends StatefulWidget {
     this.showWorkbenchShortcut = false,
     this.compactTopChrome = false,
     this.institutionLeadMode = false,
+    this.inheritDeepSeaBackdrop = false,
     this.plazaRefreshSignal = 0,
   });
 
@@ -1122,6 +1125,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final activeConfig = _activeAiConfig;
+    final deepSeaMode = widget.compactTopChrome;
     final tabInset = mainTabBottomInset(context);
     final safeBottom = MediaQuery.paddingOf(context).bottom;
     const composerBottom = 0.0;
@@ -1132,9 +1136,122 @@ class _HomeScreenState extends State<HomeScreen> {
         : 44.0;
     final feedTopPadding = widget.compactTopChrome ? 14.0 : safeTop + 60;
 
+    final pageBody = NotificationListener<UserScrollNotification>(
+      onNotification: _handleScroll,
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onVerticalDragEnd: _handleChatDragEnd,
+        child: Stack(
+          children: [
+            if (!widget.compactTopChrome)
+              const Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: _TopAura(),
+              ),
+            if (_conversationStarted) ...[
+              _HomeChatView(
+                messages: _messages,
+                sending: _sending,
+                scrollController: _scrollCtrl,
+                bottomPadding: bottomComposerSpace,
+                displayText: _displayMessageText,
+                onQuickAction: _runPrompt,
+                quickChips: activeConfig.quickChips,
+              ),
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: _ChatHeader(
+                  onMenuTap: () => _scaffoldKey.currentState?.openDrawer(),
+                  onActionTap: inputMode ? _showMainNav : _showChatInput,
+                  onReturnTap: _returnToMainInterface,
+                  showAppsIcon: inputMode,
+                  title: activeConfig.chatTitle,
+                  subtitle: activeConfig.chatSubtitle,
+                ),
+              ),
+            ] else
+              SingleChildScrollView(
+                controller: _scrollCtrl,
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  feedTopPadding,
+                  20,
+                  bottomComposerSpace,
+                ),
+                child: _HomeDopamineFeed(
+                  key: _feedKey,
+                  config: activeConfig,
+                  simplified: widget.compactTopChrome,
+                  institutionLeadMode:
+                      widget.compactTopChrome && widget.institutionLeadMode,
+                  refreshSignal: widget.plazaRefreshSignal,
+                  onStartAi: _startConversation,
+                  onPrompt: _runPrompt,
+                  onOpenForum: _openDebateForum,
+                  onOpenExplore: _openExploreSurface,
+                  onOpenWorkbench: _returnToMainInterface,
+                  onAskQuestion: _openAskQuestion,
+                  showWorkbench: widget.showWorkbenchShortcut,
+                ),
+              ),
+            if (!_conversationStarted && !widget.compactTopChrome) ...[
+              Positioned(
+                left: 8,
+                top: safeTop + 4,
+                child: _HeaderIconButton(
+                  icon: Icons.menu_rounded,
+                  onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                ),
+              ),
+            ],
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              left: 0,
+              right: 0,
+              bottom: inputMode ? composerBottom : -120,
+              child: IgnorePointer(
+                ignoring: !inputMode,
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 160),
+                  opacity: inputMode ? 1 : 0,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_showEmojiPicker)
+                        EmojiPicker(onEmojiTap: _insertEmoji),
+                      _BottomAskBar(
+                        controller: _queryCtrl,
+                        onSubmit: () => _runPrompt(),
+                        onEmojiTap: _toggleEmojiPicker,
+                        onPhotoTap: _openPhotoPicker,
+                        onRecordStart: _startRecording,
+                        onRecordEnd: _stopRecordingAndSend,
+                        sending: _sending,
+                        showEmojiPicker: _showEmojiPicker,
+                        isRecording: _isRecording,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: Colors.white,
+      backgroundColor: deepSeaMode
+          ? widget.inheritDeepSeaBackdrop
+              ? Colors.transparent
+              : kDeepSeaBackground
+          : Colors.white,
       onDrawerChanged: (isOpened) {
         final shouldHideNav =
             isOpened || (_conversationStarted && _chatInputVisible);
@@ -1147,114 +1264,9 @@ class _HomeScreenState extends State<HomeScreen> {
         onConversationDelete: _deleteConversation,
         onNewChat: _startNewChat,
       ),
-      body: NotificationListener<UserScrollNotification>(
-        onNotification: _handleScroll,
-        child: GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onVerticalDragEnd: _handleChatDragEnd,
-          child: Stack(
-            children: [
-              if (!widget.compactTopChrome)
-                const Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: _TopAura(),
-                ),
-              if (_conversationStarted) ...[
-                _HomeChatView(
-                  messages: _messages,
-                  sending: _sending,
-                  scrollController: _scrollCtrl,
-                  bottomPadding: bottomComposerSpace,
-                  displayText: _displayMessageText,
-                  onQuickAction: _runPrompt,
-                  quickChips: activeConfig.quickChips,
-                ),
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: _ChatHeader(
-                    onMenuTap: () => _scaffoldKey.currentState?.openDrawer(),
-                    onActionTap: inputMode ? _showMainNav : _showChatInput,
-                    onReturnTap: _returnToMainInterface,
-                    showAppsIcon: inputMode,
-                    title: activeConfig.chatTitle,
-                    subtitle: activeConfig.chatSubtitle,
-                  ),
-                ),
-              ] else
-                SingleChildScrollView(
-                  controller: _scrollCtrl,
-                  padding: EdgeInsets.fromLTRB(
-                    20,
-                    feedTopPadding,
-                    20,
-                    bottomComposerSpace,
-                  ),
-                  child: _HomeDopamineFeed(
-                    key: _feedKey,
-                    config: activeConfig,
-                    simplified: widget.compactTopChrome,
-                    institutionLeadMode:
-                        widget.compactTopChrome && widget.institutionLeadMode,
-                    refreshSignal: widget.plazaRefreshSignal,
-                    onStartAi: _startConversation,
-                    onPrompt: _runPrompt,
-                    onOpenForum: _openDebateForum,
-                    onOpenExplore: _openExploreSurface,
-                    onOpenWorkbench: _returnToMainInterface,
-                    onAskQuestion: _openAskQuestion,
-                    showWorkbench: widget.showWorkbenchShortcut,
-                  ),
-                ),
-              if (!_conversationStarted && !widget.compactTopChrome) ...[
-                Positioned(
-                  left: 8,
-                  top: safeTop + 4,
-                  child: _HeaderIconButton(
-                    icon: Icons.menu_rounded,
-                    onTap: () => _scaffoldKey.currentState?.openDrawer(),
-                  ),
-                ),
-              ],
-              AnimatedPositioned(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutCubic,
-                left: 0,
-                right: 0,
-                bottom: inputMode ? composerBottom : -120,
-                child: IgnorePointer(
-                  ignoring: !inputMode,
-                  child: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 160),
-                    opacity: inputMode ? 1 : 0,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_showEmojiPicker)
-                          EmojiPicker(onEmojiTap: _insertEmoji),
-                        _BottomAskBar(
-                          controller: _queryCtrl,
-                          onSubmit: () => _runPrompt(),
-                          onEmojiTap: _toggleEmojiPicker,
-                          onPhotoTap: _openPhotoPicker,
-                          onRecordStart: _startRecording,
-                          onRecordEnd: _stopRecordingAndSend,
-                          sending: _sending,
-                          showEmojiPicker: _showEmojiPicker,
-                          isRecording: _isRecording,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      body: deepSeaMode && !widget.inheritDeepSeaBackdrop
+          ? DeepSeaBackdrop(child: pageBody)
+          : pageBody,
     );
   }
 }
@@ -1286,6 +1298,50 @@ const _inkWashGradient = LinearGradient(
   colors: [_porcelainNightBlue, _inkWashBlue, _inkGlowBlue],
   stops: [0, 0.58, 1],
 );
+
+class _PressableScale extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final double pressedScale;
+
+  const _PressableScale({
+    required this.child,
+    required this.onTap,
+    this.pressedScale = 0.97,
+  });
+
+  @override
+  State<_PressableScale> createState() => _PressableScaleState();
+}
+
+class _PressableScaleState extends State<_PressableScale> {
+  bool _pressed = false;
+
+  void _setPressed(bool pressed) {
+    if (widget.onTap == null || _pressed == pressed) return;
+    setState(() => _pressed = pressed);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: widget.onTap != null,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        onTapDown: (_) => _setPressed(true),
+        onTapUp: (_) => _setPressed(false),
+        onTapCancel: () => _setPressed(false),
+        child: AnimatedScale(
+          scale: _pressed ? widget.pressedScale : 1,
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOutCubic,
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}
 
 class _InstaAvatar extends StatelessWidget {
   final IconData icon;
@@ -1589,26 +1645,26 @@ const _homeDebateTopics = [
     accent: _debateLilac,
   ),
   _DebateTopic(
-    channel: '机构实话',
+    channel: '官方信息辨别',
     track: '申请向',
-    category: '作品集',
+    category: '申请信息',
     status: '进行中',
     timeLeft: '剩 1 天',
-    title: '作品集机构是在救命，还是在制造焦虑？',
-    lead: '好服务和高压销售之间，用户需要可讨论的判断标准。',
-    pro: '时间线、材料和导师反馈能把混乱变成路径',
-    con: '过度包装让学生越来越不像自己',
+    title: '官方招生信息和经验帖冲突时，该信谁？',
+    lead: '官网、协会通知、学长经验和社媒爆料之间，需要一套核对方法。',
+    pro: '官方口径决定申请节点和硬性材料',
+    con: '经验帖能补上流程细节和真实体感',
     proPercent: 55,
     heat: '9.4k',
     comments: '389',
     floor: '57 楼',
-    hotComment: '“好的机构应该让你更清醒，不是更依赖。”',
-    proComment: '不是每个学生都有成熟的信息源，外部结构很重要。',
-    conComment: '一旦故事线被代写，学生反而丢掉自己的声音。',
-    agentPersona: '数据派顾问',
-    agentReply: '先别站队，我想看合同、导师频次和修改记录再判断。',
-    askSeed: '怎么判断作品集机构是在帮我，而不是制造焦虑？',
-    tags: ['机构', '避坑', '导师反馈'],
+    hotComment: '“先看官网日期，再看经验帖适用年份。”',
+    proComment: '政策和材料要求必须以官方页面为准。',
+    conComment: '但经验帖能提醒你哪些环节最容易被忽略。',
+    agentPersona: '信息核对员',
+    agentReply: '先把官网、协会通知和经验帖按发布时间排一下。',
+    askSeed: '当官方信息和经验帖冲突时，你会怎么核对？',
+    tags: ['官方信息', '申请节点', '经验帖'],
     icon: Icons.forum_outlined,
     accent: _debateCoral,
   ),
@@ -2415,7 +2471,7 @@ class _HomeDopamineFeedState extends State<_HomeDopamineFeed> {
     required Widget child,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 9),
+      padding: const EdgeInsets.only(bottom: 6),
       child: child,
     );
   }
@@ -2594,7 +2650,7 @@ class _HomeDopamineFeedState extends State<_HomeDopamineFeed> {
     for (final entry in _plazaCircles.asMap().entries) {
       cards.add(
         Padding(
-          padding: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.only(bottom: 6),
           child: _PlazaCircleListCard(
             circle: entry.value,
             index: entry.key,
@@ -2678,9 +2734,15 @@ class _HomeDopamineFeedState extends State<_HomeDopamineFeed> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _PlazaFeedTabs(
-              selectedIndex: _selectedPlazaTab,
-              onSelected: _selectPlazaTab,
+            DeepSeaGlassPanel(
+              padding: const EdgeInsets.all(5),
+              radius: 24,
+              opacity: 0.56,
+              airy: true,
+              child: _PlazaFeedTabs(
+                selectedIndex: _selectedPlazaTab,
+                onSelected: _selectPlazaTab,
+              ),
             ),
             const SizedBox(height: 18),
             ..._buildSimplifiedPlazaFeedItems(),
@@ -2812,7 +2874,7 @@ class _DebateLaneStrip extends StatelessWidget {
         itemBuilder: (context, index) {
           final lane = lanes[index];
           final selected = index == selectedIndex;
-          return GestureDetector(
+          return _PressableScale(
             onTap: () => onSelected(index),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
@@ -2889,16 +2951,16 @@ class _WorldSimulationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(13),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _porcelainDeepBlue.withValues(alpha: 0.16)),
+        border: Border.all(color: _porcelainDeepBlue.withValues(alpha: 0.10)),
         boxShadow: [
           BoxShadow(
-            color: _porcelainNightBlue.withValues(alpha: 0.035),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            color: _porcelainNightBlue.withValues(alpha: 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 7),
           ),
         ],
       ),
@@ -2912,7 +2974,11 @@ class _WorldSimulationCard extends StatelessWidget {
                 height: 34,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: _porcelainNightBlue,
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [_porcelainNightBlue, _inkGlowBlue],
+                  ),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
@@ -2955,8 +3021,10 @@ class _WorldSimulationCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 decoration: BoxDecoration(
-                  color: _debateJade.withValues(alpha: 0.1),
+                  color: _debateJade.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
+                  border:
+                      Border.all(color: _debateJade.withValues(alpha: 0.10)),
                 ),
                 child: const Text(
                   '今日 09:20',
@@ -3089,11 +3157,11 @@ class _WorldLayerPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 62,
-      padding: const EdgeInsets.all(9),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
+        color: color.withValues(alpha: 0.065),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.13)),
+        border: Border.all(color: color.withValues(alpha: 0.10)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3139,16 +3207,16 @@ class _AgentDebateThreadCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         gradient: _inkWashGradient,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _porcelainDeepBlue.withValues(alpha: 0.28)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         boxShadow: [
           BoxShadow(
-            color: _porcelainDeepBlue.withValues(alpha: 0.14),
-            blurRadius: 22,
-            offset: const Offset(0, 10),
+            color: _porcelainDeepBlue.withValues(alpha: 0.10),
+            blurRadius: 20,
+            offset: const Offset(0, 9),
           ),
         ],
       ),
@@ -3287,16 +3355,16 @@ class _DebateArenaCardState extends State<_DebateArenaCard> {
   Widget build(BuildContext context) {
     final round = _round;
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _debateLilac.withValues(alpha: 0.18)),
+        border: Border.all(color: _debateLilac.withValues(alpha: 0.12)),
         boxShadow: [
           BoxShadow(
-            color: _porcelainNightBlue.withValues(alpha: 0.04),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            color: _porcelainNightBlue.withValues(alpha: 0.032),
+            blurRadius: 16,
+            offset: const Offset(0, 7),
           ),
         ],
       ),
@@ -3310,7 +3378,11 @@ class _DebateArenaCardState extends State<_DebateArenaCard> {
                 height: 34,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: _porcelainNightBlue,
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [_porcelainNightBlue, _inkGlowBlue],
+                  ),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
@@ -3395,9 +3467,19 @@ class _DebateArenaCardState extends State<_DebateArenaCard> {
           ),
           const SizedBox(height: 12),
           AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
+            duration: const Duration(milliseconds: 190),
+            reverseDuration: const Duration(milliseconds: 150),
             switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
+            switchOutCurve: Curves.easeOutCubic,
+            transitionBuilder: (child, animation) {
+              final scale = Tween<double>(begin: 0.97, end: 1).animate(
+                CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+              );
+              return FadeTransition(
+                opacity: animation,
+                child: ScaleTransition(scale: scale, child: child),
+              );
+            },
             child: _ArenaRoundPanel(
               key: ValueKey(_roundIndex),
               round: round,
@@ -3484,7 +3566,7 @@ class _ArenaSideButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _debateSideColor(side);
-    return GestureDetector(
+    return _PressableScale(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
@@ -3625,11 +3707,11 @@ class _ArenaRoundDots extends StatelessWidget {
       children: [
         for (var i = 0; i < _debateArenaRounds.length; i++) ...[
           Expanded(
-            child: GestureDetector(
+            child: _PressableScale(
               onTap: () => onSelected(i),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 160),
-                height: 5,
+                height: 6,
                 decoration: BoxDecoration(
                   color: i == activeIndex
                       ? _porcelainDeepBlue
@@ -3773,11 +3855,11 @@ class _NoiseControlPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
-        color: _porcelainDeepBlue.withValues(alpha: 0.08),
+        color: _porcelainDeepBlue.withValues(alpha: 0.065),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _porcelainDeepBlue.withValues(alpha: 0.14)),
+        border: Border.all(color: _porcelainDeepBlue.withValues(alpha: 0.10)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3824,7 +3906,7 @@ class _NoiseControlPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          GestureDetector(
+          _PressableScale(
             onTap: onStartAi,
             child: Container(
               height: 34,
@@ -3833,8 +3915,15 @@ class _NoiseControlPanel extends StatelessWidget {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: _porcelainDeepBlue.withValues(alpha: 0.18),
+                  color: _porcelainDeepBlue.withValues(alpha: 0.14),
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: _porcelainDeepBlue.withValues(alpha: 0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: const Icon(
                 Icons.auto_awesome_outlined,
@@ -3917,16 +4006,16 @@ class _RhetoricalTitleLabCardState extends State<_RhetoricalTitleLabCard> {
   Widget build(BuildContext context) {
     final pack = _pack;
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: pack.color.withValues(alpha: 0.18)),
+        border: Border.all(color: pack.color.withValues(alpha: 0.12)),
         boxShadow: [
           BoxShadow(
-            color: _porcelainNightBlue.withValues(alpha: 0.035),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            color: _porcelainNightBlue.withValues(alpha: 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 7),
           ),
         ],
       ),
@@ -3974,7 +4063,7 @@ class _RhetoricalTitleLabCardState extends State<_RhetoricalTitleLabCard> {
                   ],
                 ),
               ),
-              GestureDetector(
+              _PressableScale(
                 onTap: _nextPack,
                 child: Container(
                   height: 32,
@@ -4006,7 +4095,7 @@ class _RhetoricalTitleLabCardState extends State<_RhetoricalTitleLabCard> {
               itemBuilder: (context, index) {
                 final item = _rhetoricalTitlePacks[index];
                 final selected = index == _packIndex;
-                return GestureDetector(
+                return _PressableScale(
                   onTap: () => _selectPack(index),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 160),
@@ -4178,7 +4267,7 @@ class _TitleOptionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return _PressableScale(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
@@ -4238,16 +4327,16 @@ class _QuestionComposerCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _debateGold.withValues(alpha: 0.36)),
+        border: Border.all(color: _debateGold.withValues(alpha: 0.22)),
         boxShadow: [
           BoxShadow(
-            color: _debateGold.withValues(alpha: 0.1),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            color: _debateGold.withValues(alpha: 0.075),
+            blurRadius: 16,
+            offset: const Offset(0, 7),
           ),
         ],
       ),
@@ -4281,7 +4370,7 @@ class _QuestionComposerCard extends StatelessWidget {
               color: context.artC.porcelain,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: context.artC.silver.withValues(alpha: 0.58),
+                color: context.artC.silver.withValues(alpha: 0.38),
               ),
             ),
             child: Text(
@@ -4414,15 +4503,15 @@ class _InlineActionPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return _PressableScale(
       onTap: onTap,
       child: Container(
         height: 34,
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
-          color: _instaCanvas,
+          color: color.withValues(alpha: 0.065),
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: _instaBorder),
+          border: Border.all(color: color.withValues(alpha: 0.13)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -4461,12 +4550,12 @@ class _HomeDebateHero extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: _inkWashGradient,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _porcelainDeepBlue.withValues(alpha: 0.24)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         boxShadow: [
           BoxShadow(
-            color: _porcelainDeepBlue.withValues(alpha: 0.12),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
+            color: _porcelainDeepBlue.withValues(alpha: 0.10),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -4609,17 +4698,28 @@ class _HeroActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return _PressableScale(
       onTap: onTap,
       child: Container(
-        height: 40,
-        padding: const EdgeInsets.symmetric(horizontal: 13),
+        height: 42,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
           color: color,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: color == Colors.white ? _instaBorder : color,
+            color: color == Colors.white
+                ? _instaBorder
+                : color.withValues(alpha: 0.72),
           ),
+          boxShadow: [
+            BoxShadow(
+              color: textColor == Colors.white
+                  ? Colors.black.withValues(alpha: 0.06)
+                  : color.withValues(alpha: 0.18),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -4661,7 +4761,7 @@ class _StoryRail extends StatelessWidget {
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (context, index) {
           final story = stories[index];
-          return GestureDetector(
+          return _PressableScale(
             onTap: onTap,
             child: SizedBox(
               width: 74,
@@ -4678,11 +4778,18 @@ class _StoryRail extends StatelessWidget {
                       gradient: SweepGradient(
                         colors: [
                           story.accent,
-                          _porcelainDeepBlue,
+                          _porcelainDeepBlue.withValues(alpha: 0.86),
                           _debateGold,
                           story.accent,
                         ],
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: story.accent.withValues(alpha: 0.11),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
                     ),
                     child: Container(
                       decoration: const BoxDecoration(
@@ -4770,16 +4877,16 @@ class _LiveCommentTickerState extends State<_LiveCommentTicker> {
     final comment = widget.comments[_index % widget.comments.length];
     final isAiDigest = _mode == _TickerDisplayMode.aiDigest;
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: kCobalt.withValues(alpha: 0.14)),
+        border: Border.all(color: kCobalt.withValues(alpha: 0.10)),
         boxShadow: [
           BoxShadow(
-            color: kCobalt.withValues(alpha: 0.06),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            color: kCobalt.withValues(alpha: 0.045),
+            blurRadius: 16,
+            offset: const Offset(0, 7),
           ),
         ],
       ),
@@ -4830,9 +4937,19 @@ class _LiveCommentTickerState extends State<_LiveCommentTicker> {
           ),
           const SizedBox(height: 10),
           AnimatedSwitcher(
-            duration: const Duration(milliseconds: 260),
+            duration: const Duration(milliseconds: 190),
+            reverseDuration: const Duration(milliseconds: 150),
             switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
+            switchOutCurve: Curves.easeOutCubic,
+            transitionBuilder: (child, animation) {
+              final scale = Tween<double>(begin: 0.97, end: 1).animate(
+                CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+              );
+              return FadeTransition(
+                opacity: animation,
+                child: ScaleTransition(scale: scale, child: child),
+              );
+            },
             child: isAiDigest
                 ? _AiLiveDigest(
                     key: ValueKey('digest-$_index'),
@@ -4863,7 +4980,7 @@ class _TickerModeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return _PressableScale(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
@@ -4909,11 +5026,11 @@ class _AiLiveDigest extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       key: key,
-      padding: const EdgeInsets.all(11),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: _porcelainDeepBlue.withValues(alpha: 0.07),
+        color: _porcelainDeepBlue.withValues(alpha: 0.055),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _porcelainDeepBlue.withValues(alpha: 0.12)),
+        border: Border.all(color: _porcelainDeepBlue.withValues(alpha: 0.09)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -5057,10 +5174,10 @@ class _LiveRollItem extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.fromLTRB(10, 8, 10, 9),
               decoration: BoxDecoration(
-                color: context.artC.porcelain,
+                color: context.artC.cardIconBg,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: context.artC.silver.withValues(alpha: 0.45),
+                  color: context.artC.silver.withValues(alpha: 0.34),
                 ),
               ),
               child: Column(
@@ -5192,14 +5309,17 @@ class _SectionTitle extends StatelessWidget {
           ),
         ),
         if (actionLabel != null && onAction != null)
-          GestureDetector(
+          _PressableScale(
             onTap: onAction,
             child: Container(
               height: 32,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 11),
               decoration: BoxDecoration(
-                color: _porcelainDeepBlue.withValues(alpha: 0.08),
+                color: _porcelainDeepBlue.withValues(alpha: 0.07),
                 borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: _porcelainDeepBlue.withValues(alpha: 0.10),
+                ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -5246,6 +5366,7 @@ class _PlazaFeedTabs extends StatelessWidget {
         Expanded(
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
             child: Row(
               children: [
                 for (var i = 0; i < _plazaFeedTabLabels.length; i++) ...[
@@ -5279,29 +5400,52 @@ class _PlazaFeedTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    final labelText = Text(
+      label,
+      style: TextStyle(
+        color: active
+            ? kGlassInk.withValues(alpha: 0.94)
+            : kGlassInk.withValues(alpha: 0.58),
+        fontSize: 12.8,
+        fontWeight: active ? FontWeight.w900 : FontWeight.w700,
+        letterSpacing: 0,
+        fontFamily: 'SF Pro Text',
+        fontFamilyFallback: const ['PingFang SC', 'Noto Sans SC'],
+      ),
+    );
+    return _PressableScale(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        height: 30,
-        padding: const EdgeInsets.symmetric(horizontal: 5),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          border: active
-              ? const Border(
-                  bottom: BorderSide(color: _plazaInk, width: 1.4),
-                )
-              : null,
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: active ? _plazaInk : _plazaMuted,
-            fontSize: 13,
-            fontWeight: active ? FontWeight.w800 : FontWeight.w600,
-            letterSpacing: 0,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 180),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeOutCubic,
+        transitionBuilder: (child, animation) => FadeTransition(
+          opacity: animation,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.97, end: 1).animate(animation),
+            child: child,
           ),
         ),
+        child: active
+            ? OpticalGlassSurface(
+                key: ValueKey('active-$label'),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                radius: 999,
+                surfaceOpacity: 0.16,
+                blurSigma: 10,
+                child: SizedBox(
+                  height: 32,
+                  child: Center(child: labelText),
+                ),
+              )
+            : Padding(
+                key: ValueKey('inactive-$label'),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: SizedBox(
+                  height: 32,
+                  child: Center(child: labelText),
+                ),
+              ),
       ),
     );
   }
@@ -5332,12 +5476,12 @@ class _PlazaDataStateCard extends StatelessWidget {
         : hasError
             ? '请稍后重试，或先发一个值得讨论的问题。'
             : '提问后，适合公开讨论的问题会进入这里。';
-    return Container(
+    return DeepSeaGlassPanel(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: _plazaSoft,
-        borderRadius: BorderRadius.circular(8),
-      ),
+      radius: 26,
+      glow: hasError,
+      opacity: 0.68,
+      airy: true,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -5346,18 +5490,22 @@ class _PlazaDataStateCard extends StatelessWidget {
             height: 44,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
+              color: Colors.white.withValues(alpha: 0.26),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
             ),
             child: loading
-                ? const SizedBox(
+                ? SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2.4),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.4,
+                      color: kGlassAccent,
+                    ),
                   )
                 : Icon(
                     hasError ? Icons.wifi_off_rounded : Icons.forum_outlined,
-                    color: _plazaText,
+                    color: kGlassAccent,
                     size: 23,
                   ),
           ),
@@ -5368,22 +5516,20 @@ class _PlazaDataStateCard extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: _plazaInk,
+                  style: kDeepSeaTextStyle.copyWith(
+                    color: kGlassInk,
                     fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
                 const SizedBox(height: 5),
                 Text(
                   subtitle,
-                  style: const TextStyle(
-                    color: _plazaText,
+                  style: kDeepSeaTextStyle.copyWith(
+                    color: kGlassMuted,
                     fontSize: 13,
                     height: 1.42,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 0,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 if (!loading) ...[
@@ -5427,23 +5573,32 @@ class _PlazaStateAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return _PressableScale(
       onTap: onTap,
       child: Container(
         height: 34,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: primary ? _plazaInk : Colors.white,
-          borderRadius: BorderRadius.circular(8),
+          color: primary
+              ? kGlassAccent.withValues(alpha: 0.12)
+              : Colors.white.withValues(alpha: 0.22),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: primary
+                ? kGlassAccent.withValues(alpha: 0.28)
+                : Colors.white.withValues(alpha: 0.5),
+          ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: primary ? Colors.white : _plazaText,
+            color: primary ? kGlassAccent : kGlassInk.withValues(alpha: 0.72),
             fontSize: 12,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w800,
             letterSpacing: 0,
+            fontFamily: 'SF Pro Text',
+            fontFamilyFallback: const ['PingFang SC', 'Noto Sans SC'],
           ),
         ),
       ),
@@ -5576,8 +5731,8 @@ class _PlazaLeadReplySheetState extends State<_PlazaLeadReplySheet> {
     final topic = title.length > 20 ? '${title.substring(0, 20)}...' : title;
     if (widget.consultIntent) {
       return topic.isEmpty
-          ? '你好，我们看到了你的申请问题。如果你愿意，可以补充目标国家、专业方向、预算和作品集阶段，我们会先给你一个公开的初步建议；需要进一步沟通时，也可以从机构主页发起咨询。'
-          : '你好，我们看到了你关于“$topic”的问题。如果你愿意，可以补充目标国家、专业方向、预算和作品集阶段，我们会先给你一个公开的初步建议；需要进一步沟通时，也可以从机构主页发起咨询。';
+          ? '你好，我们看到了你的申请问题。如果你愿意，可以补充目标国家、专业方向、预算和作品集阶段，我们会先给你一个公开的初步建议；需要进一步沟通时，也可以从官方组织主页发起咨询。'
+          : '你好，我们看到了你关于“$topic”的问题。如果你愿意，可以补充目标国家、专业方向、预算和作品集阶段，我们会先给你一个公开的初步建议；需要进一步沟通时，也可以从官方组织主页发起咨询。';
     }
     return '你好，我先回应一个方向：';
   }
@@ -5756,12 +5911,11 @@ class _PlazaCircleStateCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return DeepSeaGlassPanel(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: _plazaSoft,
-        borderRadius: BorderRadius.circular(8),
-      ),
+      radius: 26,
+      opacity: 0.68,
+      airy: true,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -5770,18 +5924,22 @@ class _PlazaCircleStateCard extends StatelessWidget {
             height: 42,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
+              color: Colors.white.withValues(alpha: 0.26),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
             ),
             child: loading
-                ? const SizedBox(
+                ? SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2.3),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.3,
+                      color: kGlassAccent,
+                    ),
                   )
                 : const Icon(
                     Icons.groups_outlined,
-                    color: _plazaText,
+                    color: kGlassAccent,
                     size: 22,
                   ),
           ),
@@ -5792,22 +5950,20 @@ class _PlazaCircleStateCard extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: _plazaInk,
+                  style: kDeepSeaTextStyle.copyWith(
+                    color: kGlassInk,
                     fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
                 const SizedBox(height: 5),
                 Text(
                   subtitle,
-                  style: const TextStyle(
-                    color: _plazaText,
+                  style: kDeepSeaTextStyle.copyWith(
+                    color: kGlassMuted,
                     fontSize: 12.5,
                     height: 1.42,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 0,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 if (!loading) ...[
@@ -5859,13 +6015,14 @@ class _PlazaCircleListCard extends StatelessWidget {
     final today = _plazaCircleInt(circle['today_post_count']);
     final hotTopic = _plazaCircleHotTopic(circle, index);
     final joinType = _plazaCircleJoinType(circle, index);
-    return GestureDetector(
+    return _PressableScale(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(0, 2, 0, 16),
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: _plazaBorder)),
-        ),
+      pressedScale: 0.985,
+      child: DeepSeaGlassPanel(
+        padding: const EdgeInsets.all(14),
+        radius: 26,
+        opacity: 0.7,
+        airy: true,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -5874,12 +6031,13 @@ class _PlazaCircleListCard extends StatelessWidget {
               height: 48,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: _plazaSoft,
-                borderRadius: BorderRadius.circular(8),
+                color: Colors.white.withValues(alpha: 0.26),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
               ),
               child: Icon(
                 _plazaCircleIcon(circle, index),
-                color: _plazaText,
+                color: kGlassAccent,
                 size: 24,
               ),
             ),
@@ -5895,12 +6053,11 @@ class _PlazaCircleListCard extends StatelessWidget {
                           title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: _plazaInk,
-                            fontSize: 15.5,
-                            height: 1.18,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0,
+                          style: kDeepSeaTextStyle.copyWith(
+                            color: kGlassInk,
+                            fontSize: 15.2,
+                            height: 1.2,
+                            fontWeight: FontWeight.w900,
                           ),
                         ),
                       ),
@@ -5916,12 +6073,11 @@ class _PlazaCircleListCard extends StatelessWidget {
                     subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: _plazaText,
-                      fontSize: 12.3,
+                    style: kDeepSeaTextStyle.copyWith(
+                      color: kGlassInk.withValues(alpha: 0.72),
+                      fontSize: 12,
                       height: 1.25,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 0,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -5929,12 +6085,11 @@ class _PlazaCircleListCard extends StatelessWidget {
                     '正在聊：$hotTopic',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: _plazaText,
-                      fontSize: 11.6,
+                    style: kDeepSeaTextStyle.copyWith(
+                      color: kGlassMuted.withValues(alpha: 0.82),
+                      fontSize: 11.4,
                       height: 1.2,
-                      fontWeight: FontWeight.w400,
-                      letterSpacing: 0,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 7),
@@ -5982,18 +6137,27 @@ class _PlazaCircleStatusPill extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8),
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: _plazaSoft,
+        color: active
+            ? kGlassAccent.withValues(alpha: 0.1)
+            : Colors.white.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: active
+              ? kGlassAccent.withValues(alpha: 0.24)
+              : Colors.white.withValues(alpha: 0.48),
+        ),
       ),
       child: Text(
         label,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
-          color: active ? _plazaInk : _plazaText,
+          color: active ? kGlassAccent : kGlassInk.withValues(alpha: 0.68),
           fontSize: 10,
-          fontWeight: active ? FontWeight.w700 : FontWeight.w600,
+          fontWeight: active ? FontWeight.w800 : FontWeight.w700,
           letterSpacing: 0,
+          fontFamily: 'SF Pro Text',
+          fontFamilyFallback: const ['PingFang SC', 'Noto Sans SC'],
         ),
       ),
     );
@@ -6010,16 +6174,19 @@ class _PlazaCircleMiniTag extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
-        color: _plazaSoft,
-        borderRadius: BorderRadius.circular(6),
+        color: Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.42)),
       ),
       child: Text(
         label,
-        style: const TextStyle(
-          color: _plazaMuted,
+        style: TextStyle(
+          color: kGlassMuted.withValues(alpha: 0.82),
           fontSize: 10,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
           letterSpacing: 0,
+          fontFamily: 'SF Pro Text',
+          fontFamilyFallback: const ['PingFang SC', 'Noto Sans SC'],
         ),
       ),
     );
@@ -6732,15 +6899,14 @@ class _DebateTopicCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final hotReply = _plazaTopicHotReply(topic);
     final summary = hotReply.trim().isNotEmpty ? hotReply : topic.lead;
-    return GestureDetector(
+    return _PressableScale(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(0, 1, 0, 13),
-        decoration: const BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: _plazaBorder),
-          ),
-        ),
+      pressedScale: 0.985,
+      child: DeepSeaGlassPanel(
+        padding: const EdgeInsets.all(14),
+        radius: 28,
+        opacity: 0.58,
+        airy: true,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -6752,12 +6918,11 @@ class _DebateTopicCard extends StatelessWidget {
                     topic.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: _plazaInk,
-                      fontSize: 15.5,
-                      height: 1.18,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0,
+                    style: kDeepSeaTextStyle.copyWith(
+                      color: kGlassInk,
+                      fontSize: 15.2,
+                      height: 1.2,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -6776,8 +6941,8 @@ class _DebateTopicCard extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 9),
-            _PlazaTopicThumb(topic: topic, size: 52),
+            const SizedBox(width: 10),
+            _PlazaTopicThumb(topic: topic, size: 64),
           ],
         ),
       ),
@@ -6798,10 +6963,14 @@ class _PlazaMetaText extends StatelessWidget {
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
-        color: strong ? _plazaInk : _plazaMuted,
+        color: strong
+            ? kGlassAccent.withValues(alpha: 0.92)
+            : kGlassMuted.withValues(alpha: 0.82),
         fontSize: 11,
-        fontWeight: strong ? FontWeight.w700 : FontWeight.w600,
+        fontWeight: strong ? FontWeight.w800 : FontWeight.w600,
         letterSpacing: 0,
+        fontFamily: 'SF Pro Text',
+        fontFamilyFallback: const ['PingFang SC', 'Noto Sans SC'],
       ),
     );
   }
@@ -6853,12 +7022,14 @@ class _PlazaHotReplyLine extends StatelessWidget {
             padding: const EdgeInsets.only(top: 1),
             child: Text(
               '$label ·',
-              style: const TextStyle(
-                color: _plazaMuted,
+              style: TextStyle(
+                color: kGlassAccent.withValues(alpha: 0.88),
                 fontSize: 10.2,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
                 height: 1.1,
                 letterSpacing: 0,
+                fontFamily: 'SF Pro Text',
+                fontFamilyFallback: const ['PingFang SC', 'Noto Sans SC'],
               ),
             ),
           ),
@@ -6869,12 +7040,11 @@ class _PlazaHotReplyLine extends StatelessWidget {
             displayText,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: _plazaText,
-              fontSize: 12,
-              height: 1.24,
-              fontWeight: FontWeight.w500,
-              letterSpacing: 0,
+            style: kDeepSeaTextStyle.copyWith(
+              color: kGlassInk.withValues(alpha: 0.74),
+              fontSize: 11.8,
+              height: 1.25,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
@@ -6915,18 +7085,31 @@ class _PlazaTopicThumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(2),
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: Image.network(
-          _plazaTopicImageUrl(topic),
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(
-            color: _plazaSoft,
-            alignment: Alignment.center,
-            child: Icon(topic.icon, color: _plazaMuted, size: size * 0.38),
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.56)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 14,
+            offset: const Offset(0, 7),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Image.network(
+        _plazaTopicImageUrl(topic),
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Container(
+          color: Colors.white.withValues(alpha: 0.4),
+          alignment: Alignment.center,
+          child: Icon(
+            topic.icon,
+            color: kGlassAccent.withValues(alpha: 0.78),
+            size: size * 0.38,
           ),
         ),
       ),
@@ -6952,7 +7135,7 @@ String _plazaTopicHotReply(_DebateTopic topic) {
 }
 
 String _plazaTopicImageUrl(_DebateTopic topic) {
-  return 'https://picsum.photos/seed/artsee_plaza_${Uri.encodeComponent(topic.title)}/180/180';
+  return 'https://picsum.photos/seed/artsee_plaza_${Uri.encodeComponent(topic.title)}/720/420';
 }
 
 String _plazaTopicTime(_DebateTopic topic) {
@@ -6971,15 +7154,14 @@ class _PlazaRatingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return _PressableScale(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(0, 1, 0, 13),
-        decoration: const BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: _plazaBorder),
-          ),
-        ),
+      pressedScale: 0.985,
+      child: DeepSeaGlassPanel(
+        padding: const EdgeInsets.all(14),
+        radius: 28,
+        opacity: 0.58,
+        airy: true,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -6993,12 +7175,11 @@ class _PlazaRatingCard extends StatelessWidget {
                     item.quote.trim().isEmpty ? item.subtitle : item.quote,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: _plazaText,
-                      fontSize: 12,
-                      height: 1.24,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 0,
+                    style: kDeepSeaTextStyle.copyWith(
+                      color: kGlassInk.withValues(alpha: 0.74),
+                      fontSize: 11.8,
+                      height: 1.25,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -7006,13 +7187,13 @@ class _PlazaRatingCard extends StatelessWidget {
                     source: _plazaSourceText(item.source),
                     time: item.time,
                     primary:
-                        '${item.likes} 喜欢 · ${_plazaRatingCountLabel(item)} · ${item.comments} 评论',
+                        '${item.likes} 喜欢 · ${_plazaRatingCountLabel(item)}',
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 9),
-            _PlazaRatingThumb(item: item, size: 52),
+            const SizedBox(width: 10),
+            _PlazaRatingThumb(item: item, size: 64),
           ],
         ),
       ),
@@ -7035,28 +7216,34 @@ class _PlazaRatingTitle extends StatelessWidget {
             item.title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: _plazaInk,
-              fontSize: 15.5,
-              height: 1.18,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0,
+            style: kDeepSeaTextStyle.copyWith(
+              color: kGlassInk,
+              fontSize: 15.2,
+              height: 1.2,
+              fontWeight: FontWeight.w900,
             ),
           ),
         ),
         const SizedBox(width: 8),
-        Padding(
-          padding: const EdgeInsets.only(top: 2),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+          decoration: BoxDecoration(
+            color: kGlassAccent.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: kGlassAccent.withValues(alpha: 0.24)),
+          ),
           child: Text(
             '评分 ${item.score}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: _plazaInk,
-              fontSize: 11,
+            style: TextStyle(
+              color: kGlassAccent.withValues(alpha: 0.95),
+              fontSize: 10.5,
               height: 1,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
               letterSpacing: 0,
+              fontFamily: 'SF Pro Text',
+              fontFamilyFallback: const ['PingFang SC', 'Noto Sans SC'],
             ),
           ),
         ),
@@ -7076,22 +7263,31 @@ class _PlazaRatingThumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(2),
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: Image.network(
-          _plazaRatingImageUrl(item),
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(
-            color: _plazaSoft,
-            alignment: Alignment.center,
-            child: Icon(
-              Icons.star_rate_rounded,
-              color: _plazaMuted,
-              size: size * 0.4,
-            ),
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.56)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 14,
+            offset: const Offset(0, 7),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Image.network(
+        _plazaRatingImageUrl(item),
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Container(
+          color: Colors.white.withValues(alpha: 0.4),
+          alignment: Alignment.center,
+          child: Icon(
+            Icons.star_rate_rounded,
+            color: kGlassAccent.withValues(alpha: 0.78),
+            size: size * 0.4,
           ),
         ),
       ),
@@ -8724,7 +8920,7 @@ class _DebateDetailHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 58,
+      height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -8746,7 +8942,7 @@ class _DebateDetailHeader extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: context.artC.ink,
-                fontSize: 17,
+                fontSize: 16,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 0,
               ),
@@ -8754,10 +8950,9 @@ class _DebateDetailHeader extends StatelessWidget {
           ),
           Align(
             alignment: Alignment.centerLeft,
-            child: IconButton(
-              onPressed: () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-              color: context.artC.ink,
+            child: _DetailHeaderIconButton(
+              icon: Icons.arrow_back_ios_new_rounded,
+              onTap: () => Navigator.of(context).pop(),
               tooltip: '返回',
             ),
           ),
@@ -8776,10 +8971,9 @@ class _DebateDetailHeader extends StatelessWidget {
                     busy: leadBusy,
                     onTap: onSaveLead,
                   ),
-                IconButton(
-                  onPressed: onShare,
-                  icon: const Icon(Icons.ios_share_rounded, size: 20),
-                  color: context.artC.ink,
+                _DetailHeaderIconButton(
+                  icon: Icons.ios_share_rounded,
+                  onTap: onShare,
                   tooltip: '分享',
                 ),
                 if (onConvertLead != null)
@@ -8796,6 +8990,37 @@ class _DebateDetailHeader extends StatelessWidget {
   }
 }
 
+class _DetailHeaderIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final String tooltip;
+
+  const _DetailHeaderIconButton({
+    required this.icon,
+    required this.onTap,
+    required this.tooltip,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: _PressableScale(
+        onTap: onTap,
+        child: SizedBox(
+          width: 42,
+          height: 42,
+          child: Icon(
+            icon,
+            size: icon == Icons.ios_share_rounded ? 20 : 18,
+            color: context.artC.ink.withValues(alpha: 0.88),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _DebateDetailHero extends StatelessWidget {
   final _DebateTopic topic;
 
@@ -8804,10 +9029,11 @@ class _DebateDetailHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.only(bottom: 20),
-      decoration: const BoxDecoration(
+      padding: const EdgeInsets.only(bottom: 18),
+      decoration: BoxDecoration(
         border: Border(
-          bottom: BorderSide(color: Color(0xFFE6E6E6)),
+          bottom:
+              BorderSide(color: context.artC.silver.withValues(alpha: 0.34)),
         ),
       ),
       child: Column(
@@ -8817,25 +9043,25 @@ class _DebateDetailHero extends StatelessWidget {
             topic.title,
             style: TextStyle(
               color: context.artC.ink,
-              fontSize: 27,
-              height: 1.38,
+              fontSize: 25.5,
+              height: 1.22,
               fontWeight: FontWeight.w900,
               letterSpacing: 0,
             ),
           ),
-          const SizedBox(height: 14),
-          _DebateDetailAuthorBlock(topic: topic),
-          const SizedBox(height: 20),
-          _PlazaDetailImage(topic: topic),
           const SizedBox(height: 16),
+          _DebateDetailAuthorBlock(topic: topic),
+          const SizedBox(height: 18),
+          _PlazaDetailImage(topic: topic),
+          const SizedBox(height: 14),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 20),
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 19),
             decoration: BoxDecoration(
-              color: const Color(0xFFFCFCFD),
-              borderRadius: BorderRadius.circular(12),
+              color: const Color(0xFFFCFDFE),
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: context.artC.silver.withValues(alpha: 0.28),
+                color: context.artC.silver.withValues(alpha: 0.16),
               ),
             ),
             child: Column(
@@ -8897,7 +9123,7 @@ class _DebateDetailAuthorBlock extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: topic.accent,
-                          fontSize: 12,
+                          fontSize: 11.8,
                           fontWeight: FontWeight.w900,
                           letterSpacing: 0,
                         ),
@@ -8911,11 +9137,11 @@ class _DebateDetailAuthorBlock extends StatelessWidget {
                 '${_plazaTopicTime(topic)} · ${topic.heat} 喜欢 · ${topic.comments} 评论',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Color(0xFF8E8E93),
-                  fontSize: 12,
+                style: TextStyle(
+                  color: context.artC.ink.withValues(alpha: 0.42),
+                  fontSize: 11.8,
                   height: 1.2,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
                   letterSpacing: 0,
                 ),
               ),
@@ -8975,17 +9201,17 @@ class _PlazaDetailImage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.07),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: 0.045),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         child: AspectRatio(
           aspectRatio: 16 / 9,
           child: Image.network(
@@ -9023,16 +9249,16 @@ class _PlazaArticleBody extends StatelessWidget {
             paragraphs[index],
             style: TextStyle(
               color: index == 0
-                  ? const Color(0xFF3F3F3F)
-                  : const Color(0xFF646464),
-              fontSize: 16,
-              height: index == 0 ? 1.62 : 1.72,
-              fontWeight: index == 0 ? FontWeight.w900 : FontWeight.w700,
+                  ? context.artC.ink.withValues(alpha: 0.82)
+                  : context.artC.ink.withValues(alpha: 0.64),
+              fontSize: index == 0 ? 15.8 : 15.4,
+              height: index == 0 ? 1.58 : 1.68,
+              fontWeight: index == 0 ? FontWeight.w800 : FontWeight.w600,
               letterSpacing: 0,
             ),
           ),
           if (index != paragraphs.length - 1)
-            SizedBox(height: index == 0 ? 18 : 16),
+            SizedBox(height: index == 0 ? 20 : 17),
         ],
       ],
     );
@@ -9074,7 +9300,10 @@ class _PlazaTopicReplyActions extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               _PlazaDetailAction(
                 label: '回复',
@@ -9083,13 +9312,11 @@ class _PlazaTopicReplyActions extends StatelessWidget {
                 filled: true,
                 onTap: onReply,
               ),
-              const SizedBox(width: 8),
               _PlazaDetailAction(
                 label: '转发',
                 icon: Icons.ios_share_rounded,
                 onTap: onShare,
               ),
-              const SizedBox(width: 8),
               _PlazaDetailAction(
                 label: liked ? '已赞' : '赞',
                 icon: liked
@@ -9100,37 +9327,16 @@ class _PlazaTopicReplyActions extends StatelessWidget {
                     liked ? const Color(0xFFD95D3E) : const Color(0xFF2478B8),
                 onTap: onLike,
               ),
-              const SizedBox(width: 8),
               _PlazaDetailAction(
                 label: saved ? '已收藏' : '收藏',
                 icon: saved ? Icons.bookmark_rounded : Icons.bookmark_border,
                 active: saved,
                 onTap: onSave,
               ),
-              const Spacer(),
-              GestureDetector(
+              _PlazaDetailAction(
+                label: onlyMine ? '看全部' : '只看楼主',
+                color: const Color(0xFF2478B8),
                 onTap: onOnlyHost,
-                child: Container(
-                  height: 34,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: const Color(0xFF2478B8).withValues(alpha: 0.14),
-                    ),
-                  ),
-                  child: Text(
-                    onlyMine ? '看全部' : '只看楼主',
-                    style: const TextStyle(
-                      color: Color(0xFF2478B8),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0,
-                    ),
-                  ),
-                ),
               ),
             ],
           ),
@@ -10802,16 +11008,16 @@ class _AiDebateBrief extends StatelessWidget {
   Widget build(BuildContext context) {
     final prompts = config.promptCloudItems.take(4).toList();
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         gradient: _inkWashGradient,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _porcelainDeepBlue.withValues(alpha: 0.32)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         boxShadow: [
           BoxShadow(
-            color: _porcelainDeepBlue.withValues(alpha: 0.12),
-            blurRadius: 22,
-            offset: const Offset(0, 10),
+            color: _porcelainDeepBlue.withValues(alpha: 0.10),
+            blurRadius: 20,
+            offset: const Offset(0, 9),
           ),
         ],
       ),
@@ -10861,7 +11067,7 @@ class _AiDebateBrief extends StatelessWidget {
                   ],
                 ),
               ),
-              GestureDetector(
+              _PressableScale(
                 onTap: onStartAi,
                 child: Container(
                   height: 34,
@@ -10900,7 +11106,7 @@ class _AiDebateBrief extends StatelessWidget {
             runSpacing: 8,
             children: prompts
                 .map(
-                  (item) => GestureDetector(
+                  (item) => _PressableScale(
                     onTap: () => onPrompt(item.text),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -11011,15 +11217,22 @@ class _DockAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return _PressableScale(
       onTap: onTap,
       child: Container(
-        height: 74,
-        padding: const EdgeInsets.all(10),
+        height: 76,
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.09),
+          color: color.withValues(alpha: 0.075),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withValues(alpha: 0.16)),
+          border: Border.all(color: color.withValues(alpha: 0.12)),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.055),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -11071,7 +11284,7 @@ class _HeaderIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return _PressableScale(
       onTap: onTap,
       child: Container(
         width: 42,
@@ -11083,9 +11296,9 @@ class _HeaderIconButton extends StatelessWidget {
               Border.all(color: context.artC.silver.withValues(alpha: 0.44)),
           boxShadow: [
             BoxShadow(
-              color: context.artC.ink.withValues(alpha: 0.06),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
+              color: context.artC.ink.withValues(alpha: 0.05),
+              blurRadius: 16,
+              offset: const Offset(0, 7),
             ),
           ],
         ),
@@ -11142,11 +11355,11 @@ class _ConversationDrawerState extends State<_ConversationDrawer> {
     final filteredConversations = _filteredConversations;
 
     return Drawer(
-      backgroundColor: Colors.white,
+      backgroundColor: context.artC.porcelain,
       child: SafeArea(
         top: true,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -11168,7 +11381,7 @@ class _ConversationDrawerState extends State<_ConversationDrawer> {
                 ),
               ),
               const SizedBox(height: 16),
-              GestureDetector(
+              _PressableScale(
                 onTap: () {
                   widget.onNewChat();
                   Navigator.of(context).maybePop();
@@ -11177,8 +11390,17 @@ class _ConversationDrawerState extends State<_ConversationDrawer> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
-                    color: context.artC.ink,
+                    gradient: const LinearGradient(
+                      colors: [_porcelainNightBlue, _porcelainDeepBlue],
+                    ),
                     borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _porcelainDeepBlue.withValues(alpha: 0.18),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
                   ),
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -11205,11 +11427,18 @@ class _ConversationDrawerState extends State<_ConversationDrawer> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 decoration: BoxDecoration(
-                  color: context.artC.porcelain,
+                  color: context.artC.cardIconBg,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: context.artC.silver.withValues(alpha: 0.42),
+                    color: context.artC.silver.withValues(alpha: 0.34),
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: context.artC.ink.withValues(alpha: 0.02),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: Row(
                   children: [
@@ -11330,18 +11559,26 @@ class _ConversationDrawerState extends State<_ConversationDrawer> {
                             onDismissed: (direction) {
                               widget.onConversationDelete(conversationId);
                             },
-                            child: GestureDetector(
+                            child: _PressableScale(
                               onTap: () =>
                                   widget.onConversationTap(conversation),
                               child: Container(
-                                padding: const EdgeInsets.all(14),
+                                padding: const EdgeInsets.all(15),
                                 decoration: BoxDecoration(
-                                  color: context.artC.porcelain,
+                                  color: context.artC.cardIconBg,
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
                                     color: context.artC.silver
-                                        .withValues(alpha: 0.42),
+                                        .withValues(alpha: 0.34),
                                   ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: context.artC.ink
+                                          .withValues(alpha: 0.025),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 5),
+                                    ),
+                                  ],
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -11461,14 +11698,17 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final maxBubbleWidth = math.min(
+      MediaQuery.sizeOf(context).width * 0.76,
+      520.0,
+    );
     final bubble = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
-      constraints: BoxConstraints(
-        maxWidth: MediaQuery.sizeOf(context).width * 0.68,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+      constraints: BoxConstraints(maxWidth: maxBubbleWidth),
       decoration: BoxDecoration(
-        color: user ? context.artC.deepPanel : context.artC.cardIconBg,
-        borderRadius: BorderRadius.circular(17).copyWith(
+        color: user ? null : context.artC.cardIconBg,
+        gradient: user ? _inkWashGradient : null,
+        borderRadius: BorderRadius.circular(20).copyWith(
           bottomRight: user ? const Radius.circular(4) : null,
           bottomLeft: !user ? const Radius.circular(4) : null,
         ),
@@ -11477,9 +11717,9 @@ class _MessageBubble extends StatelessWidget {
             : Border.all(color: context.artC.silver.withValues(alpha: 0.45)),
         boxShadow: [
           BoxShadow(
-            color: context.artC.ink.withValues(alpha: 0.035),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: context.artC.ink.withValues(alpha: user ? 0.07 : 0.035),
+            blurRadius: user ? 18 : 14,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -11725,31 +11965,55 @@ class _ChatAvatar extends StatelessWidget {
   }
 }
 
-class _TypingDot extends StatelessWidget {
+class _TypingDot extends StatefulWidget {
   final int delay;
 
   const _TypingDot({required this.delay});
 
   @override
+  State<_TypingDot> createState() => _TypingDotState();
+}
+
+class _TypingDotState extends State<_TypingDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _opacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 720),
+    );
+    _opacity = Tween<double>(begin: 0.35, end: 1).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    Future<void>.delayed(Duration(milliseconds: widget.delay * 120), () {
+      if (mounted) {
+        _controller.repeat(reverse: true);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.35, end: 1),
-      duration: Duration(milliseconds: 620 + delay * 120),
-      curve: Curves.easeInOut,
-      builder: (context, value, _) {
-        return Opacity(
-          opacity: value,
-          child: Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(
-              color: kCobalt.withValues(alpha: 0.72),
-              shape: BoxShape.circle,
-            ),
-          ),
-        );
-      },
-      onEnd: () {},
+    return FadeTransition(
+      opacity: _opacity,
+      child: Container(
+        width: 6,
+        height: 6,
+        decoration: BoxDecoration(
+          color: kCobalt.withValues(alpha: 0.72),
+          shape: BoxShape.circle,
+        ),
+      ),
     );
   }
 }
@@ -11814,24 +12078,36 @@ class _BottomAskBarState extends State<_BottomAskBar> {
       ignoring: false,
       child: Container(
         decoration: BoxDecoration(
-          color: context.artC.porcelain.withValues(alpha: 0.98),
-          border: Border(
-            top: BorderSide(color: context.artC.silver.withValues(alpha: 0.5)),
-          ),
+          color: context.artC.porcelain.withValues(alpha: 0.92),
           boxShadow: [
             BoxShadow(
-              color: context.artC.ink.withValues(alpha: 0.035),
-              blurRadius: 14,
-              offset: const Offset(0, -4),
+              color: context.artC.ink.withValues(alpha: 0.04),
+              blurRadius: 24,
+              offset: const Offset(0, -8),
             ),
           ],
         ),
         child: SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 7),
-            child: SizedBox(
-              height: 50,
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+            child: Container(
+              height: 58,
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: context.artC.cardIconBg.withValues(alpha: 0.98),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: context.artC.silver.withValues(alpha: 0.42),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: context.artC.ink.withValues(alpha: 0.045),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
               child: Row(
                 children: [
                   _ComposerCircleButton(
@@ -11930,7 +12206,7 @@ class _BottomAskBarState extends State<_BottomAskBar> {
                   ),
                   const SizedBox(width: 10),
                   _hasText || widget.sending
-                      ? GestureDetector(
+                      ? _PressableScale(
                           onTap: widget.sending ? null : widget.onSubmit,
                           child: Container(
                             width: 44,
@@ -11977,7 +12253,7 @@ class _ComposerCircleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return _PressableScale(
       onTap: onTap,
       child: Container(
         width: 44,
@@ -11992,8 +12268,8 @@ class _ComposerCircleButton extends StatelessWidget {
           boxShadow: [
             BoxShadow(
               color: context.artC.ink.withValues(alpha: 0.025),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -12009,13 +12285,14 @@ class _TopAura extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 180,
+      height: 150,
       decoration: BoxDecoration(
-        gradient: RadialGradient(
-          center: const Alignment(0, -1),
-          radius: 1.05,
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
           colors: [
-            kCobalt.withValues(alpha: 0.08),
+            kCobalt.withValues(alpha: 0.07),
+            kCobalt.withValues(alpha: 0.025),
             Colors.white.withValues(alpha: 0),
           ],
         ),
@@ -12084,10 +12361,18 @@ class _ChatHeader extends StatelessWidget {
     return Container(
       padding: EdgeInsets.fromLTRB(8, safeTop + 4, 8, 8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.95),
+        color: context.artC.porcelain.withValues(alpha: 0.96),
         border: Border(
-          bottom: BorderSide(color: context.artC.silver.withValues(alpha: 0.3)),
+          bottom:
+              BorderSide(color: context.artC.silver.withValues(alpha: 0.24)),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: context.artC.ink.withValues(alpha: 0.025),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Row(
         children: [
@@ -12171,15 +12456,16 @@ class _QuickActionChips extends StatelessWidget {
         spacing: 8,
         runSpacing: 8,
         children: chips
-            .map((chip) => GestureDetector(
+            .map((chip) => _PressableScale(
                   onTap: () => onTap(chip),
                   child: Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
                     decoration: BoxDecoration(
-                      color: kCobalt.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: kCobalt.withValues(alpha: 0.2)),
+                      color: kCobalt.withValues(alpha: 0.07),
+                      borderRadius: BorderRadius.circular(999),
+                      border:
+                          Border.all(color: kCobalt.withValues(alpha: 0.14)),
                     ),
                     child: Text(
                       chip,
@@ -12258,7 +12544,7 @@ class _EmptyConversationState extends StatelessWidget {
           const SizedBox(height: 24),
           ...config.emptyActions.map((action) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: GestureDetector(
+                child: _PressableScale(
                   onTap: () => onAction(action.text),
                   child: Container(
                     padding: const EdgeInsets.symmetric(

@@ -11,6 +11,7 @@ type Row = Record<string, unknown>;
 
 const db: Record<string, Row[]> = {
   user_profiles: [],
+  organizations: [],
   organization_members: [],
   events: [],
   opportunities: [],
@@ -26,6 +27,7 @@ const userIds: Record<string, string> = {
   admin: "admin-user",
   super: "super-admin-user",
   org: "org-member-user",
+  legacyBusiness: "legacy-business-user",
 };
 
 function resetDb() {
@@ -60,6 +62,12 @@ function resetDb() {
       user_role: "student",
       user_type: "personal",
     },
+    {
+      id: userIds.legacyBusiness,
+      role: "user",
+      user_role: null,
+      user_type: "business",
+    },
   ];
   db.organization_members = [
     {
@@ -67,6 +75,13 @@ function resetDb() {
       user_id: userIds.org,
       organization_id: "org-1",
       role: "advisor",
+      status: "active",
+    },
+  ];
+  db.organizations = [
+    {
+      id: "org-1",
+      type: "gallery_exhibition",
       status: "active",
     },
   ];
@@ -285,6 +300,29 @@ describe("business content authz", () => {
     expect(res.status).toBe(201);
     expect(body.data.status).toBe("reviewing");
     expect(body.data.created_by).toBe(userIds.org);
+  });
+
+  it("blocks business-type-only profiles without a current institution role or org membership", async () => {
+    const res = await postOpportunity(
+      req("/api/v1/opportunities", "legacyBusiness", {
+        title: "旧机构服务",
+        status: "published",
+      })
+    );
+
+    expect(res.status).toBe(403);
+  });
+
+  it("blocks retired study-abroad agency members from business publishing", async () => {
+    db.organizations[0].type = "study_abroad_agency";
+
+    const res = await postOpportunity(
+      req("/api/v1/opportunities", "org", {
+        title: "旧留学服务",
+        status: "published",
+      })
+    );
+    expect(res.status).toBe(403);
   });
 
   it("keeps student-created artworks in review when published is requested", async () => {

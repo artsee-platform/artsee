@@ -538,7 +538,7 @@ class _ConsultationEntryCard extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                '开始咨询入驻机构',
+                '咨询官方组织',
                 style: TextStyle(
                   color: context.artC.ink.withValues(alpha: 0.62),
                   fontSize: 12.5,

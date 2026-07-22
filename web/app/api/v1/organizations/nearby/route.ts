@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { effectiveOrganizationSubscriptionStatus } from "@/lib/api/organization-subscription";
+import { isPublicOfficialOrganization } from "@/lib/api/organization-visibility";
 import { createServiceClient } from "@/lib/api/supabase-service";
 import { errorResponse, parsePagination } from "@/lib/api/route-helpers";
 
 type Row = Record<string, unknown>;
 
 const SORT_VALUES = new Set(["comprehensive", "distance", "rating", "match"]);
-
 function cleanText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -196,8 +195,7 @@ export async function GET(req: NextRequest) {
         "id,owner_user_id,name,type,status,verification_status,metadata,city,province,latitude,longitude,focus_areas,supports_online,supports_offline,rating,review_count,contract_count,subscription_status,subscription_expires_at,created_at,updated_at",
         { count: "exact" }
       )
-      .eq("status", "active")
-      .eq("subscription_status", "active");
+      .eq("status", "active");
 
     if (serviceMode === "online") query = query.eq("supports_online", true);
     if (serviceMode === "offline") query = query.eq("supports_offline", true);
@@ -220,10 +218,7 @@ export async function GET(req: NextRequest) {
     }
 
     const normalized = (data ?? [])
-      .filter(
-        (row) =>
-          effectiveOrganizationSubscriptionStatus(row as Row) === "active"
-      )
+      .filter((row) => isPublicOfficialOrganization(row as Row))
       .map((row) =>
         normalizeOrganization(row as Row, {
           city,

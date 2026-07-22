@@ -401,10 +401,16 @@ String _roleLabel(String role) {
 
 String _organizationTypeLabel(String type) {
   switch (type) {
+    case 'official_association':
+      return '官方协会';
+    case 'school_official':
+      return '院校官方';
+    case 'official_partner':
+      return '官方合作组织';
     case 'study_abroad_agency':
-      return '艺术留学机构';
+      return '留学服务（已下线）';
     case 'portfolio_training':
-      return '作品集机构';
+      return '作品集服务（已下线）';
     case 'gallery_exhibition':
       return '画廊展览';
     case 'event_organizer':

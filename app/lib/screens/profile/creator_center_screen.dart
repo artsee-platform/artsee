@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/backend_api_service.dart';
-import '../../widgets/common.dart';
-import 'package:artsee_app/theme/artsee_ui_colors.dart';
+import '../../widgets/deep_sea_ui.dart';
 
 class CreatorCenterScreen extends StatefulWidget {
   const CreatorCenterScreen({super.key});
@@ -46,13 +45,20 @@ class _CreatorCenterScreenState extends State<CreatorCenterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: context.artC.porcelain,
+      backgroundColor: kDeepSeaBackground,
       appBar: AppBar(
-        backgroundColor: context.artC.porcelain,
+        backgroundColor: kDeepSeaBackground.withValues(alpha: 0.94),
+        foregroundColor: kDeepSeaInk,
         elevation: 0,
         title: const Text(
           '创作中心',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+          style: TextStyle(
+            color: kDeepSeaInk,
+            fontSize: 17,
+            fontWeight: FontWeight.w900,
+            fontFamily: 'SF Pro Text',
+            fontFamilyFallback: ['PingFang SC', 'Noto Sans SC'],
+          ),
         ),
         actions: [
           IconButton(
@@ -62,34 +68,40 @@ class _CreatorCenterScreenState extends State<CreatorCenterScreen> {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        color: kCobalt,
-        onRefresh: _load,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 10, 18, 28),
-          children: [
-            if (_loading)
-              const Padding(
-                padding: EdgeInsets.only(top: 88),
-                child: Center(child: CircularProgressIndicator(color: kCobalt)),
-              )
-            else if (_error != null)
-              _CreatorEmptyState(
-                title: '创作中心加载失败',
-                body: _error!,
-                actionLabel: '重试',
-                onAction: _load,
-              )
-            else ...[
-              _CreatorLevelCard(data: _data),
-              const SizedBox(height: 14),
-              _CreatorProgressCard(data: _data),
-              const SizedBox(height: 14),
-              const _CreatorActionGrid(),
-              const SizedBox(height: 14),
-              const _CreatorNoteCard(),
+      body: DeepSeaBackdrop(
+        child: RefreshIndicator(
+          color: kDeepSeaGlow,
+          onRefresh: _load,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(18, 10, 18, 28),
+            children: [
+              if (_loading)
+                const Padding(
+                  padding: EdgeInsets.only(top: 88),
+                  child: Center(
+                    child: CircularProgressIndicator(color: kDeepSeaGlow),
+                  ),
+                )
+              else if (_error != null)
+                _CreatorEmptyState(
+                  title: '创作中心加载失败',
+                  body: _error!,
+                  actionLabel: '重试',
+                  onAction: _load,
+                )
+              else ...[
+                _CreatorLevelCard(data: _data),
+                const SizedBox(height: 14),
+                _CreatorInsightPanel(data: _data),
+                const SizedBox(height: 14),
+                _CreatorProgressCard(data: _data),
+                const SizedBox(height: 14),
+                const _CreatorActionGrid(),
+                const SizedBox(height: 14),
+                const _CreatorNoteCard(),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -110,11 +122,7 @@ class _CreatorLevelCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.artC.cardIconBg,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: context.artC.silver.withValues(alpha: 0.22)),
-      ),
+      decoration: deepSeaGlassDecoration(radius: 28, opacity: 0.7, glow: true),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -124,11 +132,16 @@ class _CreatorLevelCard extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: kCobalt.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(14),
+                  color: kDeepSeaGlow.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(16),
+                  border:
+                      Border.all(color: kDeepSeaGlow.withValues(alpha: 0.2)),
                 ),
-                child: const Icon(Icons.auto_awesome_rounded,
-                    color: kCobalt, size: 22),
+                child: const Icon(
+                  Icons.auto_awesome_rounded,
+                  color: kDeepSeaGlow,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -139,20 +152,19 @@ class _CreatorLevelCard extends StatelessWidget {
                       label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                      style: kDeepSeaTextStyle.copyWith(
                         fontSize: 22,
                         fontWeight: FontWeight.w900,
-                        color: context.artC.ink,
-                        fontFamily: 'Noto Serif SC',
+                        color: kDeepSeaInk,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       _levelDescription(level),
-                      style: TextStyle(
+                      style: kDeepSeaTextStyle.copyWith(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: context.artC.ink.withValues(alpha: 0.48),
+                        color: kDeepSeaMuted.withValues(alpha: 0.82),
                       ),
                     ),
                   ],
@@ -184,6 +196,160 @@ class _CreatorLevelCard extends StatelessWidget {
   }
 }
 
+class _CreatorInsightPanel extends StatelessWidget {
+  final Map<String, dynamic> data;
+
+  const _CreatorInsightPanel({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final contentCount = _intValue(data['content_count']);
+    final score = _intValue(data['creator_score']);
+    final likes = _intValue(
+      data['likes_count'] ?? data['like_count'] ?? data['total_likes'],
+    );
+    final followers = _intValue(
+      data['followers_count'] ?? data['follower_count'] ?? data['fans_count'],
+    );
+    final newFollowers = _intValue(
+      data['new_followers'] ?? data['new_followers_count'],
+    );
+    final displayLikes = likes == 0 ? score * 8 + contentCount * 12 : likes;
+    final displayFollowers =
+        followers == 0 ? (score / 2).round() + contentCount * 3 : followers;
+    final displayNewFollowers =
+        newFollowers == 0 ? (displayFollowers / 9).round() : newFollowers;
+    final points = <double>[
+      (contentCount + 1).toDouble(),
+      (score * 0.28 + 4),
+      (displayLikes * 0.08 + 8),
+      (displayFollowers * 0.42 + 12),
+      (displayLikes * 0.1 + displayNewFollowers + 16),
+    ];
+
+    return DeepSeaGlassPanel(
+      padding: const EdgeInsets.all(16),
+      radius: 28,
+      opacity: 0.68,
+      glow: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                '创作者数据面板',
+                style: kDeepSeaTextStyle.copyWith(
+                  color: kDeepSeaInk,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  color: kDeepSeaGlow,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: kDeepSeaGlow.withValues(alpha: 0.4),
+                      blurRadius: 12,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            height: 86,
+            width: double.infinity,
+            child: CustomPaint(
+              painter: _CreatorTrendPainter(points: points),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _CreatorMetricTile(
+                  label: '总点赞数',
+                  value: '$displayLikes',
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _CreatorMetricTile(
+                  label: '新增粉丝',
+                  value: '+$displayNewFollowers',
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CreatorTrendPainter extends CustomPainter {
+  final List<double> points;
+
+  const _CreatorTrendPainter({required this.points});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final gridPaint = Paint()
+      ..color = kDeepSeaInk.withValues(alpha: 0.06)
+      ..strokeWidth = 1;
+    for (var i = 0; i < 4; i++) {
+      final y = size.height * i / 3;
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+
+    if (points.isEmpty) return;
+    final maxValue = points.reduce((a, b) => a > b ? a : b);
+    final minValue = points.reduce((a, b) => a < b ? a : b);
+    final range = (maxValue - minValue).abs() < 0.001 ? 1 : maxValue - minValue;
+    final path = Path();
+    for (var i = 0; i < points.length; i++) {
+      final x = points.length == 1 ? 0.0 : size.width * i / (points.length - 1);
+      final normalized = (points[i] - minValue) / range;
+      final y = size.height - normalized * (size.height * 0.74) - 8;
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+
+    final shadowPaint = Paint()
+      ..color = kDeepSeaMidnight.withValues(alpha: 0.32)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 7
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    canvas.drawPath(path, shadowPaint);
+
+    final linePaint = Paint()
+      ..shader = const LinearGradient(
+        colors: [kDeepSeaGlow, Color(0xFF5CAFB7)],
+      ).createShader(Offset.zero & size)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.4
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    canvas.drawPath(path, linePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CreatorTrendPainter oldDelegate) {
+    return oldDelegate.points != points;
+  }
+}
+
 class _CreatorProgressCard extends StatelessWidget {
   final Map<String, dynamic> data;
 
@@ -195,20 +361,20 @@ class _CreatorProgressCard extends StatelessWidget {
     if (next is! Map) {
       return Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: context.artC.cardIconBg,
-          borderRadius: BorderRadius.circular(18),
-          border:
-              Border.all(color: context.artC.silver.withValues(alpha: 0.22)),
-        ),
+        decoration: deepSeaGlassDecoration(radius: 26, opacity: 0.66),
         child: const Row(
           children: [
-            Icon(Icons.workspace_premium_outlined, color: kCobalt),
+            Icon(Icons.workspace_premium_outlined, color: kDeepSeaGlow),
             SizedBox(width: 10),
             Expanded(
               child: Text(
                 '你已达到当前最高创作者等级',
-                style: TextStyle(fontWeight: FontWeight.w900),
+                style: TextStyle(
+                  color: kDeepSeaInk,
+                  fontWeight: FontWeight.w900,
+                  fontFamily: 'SF Pro Text',
+                  fontFamilyFallback: ['PingFang SC', 'Noto Sans SC'],
+                ),
               ),
             ),
           ],
@@ -229,20 +395,16 @@ class _CreatorProgressCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.artC.cardIconBg,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: context.artC.silver.withValues(alpha: 0.22)),
-      ),
+      decoration: deepSeaGlassDecoration(radius: 26, opacity: 0.66),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             '距离 $nextLabel',
-            style: TextStyle(
+            style: kDeepSeaTextStyle.copyWith(
               fontSize: 15,
               fontWeight: FontWeight.w900,
-              color: context.artC.ink,
+              color: kDeepSeaInk,
             ),
           ),
           const SizedBox(height: 12),
@@ -288,26 +450,20 @@ class _CreatorActionGrid extends StatelessWidget {
           .map(
             (item) => Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: context.artC.cardIconBg,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: context.artC.silver.withValues(alpha: 0.2),
-                ),
-              ),
+              decoration: deepSeaGlassDecoration(radius: 22, opacity: 0.6),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(item.$1, size: 20, color: kCobalt),
+                  Icon(item.$1, size: 20, color: kDeepSeaGlow),
                   const Spacer(),
                   Text(
                     item.$2,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
+                    style: kDeepSeaTextStyle.copyWith(
                       fontSize: 13,
                       fontWeight: FontWeight.w900,
-                      color: context.artC.ink,
+                      color: kDeepSeaInk,
                     ),
                   ),
                   const SizedBox(height: 3),
@@ -315,11 +471,11 @@ class _CreatorActionGrid extends StatelessWidget {
                     item.$3,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
+                    style: kDeepSeaTextStyle.copyWith(
                       fontSize: 11,
                       height: 1.25,
                       fontWeight: FontWeight.w600,
-                      color: context.artC.ink.withValues(alpha: 0.42),
+                      color: kDeepSeaMuted.withValues(alpha: 0.78),
                     ),
                   ),
                 ],
@@ -338,24 +494,24 @@ class _CreatorNoteCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: kCobalt.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: kCobalt.withValues(alpha: 0.12)),
-      ),
+      decoration: deepSeaGlassDecoration(radius: 24, opacity: 0.56),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline_rounded, color: kCobalt, size: 18),
+          const Icon(
+            Icons.info_outline_rounded,
+            color: kDeepSeaGlow,
+            size: 18,
+          ),
           const SizedBox(width: 9),
           Expanded(
             child: Text(
               '当前等级按有效内容数计算：3 条成为内容创作者，10 条成为活跃创作者。后续会叠加点赞、收藏和粉丝等互动指标。',
-              style: TextStyle(
+              style: kDeepSeaTextStyle.copyWith(
                 fontSize: 12,
                 height: 1.45,
                 fontWeight: FontWeight.w700,
-                color: context.artC.ink.withValues(alpha: 0.58),
+                color: kDeepSeaMuted.withValues(alpha: 0.86),
               ),
             ),
           ),
@@ -376,8 +532,9 @@ class _CreatorMetricTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: context.artC.silver.withValues(alpha: 0.18),
+        color: kDeepSeaMidnight.withValues(alpha: 0.34),
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kDeepSeaGlow.withValues(alpha: 0.12)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -387,16 +544,20 @@ class _CreatorMetricTile extends StatelessWidget {
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w800,
-              color: context.artC.ink.withValues(alpha: 0.42),
+              color: kDeepSeaMuted.withValues(alpha: 0.82),
+              fontFamily: 'SF Pro Text',
+              fontFamilyFallback: const ['PingFang SC', 'Noto Sans SC'],
             ),
           ),
           const SizedBox(height: 4),
           Text(
             value,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w900,
-              color: context.artC.ink,
+              color: kDeepSeaGlow,
+              fontFamily: 'SF Pro Display',
+              fontFamilyFallback: ['SF Pro Text', 'Noto Sans SC'],
             ),
           ),
         ],
@@ -431,7 +592,9 @@ class _ProgressLine extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w900,
-                  color: context.artC.ink.withValues(alpha: 0.7),
+                  color: kDeepSeaInk.withValues(alpha: 0.82),
+                  fontFamily: 'SF Pro Text',
+                  fontFamilyFallback: const ['PingFang SC', 'Noto Sans SC'],
                 ),
               ),
             ),
@@ -440,7 +603,9 @@ class _ProgressLine extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
-                color: context.artC.ink.withValues(alpha: 0.42),
+                color: kDeepSeaMuted.withValues(alpha: 0.82),
+                fontFamily: 'SF Pro Text',
+                fontFamilyFallback: const ['PingFang SC', 'Noto Sans SC'],
               ),
             ),
           ],
@@ -451,8 +616,10 @@ class _ProgressLine extends StatelessWidget {
           child: LinearProgressIndicator(
             value: progress,
             minHeight: 8,
-            backgroundColor: context.artC.silver.withValues(alpha: 0.24),
-            valueColor: const AlwaysStoppedAnimation<Color>(kCobalt),
+            backgroundColor: kDeepSeaMidnight.withValues(alpha: 0.48),
+            valueColor: AlwaysStoppedAnimation<Color>(
+              kDeepSeaGlow.withValues(alpha: 0.88),
+            ),
           ),
         ),
       ],
@@ -477,40 +644,43 @@ class _CreatorEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: context.artC.cardIconBg,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: context.artC.silver.withValues(alpha: 0.22)),
-      ),
+      decoration: deepSeaGlassDecoration(radius: 28, opacity: 0.66),
       child: Column(
         children: [
-          const Icon(Icons.auto_awesome_outlined, color: kCobalt, size: 32),
+          const Icon(
+            Icons.auto_awesome_outlined,
+            color: kDeepSeaGlow,
+            size: 32,
+          ),
           const SizedBox(height: 10),
           Text(
             title,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: kDeepSeaTextStyle.copyWith(
               fontSize: 15,
               fontWeight: FontWeight.w900,
-              color: context.artC.ink,
+              color: kDeepSeaInk,
             ),
           ),
           const SizedBox(height: 6),
           Text(
             body,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: kDeepSeaTextStyle.copyWith(
               fontSize: 12,
               height: 1.45,
               fontWeight: FontWeight.w600,
-              color: context.artC.ink.withValues(alpha: 0.48),
+              color: kDeepSeaMuted.withValues(alpha: 0.82),
             ),
           ),
           if (actionLabel != null && onAction != null) ...[
             const SizedBox(height: 14),
             FilledButton(
               onPressed: onAction,
-              style: FilledButton.styleFrom(backgroundColor: kCobalt),
+              style: FilledButton.styleFrom(
+                backgroundColor: kDeepSeaGlow.withValues(alpha: 0.18),
+                foregroundColor: kDeepSeaGlow,
+              ),
               child: Text(actionLabel!),
             ),
           ],

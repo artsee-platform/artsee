@@ -40,7 +40,7 @@ const double kRadiusMedium = 16.0;
 const double kRadiusSmall = 12.0;
 
 /// 与 `MainScaffold` 底部悬浮导航 + FAB 占用高度一致（勿与实现脱节）
-const double kMainTabOverlayHeight = 118.0;
+const double kMainTabOverlayHeight = 164.0;
 
 /// 主 Tab 页内容区底部留白，避免被悬浮栏遮挡
 double mainTabBottomInset(BuildContext context) =>

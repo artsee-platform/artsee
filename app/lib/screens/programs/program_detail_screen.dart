@@ -52,7 +52,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
       backgroundColor: context.artC.porcelain,
       body: SafeArea(
         child: _loading
-            ? Center(
+            ? const Center(
                 child:
                     CircularProgressIndicator(color: kCobalt, strokeWidth: 2.5))
             : _error != null
@@ -82,11 +82,11 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
     final coverImageUrl = d['cover_image_url'] as String?;
 
     final school = d['schools'] as Map<String, dynamic>?;
-    final coverImageUrls = <String>[
+    final coverImageUrls = <String>{
       ..._asStringList(d['cover_image_urls']),
       if (coverImageUrl != null && coverImageUrl.isNotEmpty) coverImageUrl,
       ..._asStringList(school?['campus_image_urls']),
-    ].toSet().toList();
+    }.toList();
     final schoolName = school?['name_zh'] as String?;
     final schoolCountry = school?['country'] as String?;
     final schoolLogo = school?['logo_url'] as String?;
@@ -129,17 +129,23 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
             child: Row(
               children: [
-                GestureDetector(
+                _ProgramDetailPressable(
                   onTap: () => Navigator.pop(context),
+                  pressedScale: 0.96,
                   child: Container(
                     width: 40,
                     height: 40,
+                    alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: context.artC.silver.withOpacity(0.35),
-                      shape: BoxShape.circle,
+                      color: context.artC.cardIconBg.withValues(alpha: 0.78),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: context.artC.silver.withValues(alpha: 0.26),
+                      ),
                     ),
                     child: Icon(Icons.arrow_back_ios,
-                        size: 18, color: context.artC.ink.withOpacity(0.6)),
+                        size: 18,
+                        color: context.artC.ink.withValues(alpha: 0.6)),
                   ),
                 ),
                 const Spacer(),
@@ -162,10 +168,10 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
                       width: 64,
                       height: 64,
                       decoration: BoxDecoration(
-                        color: context.artC.cardIconBg,
-                        borderRadius: BorderRadius.circular(18),
+                        color: context.artC.cardIconBg.withValues(alpha: 0.84),
+                        borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: context.artC.silver.withOpacity(0.48),
+                          color: context.artC.silver.withValues(alpha: 0.28),
                         ),
                         boxShadow: [
                           BoxShadow(
@@ -176,7 +182,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
                         ],
                       ),
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius: BorderRadius.circular(8),
                         child: schoolLogo != null && schoolLogo.isNotEmpty
                             ? Image.network(
                                 schoolLogo,
@@ -187,7 +193,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
                             : Center(
                                 child: Text(
                                   (schoolName ?? '艺').substring(0, 1),
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontSize: 28,
                                     fontWeight: FontWeight.w700,
                                     color: kCobalt,
@@ -218,7 +224,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
                               degreeFullName,
                               style: TextStyle(
                                 fontSize: 13,
-                                color: context.artC.ink.withOpacity(0.45),
+                                color: context.artC.ink.withValues(alpha: 0.45),
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -229,7 +235,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
                               degreeType,
                               style: TextStyle(
                                 fontSize: 13,
-                                color: context.artC.ink.withOpacity(0.45),
+                                color: context.artC.ink.withValues(alpha: 0.45),
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -241,7 +247,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: kCobalt.withOpacity(0.85),
+                                color: kCobalt.withValues(alpha: 0.85),
                               ),
                             ),
                           ],
@@ -303,7 +309,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
                           style: TextStyle(
                             fontSize: 14,
                             height: 1.6,
-                            color: context.artC.ink.withOpacity(0.75),
+                            color: context.artC.ink.withValues(alpha: 0.75),
                           ),
                         ),
                       ],
@@ -323,7 +329,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
                           style: TextStyle(
                             fontSize: 14,
                             height: 1.6,
-                            color: context.artC.ink.withOpacity(0.75),
+                            color: context.artC.ink.withValues(alpha: 0.75),
                           ),
                         ),
                       ],
@@ -479,16 +485,16 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: kCobalt.withOpacity(0.07),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: kCobalt.withOpacity(0.12)),
+        color: kCobalt.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: kCobalt.withValues(alpha: 0.12)),
       ),
       child: Text(
         text,
         style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w800,
-          color: kCobalt.withOpacity(0.86),
+          color: kCobalt.withValues(alpha: 0.86),
         ),
       ),
     );
@@ -499,7 +505,8 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
       width: double.infinity,
       child: ArtseeSurface(
         padding: const EdgeInsets.all(20),
-        radius: 18,
+        radius: 8,
+        color: context.artC.cardIconBg.withValues(alpha: 0.84),
         child: child,
       ),
     );
@@ -524,8 +531,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
     required String? dataSource,
     required String? sourceUrl,
   }) {
-    final normalizedScore =
-        difficultyScore == null ? null : difficultyScore.clamp(1, 5).toInt();
+    final normalizedScore = difficultyScore?.clamp(1, 5).toInt();
     final hasSummary = competitionLevel != null && competitionLevel.isNotEmpty;
     final hasEvidence = evidenceNote != null && evidenceNote.isNotEmpty;
     final hasSource = dataSource != null && dataSource.isNotEmpty;
@@ -553,8 +559,9 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: _difficultyColor(normalizedScore).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(999),
+                    color: _difficultyColor(normalizedScore)
+                        .withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     _difficultyLabel(normalizedScore),
@@ -588,7 +595,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: context.artC.ink.withOpacity(0.38),
+                      color: context.artC.ink.withValues(alpha: 0.38),
                     ),
                   ),
                 ),
@@ -610,7 +617,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
                         '参考录取率',
                         style: TextStyle(
                           fontSize: 11,
-                          color: context.artC.ink.withOpacity(0.4),
+                          color: context.artC.ink.withValues(alpha: 0.4),
                         ),
                       ),
                     ],
@@ -623,7 +630,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
               child: LinearProgressIndicator(
                 value: normalizedScore / 5,
                 minHeight: 8,
-                backgroundColor: context.artC.silver.withOpacity(0.45),
+                backgroundColor: context.artC.silver.withValues(alpha: 0.45),
                 valueColor: AlwaysStoppedAnimation<Color>(
                   _difficultyColor(normalizedScore),
                 ),
@@ -640,7 +647,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
               style: TextStyle(
                 fontSize: 13,
                 height: 1.6,
-                color: context.artC.ink.withOpacity(0.72),
+                color: context.artC.ink.withValues(alpha: 0.72),
               ),
             ),
           ],
@@ -650,10 +657,10 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: context.artC.silver.withOpacity(0.22),
-                borderRadius: BorderRadius.circular(14),
+                color: context.artC.silver.withValues(alpha: 0.22),
+                borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: context.artC.silver.withOpacity(0.32),
+                  color: context.artC.silver.withValues(alpha: 0.32),
                 ),
               ),
               child: Text(
@@ -661,7 +668,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
                 style: TextStyle(
                   fontSize: 12,
                   height: 1.55,
-                  color: context.artC.ink.withOpacity(0.58),
+                  color: context.artC.ink.withValues(alpha: 0.58),
                 ),
               ),
             ),
@@ -691,7 +698,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
               fontSize: 10,
               fontWeight: FontWeight.w700,
               letterSpacing: 0,
-              color: context.artC.ink.withOpacity(0.32),
+              color: context.artC.ink.withValues(alpha: 0.32),
             ),
           ),
           const SizedBox(height: 18),
@@ -731,7 +738,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
                     height: 6,
                     margin: const EdgeInsets.only(top: 8, right: 10),
                     decoration: BoxDecoration(
-                      color: kCobalt.withOpacity(0.55),
+                      color: kCobalt.withValues(alpha: 0.55),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -741,7 +748,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
                       style: TextStyle(
                         fontSize: 14,
                         height: 1.55,
-                        color: context.artC.ink.withOpacity(0.75),
+                        color: context.artC.ink.withValues(alpha: 0.75),
                       ),
                     ),
                   ),
@@ -764,7 +771,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
             label,
             style: TextStyle(
               fontSize: 13,
-              color: context.artC.ink.withOpacity(0.45),
+              color: context.artC.ink.withValues(alpha: 0.45),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -803,6 +810,48 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
   }
 }
 
+class _ProgramDetailPressable extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final double pressedScale;
+
+  const _ProgramDetailPressable({
+    required this.child,
+    required this.onTap,
+    this.pressedScale = 0.97,
+  });
+
+  @override
+  State<_ProgramDetailPressable> createState() =>
+      _ProgramDetailPressableState();
+}
+
+class _ProgramDetailPressableState extends State<_ProgramDetailPressable> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value || widget.onTap == null) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onTap,
+      onTapDown: (_) => _setPressed(true),
+      onTapCancel: () => _setPressed(false),
+      onTapUp: (_) => _setPressed(false),
+      child: AnimatedScale(
+        scale: _pressed ? widget.pressedScale : 1,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOutCubic,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
 class _CareerPathNode extends StatelessWidget {
   final String label;
   final int index;
@@ -834,7 +883,7 @@ class _CareerPathNode extends StatelessWidget {
             right: isLast ? centerX : 0,
             child: Container(
               height: 2,
-              color: context.artC.silver.withOpacity(0.85),
+              color: context.artC.silver.withValues(alpha: 0.85),
             ),
           ),
           Positioned(
@@ -843,7 +892,7 @@ class _CareerPathNode extends StatelessWidget {
             child: Container(
               width: 2,
               height: 25,
-              color: activeColor.withOpacity(0.55),
+              color: activeColor.withValues(alpha: 0.55),
             ),
           ),
           Positioned(
@@ -858,7 +907,7 @@ class _CareerPathNode extends StatelessWidget {
                 border: Border.all(color: activeColor, width: 3),
                 boxShadow: [
                   BoxShadow(
-                    color: activeColor.withOpacity(0.14),
+                    color: activeColor.withValues(alpha: 0.14),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -875,13 +924,13 @@ class _CareerPathNode extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
                 color: index == 0
-                    ? kCobalt.withOpacity(0.08)
-                    : context.artC.cardIconBg,
-                borderRadius: BorderRadius.circular(14),
+                    ? kCobalt.withValues(alpha: 0.08)
+                    : context.artC.cardIconBg.withValues(alpha: 0.84),
+                borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                   color: index == 0
-                      ? kCobalt.withOpacity(0.18)
-                      : context.artC.silver.withOpacity(0.55),
+                      ? kCobalt.withValues(alpha: 0.18)
+                      : context.artC.silver.withValues(alpha: 0.55),
                 ),
               ),
               child: Column(
@@ -892,7 +941,7 @@ class _CareerPathNode extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 9,
                       fontWeight: FontWeight.w900,
-                      color: activeColor.withOpacity(0.72),
+                      color: activeColor.withValues(alpha: 0.72),
                       letterSpacing: 0,
                     ),
                   ),
@@ -905,7 +954,7 @@ class _CareerPathNode extends StatelessWidget {
                       fontSize: 12,
                       height: 1.25,
                       fontWeight: FontWeight.w800,
-                      color: context.artC.ink.withOpacity(0.78),
+                      color: context.artC.ink.withValues(alpha: 0.78),
                     ),
                   ),
                 ],
@@ -959,7 +1008,7 @@ class _ImageCarouselState extends State<_ImageCarousel> {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(kRadiusLarge),
+      borderRadius: BorderRadius.circular(8),
       child: AspectRatio(
         aspectRatio: 16 / 9,
         child: Stack(
@@ -974,10 +1023,10 @@ class _ImageCarouselState extends State<_ImageCarousel> {
                   widget.imageUrls[index],
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => Container(
-                    color: context.artC.silver.withOpacity(0.26),
+                    color: context.artC.silver.withValues(alpha: 0.26),
                     child: Icon(
                       Icons.image_not_supported_outlined,
-                      color: context.artC.ink.withOpacity(0.28),
+                      color: context.artC.ink.withValues(alpha: 0.28),
                     ),
                   ),
                 );
@@ -998,9 +1047,10 @@ class _ImageCarouselState extends State<_ImageCarousel> {
                         width: i == _index ? 18 : 6,
                         height: 6,
                         decoration: BoxDecoration(
-                          color: Colors.white
-                              .withOpacity(i == _index ? 0.95 : 0.58),
-                          borderRadius: BorderRadius.circular(99),
+                          color: Colors.white.withValues(
+                            alpha: i == _index ? 0.95 : 0.58,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                       ),
                   ],

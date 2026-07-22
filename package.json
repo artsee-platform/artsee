@@ -16,6 +16,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:backend": "node tests/backend/supabase-health.mjs",
     "test:web": "npm run test --workspace=web",
+    "audit:retired-agencies": "node scripts/audit-retired-agencies.mjs",
+    "audit:retired-user-roles": "node scripts/audit-retired-user-roles.mjs",
     "ensure:dev-user": "node scripts/ensure-dev-test-user.mjs",
     "seed:events": "node scripts/seed-events-opportunities.mjs",
     "e2e:admin": "node scripts/browser-admin-e2e.mjs",

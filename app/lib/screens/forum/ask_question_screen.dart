@@ -152,9 +152,9 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.artC.porcelain,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: context.artC.porcelain,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
@@ -171,17 +171,48 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: _submitting ? null : _submit,
-            style: TextButton.styleFrom(
-              foregroundColor: kCobalt,
-              textStyle: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0,
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: _AskPressable(
+              onTap: _submitting ? null : _submit,
+              pressedScale: 0.95,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                curve: Curves.easeOutCubic,
+                height: 34,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color:
+                      _submitting ? kCobalt.withValues(alpha: 0.58) : kCobalt,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: _submitting
+                      ? null
+                      : [
+                          BoxShadow(
+                            color: kCobalt.withValues(alpha: 0.16),
+                            blurRadius: 14,
+                            offset: const Offset(0, 7),
+                          ),
+                        ],
+                ),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 140),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeOutCubic,
+                  child: Text(
+                    _submitting ? '发布中' : '发布',
+                    key: ValueKey(_submitting),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                ),
               ),
             ),
-            child: Text(_submitting ? '发布中' : '发布'),
           ),
         ],
       ),
@@ -243,11 +274,27 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
                 cursorColor: kCobalt,
                 decoration: InputDecoration(
                   hintText: '分享你的申请背景、作品集进度和目前最卡住的地方...',
-                  filled: false,
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  contentPadding: EdgeInsets.zero,
+                  filled: true,
+                  fillColor: context.artC.cardIconBg.withValues(alpha: 0.76),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(
+                      color: context.artC.silver.withValues(alpha: 0.24),
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(
+                      color: context.artC.silver.withValues(alpha: 0.24),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(
+                      color: kCobalt.withValues(alpha: 0.28),
+                    ),
+                  ),
+                  contentPadding: const EdgeInsets.all(14),
                   hintStyle: TextStyle(
                     color: context.artC.ink.withValues(alpha: 0.30),
                     fontSize: 15,
@@ -283,44 +330,117 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
               ),
             ),
             const SizedBox(height: 34),
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '匿名提问',
-                        style: TextStyle(
-                          color: context.artC.ink,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '其他用户不会看到你的昵称和头像。',
-                        style: TextStyle(
-                          color: context.artC.ink.withValues(alpha: 0.42),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0,
-                        ),
-                      ),
-                    ],
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOutCubic,
+              padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+              decoration: BoxDecoration(
+                color: _anonymous
+                    ? kCobalt.withValues(alpha: 0.06)
+                    : context.artC.cardIconBg.withValues(alpha: 0.78),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: _anonymous
+                      ? kCobalt.withValues(alpha: 0.18)
+                      : context.artC.silver.withValues(alpha: 0.24),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _anonymous
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                    size: 20,
+                    color: _anonymous
+                        ? kCobalt
+                        : context.artC.ink.withValues(alpha: 0.48),
                   ),
-                ),
-                Switch(
-                  value: _anonymous,
-                  activeThumbColor: kCobalt,
-                  activeTrackColor: kCobalt.withValues(alpha: 0.18),
-                  onChanged: (value) => setState(() => _anonymous = value),
-                ),
-              ],
+                  const SizedBox(width: 11),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '匿名提问',
+                          style: TextStyle(
+                            color: context.artC.ink,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0,
+                            height: 1.1,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          '其他用户不会看到你的昵称和头像。',
+                          style: TextStyle(
+                            color: context.artC.ink.withValues(alpha: 0.42),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: _anonymous,
+                    activeThumbColor: kCobalt,
+                    activeTrackColor: kCobalt.withValues(alpha: 0.18),
+                    inactiveThumbColor:
+                        context.artC.ink.withValues(alpha: 0.34),
+                    inactiveTrackColor: context.artC.silver.withValues(
+                      alpha: 0.36,
+                    ),
+                    onChanged: (value) => setState(() => _anonymous = value),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _AskPressable extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final double pressedScale;
+
+  const _AskPressable({
+    required this.child,
+    required this.onTap,
+    this.pressedScale = 0.97,
+  });
+
+  @override
+  State<_AskPressable> createState() => _AskPressableState();
+}
+
+class _AskPressableState extends State<_AskPressable> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value || widget.onTap == null) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onTap,
+      onTapDown: (_) => _setPressed(true),
+      onTapCancel: () => _setPressed(false),
+      onTapUp: (_) => _setPressed(false),
+      child: AnimatedScale(
+        scale: _pressed ? widget.pressedScale : 1,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOutCubic,
+        child: widget.child,
       ),
     );
   }
@@ -344,7 +464,7 @@ class _QuestionSection extends StatelessWidget {
           title,
           style: TextStyle(
             color: context.artC.ink,
-            fontSize: 17,
+            fontSize: 13,
             fontWeight: FontWeight.w900,
             height: 1.1,
             letterSpacing: 0,
@@ -370,24 +490,31 @@ class _QuestionCategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return _AskPressable(
       onTap: onTap,
-      child: Container(
+      pressedScale: 0.97,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         decoration: BoxDecoration(
           color: selected
-              ? context.artC.ink.withValues(alpha: 0.055)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(999),
+              ? kCobalt.withValues(alpha: 0.08)
+              : context.artC.cardIconBg.withValues(alpha: 0.78),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected
+                ? kCobalt.withValues(alpha: 0.22)
+                : context.artC.silver.withValues(alpha: 0.24),
+          ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: selected
-                ? context.artC.ink
-                : context.artC.ink.withValues(alpha: 0.28),
+            color:
+                selected ? kCobalt : context.artC.ink.withValues(alpha: 0.52),
             fontSize: 13,
-            fontWeight: selected ? FontWeight.w900 : FontWeight.w600,
+            fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
             letterSpacing: 0,
           ),
         ),
@@ -412,18 +539,28 @@ class _QuietInputLine extends StatelessWidget {
       cursorColor: kCobalt,
       decoration: InputDecoration(
         hintText: hint,
-        filled: false,
+        filled: true,
+        fillColor: context.artC.cardIconBg.withValues(alpha: 0.76),
         isDense: true,
-        contentPadding: const EdgeInsets.fromLTRB(0, 8, 0, 11),
-        enabledBorder: UnderlineInputBorder(
+        contentPadding: const EdgeInsets.fromLTRB(13, 12, 13, 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(
-            color: context.artC.ink.withValues(alpha: 0.10),
+            color: context.artC.silver.withValues(alpha: 0.24),
             width: 1,
           ),
         ),
-        focusedBorder: UnderlineInputBorder(
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(
-            color: context.artC.ink.withValues(alpha: 0.22),
+            color: context.artC.silver.withValues(alpha: 0.24),
+            width: 1,
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(
+            color: kCobalt.withValues(alpha: 0.28),
             width: 1,
           ),
         ),

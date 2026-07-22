@@ -40,7 +40,7 @@ class _ArtInterestOnboardingScreenState
   final TextEditingController _businessIntroCtrl = TextEditingController();
 
   static const _businessReviewGoal = 'business_draft';
-  static const _businessCredentialMaterial = '营业执照或机构证明';
+  static const _businessCredentialMaterial = '营业执照或组织证明';
 
   static const _cities = [
     '北京',
@@ -93,7 +93,7 @@ class _ArtInterestOnboardingScreenState
     _Choice(
       id: 'business',
       title: '机构',
-      subtitle: '先创建机构草稿，资料后续补齐',
+      subtitle: '画廊、美术馆、协会、品牌合作',
       icon: Icons.storefront_outlined,
     ),
   ];
@@ -165,17 +165,21 @@ class _ArtInterestOnboardingScreenState
 
   List<_Choice> get _businessTypeChoices => const [
         _Choice(
-            id: 'study_abroad_agency',
-            title: '艺术留学机构',
+            id: 'gallery_exhibition',
+            title: '画廊 / 美术馆 / 展览机构',
+            icon: Icons.museum_outlined),
+        _Choice(
+            id: 'official_association',
+            title: '官方协会 / 行业组织',
+            icon: Icons.verified_outlined),
+        _Choice(
+            id: 'school_official',
+            title: '院校官方 / 招生部门',
             icon: Icons.school_outlined),
         _Choice(
-            id: 'portfolio_training',
-            title: '艺术培训 / 作品集机构',
-            icon: Icons.palette_outlined),
-        _Choice(
-            id: 'gallery_exhibition',
-            title: '画廊 / 展览机构',
-            icon: Icons.museum_outlined),
+            id: 'official_partner',
+            title: '官方合作组织',
+            icon: Icons.handshake_outlined),
         _Choice(
             id: 'event_organizer',
             title: '艺术活动主办方',

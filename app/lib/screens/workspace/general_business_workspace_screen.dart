@@ -659,6 +659,9 @@ String _text(Object? value, {String fallback = ''}) {
 
 String _roleLabel(String? role) {
   return switch (role) {
+    'official_association' => '官方协会',
+    'school_official' => '院校官方',
+    'official_partner' => '官方合作组织',
     'event_organizer' => '活动机构',
     'hotel_culture_space' => '文旅空间',
     'brand_partner' => '品牌合作方',

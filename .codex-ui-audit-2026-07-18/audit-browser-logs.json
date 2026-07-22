@@ -1,0 +1,44 @@
+[
+  {
+    "level": "warn",
+    "message": "Failed to load font Noto Serif SC at assets/assets/fonts/NotoSerifSC-Regular.otf",
+    "timestamp": "2026-07-18T22:57:31.363Z",
+    "url": "http://127.0.0.1:7331/dart_sdk.js"
+  },
+  {
+    "level": "warn",
+    "message": "Verify that assets/assets/fonts/NotoSerifSC-Regular.otf contains a valid font.",
+    "timestamp": "2026-07-18T22:57:31.364Z",
+    "url": "http://127.0.0.1:7331/dart_sdk.js"
+  },
+  {
+    "level": "warn",
+    "message": "Failed to load font Noto Serif SC at assets/assets/fonts/NotoSerifSC-SemiBold.otf",
+    "timestamp": "2026-07-18T22:57:31.364Z",
+    "url": "http://127.0.0.1:7331/dart_sdk.js"
+  },
+  {
+    "level": "warn",
+    "message": "Verify that assets/assets/fonts/NotoSerifSC-SemiBold.otf contains a valid font.",
+    "timestamp": "2026-07-18T22:57:31.364Z",
+    "url": "http://127.0.0.1:7331/dart_sdk.js"
+  },
+  {
+    "level": "warn",
+    "message": "Failed to load font Noto Serif SC at assets/assets/fonts/NotoSerifSC-Bold.otf",
+    "timestamp": "2026-07-18T22:57:31.364Z",
+    "url": "http://127.0.0.1:7331/dart_sdk.js"
+  },
+  {
+    "level": "warn",
+    "message": "Verify that assets/assets/fonts/NotoSerifSC-Bold.otf contains a valid font.",
+    "timestamp": "2026-07-18T22:57:31.364Z",
+    "url": "http://127.0.0.1:7331/dart_sdk.js"
+  },
+  {
+    "level": "error",
+    "message": "══╡ EXCEPTION CAUGHT BY RENDERING LIBRARY ╞═════════════════════════════════════════════════════════\nThe following assertion was thrown during layout:\nA RenderFlex overflowed by 9.0 pixels on the right.\n\nThe relevant error-causing widget was:\n  Row Row:file:///Users/tom/Desktop/artsee/app/lib/screens/home/home_screen.dart:9220:11\n\nThe overflowing RenderFlex has an orientation of Axis.horizontal.\nThe edge of the RenderFlex that is overflowing has been marked in the rendering with a yellow and\nblack striped pattern. This is usually caused by the contents being too big for the RenderFlex.\nConsider applying a flex factor (e.g. using an Expanded widget) to force the children of the\nRenderFlex to fit within the available space instead of being sized to their natural size.\nThis is considered an error condition because it indicates that there is content that cannot be\nseen. If the content is legitimately bigger than the available space, consider clipping it with a\nClipRect widget before putting it in the flex, or using a scrollable container rather than a Flex,\nlike a ListView.\nThe specific RenderFlex in question is: RenderFlex#6bf37 relayoutBoundary=up22 OVERFLOWING:\n  creator: Row ← Column ← Padding ← DecoratedBox ← Container ← _PlazaTopicReplyActions ← Column ←\n    Padding ← _SingleChildViewport ← IgnorePointer-[GlobalKey#bfe8f] ← Semantics ← Listener ← ⋯\n  parentData: offset=Offset(0.0, 0.0); flex=null; fit=null (can use size)\n  constraints: BoxConstraints(w=339.0, 0.0<=h<=Infinity)\n  size: Size(339.0, 34.0)\n  direction: horizontal\n  mainAxisAlignment: start\n  mainAxisSize: max\n  crossAxisAlignment: center\n  textDirection: ltr\n  verticalDirection: down\n  spacing: 0.0\n◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤\n════════════════════════════════════════════════════════════════════════════════════════════════════",
+    "timestamp": "2026-07-18T22:58:31.576Z",
+    "url": "http://127.0.0.1:7331/packages/flutter/src/foundation/_error_dumper_web.dart.lib.js"
+  }
+]

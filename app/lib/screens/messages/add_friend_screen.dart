@@ -1512,7 +1512,10 @@ String _candidateRoleLabel(Map<String, dynamic> candidate) {
     'personal' => '个人用户',
     'business' => '机构',
     'institution' => '机构',
-    'study_abroad_agency' => '艺术留学机构',
+    'official_association' => '官方协会',
+    'school_official' => '院校官方',
+    'official_partner' => '官方合作组织',
+    'study_abroad_agency' => '留学服务（已下线）',
     _ => 'Artsee 用户',
   };
 }

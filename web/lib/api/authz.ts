@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import type { User } from "@supabase/supabase-js";
 import { isAdminRole } from "./admin-roles";
 import { getUserFromBearer } from "./auth-user";
+import { isRetiredCommercialAgencyType } from "./organization-visibility";
 import { createServiceClient } from "./supabase-service";
 
 export type AuthzProfile = {
@@ -24,8 +25,9 @@ export type AuthzResult =
     };
 
 const BUSINESS_USER_ROLES = new Set([
-  "study_abroad_agency",
-  "portfolio_training",
+  "official_association",
+  "official_partner",
+  "school_official",
   "gallery_exhibition",
   "event_organizer",
   "hotel_culture_space",
@@ -137,6 +139,16 @@ export async function requireOrgMember(
 
   if (error) return serverError(error.message);
   if (!data) return forbidden("需要机构成员权限");
+
+  const { data: organization, error: organizationError } = await supabase
+    .from("organizations")
+    .select("id,type")
+    .eq("id", organizationId)
+    .maybeSingle();
+  if (organizationError) return serverError(organizationError.message);
+  if (isRetiredCommercialAgencyType(organization?.type)) {
+    return forbidden("该机构类型已下线");
+  }
   return auth;
 }
 
@@ -148,10 +160,13 @@ export async function requireBusinessPublisher(
   if (isAdminProfile(auth.profile)) return auth;
 
   const profile = auth.profile;
+  const hasRetiredProfileRole =
+    isRetiredCommercialAgencyType(profile?.user_role) ||
+    isRetiredCommercialAgencyType(profile?.role);
   if (
-    profile?.user_type === "business" ||
-    BUSINESS_USER_ROLES.has(profile?.user_role ?? "") ||
-    BUSINESS_USER_ROLES.has(profile?.role ?? "")
+    !hasRetiredProfileRole &&
+    (BUSINESS_USER_ROLES.has(profile?.user_role ?? "") ||
+      BUSINESS_USER_ROLES.has(profile?.role ?? ""))
   ) {
     return auth;
   }
@@ -159,11 +174,36 @@ export async function requireBusinessPublisher(
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("organization_members")
-    .select("id")
+    .select("id,organization_id")
     .eq("user_id", auth.user.id)
     .eq("status", "active")
-    .limit(1);
+    .limit(20);
   if (error) return serverError(error.message);
-  if ((data ?? []).length > 0) return auth;
+  const organizationIds = uniqueStrings(
+    ((data ?? []) as Record<string, unknown>[]).map((row) =>
+      typeof row.organization_id === "string" ? row.organization_id : null
+    )
+  );
+  if (organizationIds.length > 0) {
+    const { data: organizations, error: organizationError } = await supabase
+      .from("organizations")
+      .select("id,type")
+      .in("id", organizationIds)
+      .limit(organizationIds.length);
+    if (organizationError) return serverError(organizationError.message);
+    if (
+      ((organizations ?? []) as Record<string, unknown>[]).some(
+        (row) => !isRetiredCommercialAgencyType(row.type)
+      )
+    ) {
+      return auth;
+    }
+  }
   return forbidden("需要机构或商家权限");
+}
+
+function uniqueStrings(values: Array<string | null | undefined>) {
+  return Array.from(
+    new Set(values.filter((value): value is string => typeof value === "string" && value.length > 0))
+  );
 }

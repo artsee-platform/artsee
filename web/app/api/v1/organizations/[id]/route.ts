@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromBearer } from "@/lib/api/auth-user";
 import { getUserMembership } from "@/lib/api/membership";
-import { effectiveOrganizationSubscriptionStatus } from "@/lib/api/organization-subscription";
+import { isPublicOfficialOrganization } from "@/lib/api/organization-visibility";
 import { createServiceClient } from "@/lib/api/supabase-service";
 import {
   errorResponse,
@@ -14,7 +14,6 @@ type Row = Record<string, unknown>;
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
 function cleanText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -118,9 +117,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
       return errorResponse(error);
     }
     if (!data) return notFoundResponse();
-    if (effectiveOrganizationSubscriptionStatus(data as Row) !== "active") {
-      return notFoundResponse();
-    }
+    if (!isPublicOfficialOrganization(data as Row)) return notFoundResponse();
 
     const { data: reviewsData, error: reviewsError } = await supabase
       .from("consultation_reviews")

@@ -165,8 +165,8 @@ function resetDb() {
     {
       id: ORG_ID,
       owner_user_id: OWNER_ID,
-      name: "艺见留学",
-      type: "study_abroad_agency",
+      name: "艺见美术馆",
+      type: "gallery_exhibition",
       status: "active",
       subscription_status: "active",
       subscription_expires_at: "2099-01-01T00:00:00.000Z",
@@ -214,7 +214,7 @@ describe("conversations API", () => {
     expect(res.status).toBe(200);
     expect(db.conversations[0]).toMatchObject({
       type: "organization",
-      title: "艺见留学",
+      title: "艺见美术馆",
     });
     expect(db.conversations[0].metadata).toMatchObject({
       group_kind: "student_organization",
@@ -241,7 +241,7 @@ describe("conversations API", () => {
       {
         id: "conv-existing",
         type: "organization",
-        title: "艺见留学",
+        title: "艺见美术馆",
         created_by: STUDENT_ID,
         metadata: { organization_id: ORG_ID, student_user_id: STUDENT_ID },
       },

@@ -68,14 +68,14 @@ function resetDb() {
     {
       id: "org-active",
       status: "active",
-      type: "study_abroad_agency",
+      type: "gallery_exhibition",
       subscription_status: "active",
       subscription_expires_at: "2099-01-01T00:00:00.000Z",
     },
     {
       id: "org-expired",
       status: "active",
-      type: "portfolio_training",
+      type: "official_association",
       subscription_status: "active",
       subscription_expires_at: "2020-01-01T00:00:00.000Z",
     },

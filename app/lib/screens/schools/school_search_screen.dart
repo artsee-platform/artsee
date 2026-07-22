@@ -199,15 +199,26 @@ class _SchoolSearchScreenState extends State<SchoolSearchScreen> {
                 ),
               ),
             ),
-            TextButton(
-              onPressed: _applyKeyword,
-              style: TextButton.styleFrom(
-                foregroundColor: kCobalt,
-                visualDensity: VisualDensity.compact,
-              ),
-              child: const Text(
-                '应用到院校页',
-                style: TextStyle(fontWeight: FontWeight.w900),
+            _SearchPressable(
+              onTap: _applyKeyword,
+              pressedScale: 0.96,
+              child: Container(
+                height: 32,
+                padding: const EdgeInsets.symmetric(horizontal: 11),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: kCobalt.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: kCobalt.withValues(alpha: 0.18)),
+                ),
+                child: const Text(
+                  '应用到院校页',
+                  style: TextStyle(
+                    color: kCobalt,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               ),
             ),
           ],
@@ -223,6 +234,47 @@ class _SchoolSearchScreenState extends State<SchoolSearchScreen> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _SearchPressable extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final double pressedScale;
+
+  const _SearchPressable({
+    required this.child,
+    required this.onTap,
+    this.pressedScale = 0.97,
+  });
+
+  @override
+  State<_SearchPressable> createState() => _SearchPressableState();
+}
+
+class _SearchPressableState extends State<_SearchPressable> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value || widget.onTap == null) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onTap,
+      onTapDown: (_) => _setPressed(true),
+      onTapCancel: () => _setPressed(false),
+      onTapUp: (_) => _setPressed(false),
+      child: AnimatedScale(
+        scale: _pressed ? widget.pressedScale : 1,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOutCubic,
+        child: widget.child,
+      ),
     );
   }
 }
@@ -264,11 +316,14 @@ class _SearchHeader extends StatelessWidget {
           ),
           Expanded(
             child: Container(
-              height: 40,
+              height: 42,
               padding: const EdgeInsets.only(left: 13, right: 4),
               decoration: BoxDecoration(
-                color: context.artC.silver.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(999),
+                color: context.artC.cardIconBg.withValues(alpha: 0.8),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: context.artC.silver.withValues(alpha: 0.28),
+                ),
               ),
               child: Row(
                 children: [
@@ -304,8 +359,7 @@ class _SearchHeader extends StatelessWidget {
                       if (value.text.isEmpty) {
                         return const SizedBox(width: 2);
                       }
-                      return GestureDetector(
-                        behavior: HitTestBehavior.opaque,
+                      return _SearchPressable(
                         onTap: () {
                           controller.clear();
                           focusNode.requestFocus();
@@ -327,19 +381,41 @@ class _SearchHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          TextButton(
-            onPressed: loading ? null : () => onSubmit(controller.text),
-            style: TextButton.styleFrom(
-              foregroundColor: kCobalt,
-              disabledForegroundColor: kCobalt.withValues(alpha: 0.36),
-              visualDensity: VisualDensity.compact,
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-            ),
-            child: Text(
-              loading ? '搜索中' : '搜索',
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
+          _SearchPressable(
+            onTap: loading ? null : () => onSubmit(controller.text),
+            pressedScale: 0.95,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOutCubic,
+              height: 42,
+              padding: const EdgeInsets.symmetric(horizontal: 13),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: loading ? kCobalt.withValues(alpha: 0.52) : kCobalt,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: loading
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: kCobalt.withValues(alpha: 0.14),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+              ),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 140),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeOutCubic,
+                child: Text(
+                  loading ? '搜索中' : '搜索',
+                  key: ValueKey(loading),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               ),
             ),
           ),
@@ -360,27 +436,26 @@ class _QuickKeywordChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-          decoration: BoxDecoration(
-            color: context.artC.cardIconBg,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: context.artC.silver.withValues(alpha: 0.34),
-            ),
+    return _SearchPressable(
+      onTap: onTap,
+      pressedScale: 0.96,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+        decoration: BoxDecoration(
+          color: context.artC.cardIconBg.withValues(alpha: 0.82),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: context.artC.silver.withValues(alpha: 0.28),
           ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: context.artC.ink.withValues(alpha: 0.7),
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: context.artC.ink.withValues(alpha: 0.7),
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
           ),
         ),
       ),
@@ -407,114 +482,113 @@ class _SchoolSearchResultCard extends StatelessWidget {
     final schoolType = _schoolTypeLabel(_stringValue(item['school_type']));
     final initial = nameZh.isEmpty ? '?' : nameZh.substring(0, 1);
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Ink(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: context.artC.cardIconBg,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: context.artC.silver.withValues(alpha: 0.32),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: context.artC.ink.withValues(alpha: 0.035),
-                blurRadius: 12,
-                offset: const Offset(0, 5),
-              ),
-            ],
+    return _SearchPressable(
+      onTap: onTap,
+      pressedScale: 0.985,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: context.artC.cardIconBg.withValues(alpha: 0.84),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: context.artC.silver.withValues(alpha: 0.26),
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: kCobalt.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Text(
-                  initial,
-                  style: const TextStyle(
-                    color: kCobalt,
-                    fontSize: 21,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0,
-                  ),
+          boxShadow: [
+            BoxShadow(
+              color: context.artC.ink.withValues(alpha: 0.02),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: kCobalt.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                initial,
+                style: const TextStyle(
+                  color: kCobalt,
+                  fontSize: 21,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      nameZh,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: context.artC.ink,
-                        fontSize: 15.5,
-                        fontWeight: FontWeight.w900,
-                      ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    nameZh,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: context.artC.ink,
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w900,
                     ),
-                    if (nameEn != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        nameEn,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: context.artC.ink.withValues(alpha: 0.38),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 7),
+                  ),
+                  if (nameEn != null) ...[
+                    const SizedBox(height: 2),
                     Text(
-                      [
-                        if (city != null) city,
-                        if (country != null) country,
-                        schoolType,
-                      ].join(' · '),
+                      nameEn,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: context.artC.ink.withValues(alpha: 0.48),
-                        fontSize: 11.5,
+                        color: context.artC.ink.withValues(alpha: 0.38),
+                        fontSize: 11,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
+                  const SizedBox(height: 7),
                   Text(
-                    rank == null ? 'QS -' : 'QS #$rank',
-                    style: const TextStyle(
-                      color: kCobalt,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
+                    [
+                      if (city != null) city,
+                      if (country != null) country,
+                      schoolType,
+                    ].join(' · '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: context.artC.ink.withValues(alpha: 0.48),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: context.artC.ink.withValues(alpha: 0.28),
                   ),
                 ],
               ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  rank == null ? 'QS -' : 'QS #$rank',
+                  style: const TextStyle(
+                    color: kCobalt,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: context.artC.ink.withValues(alpha: 0.28),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -567,12 +641,31 @@ class _SearchStateView extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 14),
-            TextButton(
-              onPressed: onAction,
-              style: TextButton.styleFrom(foregroundColor: kCobalt),
-              child: Text(
-                actionLabel,
-                style: const TextStyle(fontWeight: FontWeight.w900),
+            _SearchPressable(
+              onTap: onAction,
+              pressedScale: 0.95,
+              child: Container(
+                height: 38,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: kCobalt,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: kCobalt.withValues(alpha: 0.14),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  actionLabel,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               ),
             ),
           ],

@@ -14,28 +14,71 @@ void main() {
       expect(workspaceSurfaceForProfile(profile), 'school');
     });
 
-    test('只有 business 类型的用户进入通用工作台', () {
+    test('只有 business 类型但没有机构角色或成员关系时不进入工作台', () {
       final profile = {
         'user_type': 'business',
       };
 
-      expect(usesWorkspaceTabForProfile(profile), isTrue);
+      expect(usesWorkspaceTabForProfile(profile), isFalse);
       expect(workspaceRoleForProfile(profile), 'business');
-      expect(workspaceSurfaceForProfile(profile), 'general_business_workspace');
+      expect(workspaceSurfaceForProfile(profile), 'school');
     });
 
-    test('艺术留学机构进入机构工作台', () {
+    test('艺术留学机构不再进入机构后台', () {
       final profile = {
         'user_type': 'business',
         'user_role': 'study_abroad_agency',
       };
 
-      expect(usesWorkspaceTabForProfile(profile), isTrue);
+      expect(usesWorkspaceTabForProfile(profile), isFalse);
       expect(workspaceRoleForProfile(profile), 'study_abroad_agency');
-      expect(workspaceSurfaceForProfile(profile), 'institution_workspace');
+      expect(workspaceSurfaceForProfile(profile), 'school');
       expect(
         mainNavigationLabelsForProfile(profile),
-        ['工作台', '发现', '消息', '我的'],
+        ['院校', '发现', '消息', '我的'],
+      );
+    });
+
+    test('官方协会进入通用机构工作台', () {
+      final profile = {
+        'user_type': 'business',
+        'user_role': 'official_association',
+      };
+
+      expect(usesWorkspaceTabForProfile(profile), isTrue);
+      expect(workspaceRoleForProfile(profile), 'official_association');
+      expect(workspaceSurfaceForProfile(profile), 'general_business_workspace');
+    });
+
+    test('作品集机构不再进入机构后台', () {
+      final profile = {
+        'user_type': 'business',
+        'user_role': 'portfolio_training',
+      };
+
+      expect(usesWorkspaceTabForProfile(profile), isFalse);
+      expect(workspaceSurfaceForProfile(profile), 'school');
+    });
+
+    test('旧留学角色加入有效机构后仍可进入机构工作台', () {
+      final profile = {
+        'user_type': 'business',
+        'user_role': 'study_abroad_agency',
+      };
+
+      expect(
+        usesWorkspaceTabForProfile(
+          profile,
+          hasOrganizationMembership: true,
+        ),
+        isTrue,
+      );
+      expect(
+        workspaceSurfaceForProfile(
+          profile,
+          hasOrganizationMembership: true,
+        ),
+        'general_business_workspace',
       );
     });
 

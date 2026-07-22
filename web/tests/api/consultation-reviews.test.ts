@@ -30,7 +30,7 @@ function resetDb() {
   db.organizations = [
     {
       id: ORG_ID,
-      name: "艺见留学",
+      name: "艺见美术馆",
       owner_user_id: OWNER_ID,
       status: "active",
       rating: 0,

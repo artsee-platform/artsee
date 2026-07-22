@@ -48,7 +48,8 @@ function resetDb() {
   db.organizations = [
     {
       id: ORG_ID,
-      name: "艺见留学",
+      name: "艺见美术馆",
+      type: "gallery_exhibition",
       status: "active",
       subscription_status: "inactive",
       subscription_expires_at: null,
@@ -179,6 +180,15 @@ describe("POST /api/v1/me/organizations/:id/subscription/upgrade", () => {
     const body = await res.json();
     expect(res.status).toBe(503);
     expect(body.error).toContain("ORG_SUBSCRIPTION_YEARLY_AMOUNT_TOTAL");
+  });
+
+  it("blocks retired study-abroad agency subscription upgrades", async () => {
+    db.organizations[0].type = "study_abroad_agency";
+    process.env.ORG_SUBSCRIPTION_YEARLY_AMOUNT_TOTAL = "198000";
+    const res = await upgradeOrganizationSubscription(req("owner"), ctx());
+    const body = await res.json();
+    expect(res.status).toBe(403);
+    expect(body.error).toBe("该机构类型已下线");
   });
 
   it("creates an organization subscription checkout order", async () => {

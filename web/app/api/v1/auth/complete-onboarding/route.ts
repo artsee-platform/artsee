@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromBearer } from "@/lib/api/auth-user";
+import { isRetiredCommercialAgencyType } from "@/lib/api/organization-visibility";
 import { createServiceClient } from "@/lib/api/supabase-service";
 
 type Row = Record<string, unknown>;
 type SupabaseServiceClient = ReturnType<typeof createServiceClient>;
 
 const BUSINESS_ROLES = new Set([
-  "study_abroad_agency",
-  "portfolio_training",
+  "official_association",
+  "official_partner",
+  "school_official",
   "gallery_exhibition",
   "event_organizer",
   "hotel_culture_space",
@@ -218,6 +220,12 @@ export async function POST(req: NextRequest) {
 
     const interestedCategories = toStringArray(body.interestedCategories ?? body.interested_categories);
     const userRole = toOptionalString(body.userRole ?? body.user_role);
+    if (isRetiredCommercialAgencyType(userRole)) {
+      return NextResponse.json(
+        { success: false, error: "该机构类型已下线，请选择画廊、美术馆、协会或其他机构类型" },
+        { status: 400 }
+      );
+    }
     const userType = toOptionalString(body.userType ?? body.user_type ?? userRole);
     const primaryGoal = toOptionalString(body.primaryGoal ?? body.primary_goal);
     const currentStage = toOptionalString(body.currentStage ?? body.current_stage);
@@ -231,13 +239,14 @@ export async function POST(req: NextRequest) {
     const businessMaterials =
       toStringArray(body.businessMaterials ?? body.business_materials).length > 0
         ? toStringArray(body.businessMaterials ?? body.business_materials)
-        : targetMajors.filter((item) => !/^(机构名称|联系人|渠道|简介)：/u.test(item));
+        : targetMajors.filter((item) => !/^(机构名称|组织名称|联系人|渠道|简介)：/u.test(item));
     const businessProofFiles = toStringArray(
       body.businessProofFiles ?? body.business_proof_files
     );
     const businessName =
       toOptionalString(body.businessName ?? body.business_name) ??
-      firstLabeledValue(targetMajors, "机构名称");
+      firstLabeledValue(targetMajors, "机构名称") ??
+      firstLabeledValue(targetMajors, "组织名称");
     const businessContact =
       toOptionalString(body.businessContact ?? body.business_contact) ??
       firstLabeledValue(targetMajors, "联系人");

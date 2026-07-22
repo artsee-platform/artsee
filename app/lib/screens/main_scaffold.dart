@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../widgets/common.dart';
-import 'auth/login_screen.dart';
 import 'create/create_post_screen.dart';
 import 'home/home_screen.dart';
 import 'news/news_scaffold.dart';
@@ -19,6 +18,7 @@ import '../services/backend_api_service.dart';
 import '../utils/auth_gate.dart';
 import '../utils/submission_review_feedback.dart';
 import 'package:artsee_app/theme/artsee_ui_colors.dart';
+import '../widgets/deep_sea_ui.dart';
 
 /// ═══════════════════════════════════════════════════════════════
 /// artiqore 艺见心 — App 总入口
@@ -26,8 +26,9 @@ import 'package:artsee_app/theme/artsee_ui_colors.dart';
 /// ═══════════════════════════════════════════════════════════════
 
 const _workspaceBusinessRoles = {
-  'study_abroad_agency',
-  'portfolio_training',
+  'official_association',
+  'official_partner',
+  'school_official',
   'gallery_exhibition',
   'event_organizer',
   'hotel_culture_space',
@@ -40,11 +41,14 @@ const _workspaceBusinessRoles = {
 };
 
 const _institutionWorkspaceRoles = {
-  'study_abroad_agency',
-  'portfolio_training',
   'institution',
   'institution_user',
   'advisor',
+};
+
+const _retiredAgencyRoles = {
+  'study_abroad_agency',
+  'portfolio_training',
 };
 
 String _profileString(Map<String, dynamic>? profile, String key) {
@@ -58,12 +62,15 @@ bool usesWorkspaceTabForProfile(
   final userType = _profileString(profile, 'user_type');
   final userRole = _profileString(profile, 'user_role');
   final systemRole = _profileString(profile, 'role');
-  return userType == 'business' ||
-      userType == 'institution' ||
-      hasOrganizationMembership ||
-      _workspaceBusinessRoles.contains(userRole) ||
+  if (_retiredAgencyRoles.contains(userRole) && !hasOrganizationMembership) {
+    return false;
+  }
+  final hasCurrentWorkspaceRole = _workspaceBusinessRoles.contains(userRole) ||
       systemRole == 'institution_user' ||
       systemRole == 'advisor';
+  return userType == 'institution' ||
+      hasOrganizationMembership ||
+      hasCurrentWorkspaceRole;
 }
 
 String workspaceRoleForProfile(Map<String, dynamic>? profile) {
@@ -235,8 +242,8 @@ class _MainScaffoldState extends State<MainScaffold> {
       : const [
           _NavItem(
             tabIndex: 1,
-            icon: Icons.school_outlined,
-            activeIcon: Icons.school_rounded,
+            icon: Icons.home_outlined,
+            activeIcon: Icons.home_rounded,
             label: '院校',
           ),
           _NavItem(
@@ -247,7 +254,7 @@ class _MainScaffoldState extends State<MainScaffold> {
           ),
           _NavItem(
             tabIndex: 3,
-            icon: Icons.chat_bubble_outline,
+            icon: Icons.chat_bubble_outline_rounded,
             activeIcon: Icons.chat_bubble_rounded,
             label: '消息',
           ),
@@ -1704,7 +1711,7 @@ class _MainScaffoldState extends State<MainScaffold> {
             curve: Curves.easeOutCubic,
             left: 0,
             right: 0,
-            bottom: hideFloatingNav ? -96 : 0,
+            bottom: hideFloatingNav ? -88 : 0,
             child: IgnorePointer(
               ignoring: hideFloatingNav,
               child: AnimatedOpacity(
@@ -1719,7 +1726,7 @@ class _MainScaffoldState extends State<MainScaffold> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                           child: Center(child: _buildFloatingNav()),
                         ),
                       ],
@@ -1738,30 +1745,20 @@ class _MainScaffoldState extends State<MainScaffold> {
     final leadingItems = _navItems.take(2);
     final trailingItems = _navItems.skip(2);
 
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 430),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: context.artC.cardIconBg.withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.72)),
-        boxShadow: [
-          BoxShadow(
-            color: context.artC.ink.withValues(alpha: 0.075),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          ...leadingItems.map(_buildNavButtonSlot),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2),
-            child: _AiNavButton(onTap: _openDotChatRoute),
-          ),
-          ...trailingItems.map(_buildNavButtonSlot),
-        ],
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 330),
+      child: DeepSeaGlassPanel(
+        padding: const EdgeInsets.all(5),
+        radius: 32,
+        opacity: 0.48,
+        airy: true,
+        child: Row(
+          children: [
+            ...leadingItems.map(_buildNavButtonSlot),
+            Expanded(child: _AiNavButton(onTap: _openDotChatRoute)),
+            ...trailingItems.map(_buildNavButtonSlot),
+          ],
+        ),
       ),
     );
   }
@@ -1772,10 +1769,6 @@ class _MainScaffoldState extends State<MainScaffold> {
         item: item,
         isSelected: _currentIndex == item.tabIndex,
         onTap: () {
-          if (item.tabIndex == 4 && !SupabaseService.isLoggedIn) {
-            _openLoginOrProfile();
-            return;
-          }
           setState(() {
             _currentIndex = item.tabIndex;
             _homeNavHidden = false;
@@ -1785,17 +1778,6 @@ class _MainScaffoldState extends State<MainScaffold> {
         },
       ),
     );
-  }
-
-  Future<void> _openLoginOrProfile() async {
-    if (!SupabaseService.isLoggedIn) {
-      await Navigator.of(context).push<void>(
-        MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
-      );
-      _loadProfile();
-      return;
-    }
-    setState(() => _currentIndex = 4);
   }
 
   void _handleHeaderSearch(String keyword) {
@@ -1948,115 +1930,103 @@ class _TopHeaderState extends State<_TopHeader> {
       child: Row(
         children: [
           Expanded(
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              curve: Curves.easeOutCubic,
-              height: 46,
+            child: OpticalGlassSurface(
               padding: const EdgeInsets.only(left: 14, right: 6),
-              decoration: BoxDecoration(
-                color: context.artC.cardIconBg,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isFocused
-                      ? activeColor.withValues(alpha: 0.42)
-                      : context.artC.silver.withValues(alpha: 0.34),
-                  width: isFocused ? 1.2 : 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: (isFocused ? activeColor : context.artC.ink)
-                        .withValues(alpha: isFocused ? 0.08 : 0.03),
-                    blurRadius: isFocused ? 16 : 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.search_rounded,
-                    size: 19,
-                    color: activeColor.withValues(alpha: 0.88),
-                  ),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      focusNode: _focusNode,
-                      onSubmitted: _handleSubmit,
-                      cursorColor: activeColor,
-                      textInputAction: TextInputAction.search,
-                      maxLines: 1,
-                      textAlignVertical: TextAlignVertical.center,
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        height: 1.15,
-                        fontWeight: FontWeight.w800,
-                        color: context.artC.ink,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: widget.searchHint,
-                        hintStyle: TextStyle(
+              radius: 18,
+              surfaceOpacity: isFocused ? 0.22 : 0.17,
+              blurSigma: 14,
+              emphasized: isFocused,
+              child: SizedBox(
+                height: 46,
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.search_rounded,
+                      size: 19,
+                      color: isFocused
+                          ? kGlassAccent
+                          : kGlassInk.withValues(alpha: 0.64),
+                    ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        focusNode: _focusNode,
+                        onSubmitted: _handleSubmit,
+                        cursorColor: activeColor,
+                        textInputAction: TextInputAction.search,
+                        maxLines: 1,
+                        textAlignVertical: TextAlignVertical.center,
+                        style: TextStyle(
                           fontSize: 13.5,
                           height: 1.15,
-                          fontWeight: FontWeight.w700,
-                          color: context.artC.ink.withValues(alpha: 0.36),
+                          fontWeight: FontWeight.w800,
+                          color: context.artC.ink,
                         ),
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        disabledBorder: InputBorder.none,
-                        errorBorder: InputBorder.none,
-                        focusedErrorBorder: InputBorder.none,
-                        filled: false,
-                        isCollapsed: true,
-                        contentPadding: EdgeInsets.zero,
+                        decoration: InputDecoration(
+                          hintText: widget.searchHint,
+                          hintStyle: TextStyle(
+                            fontSize: 13.5,
+                            height: 1.15,
+                            fontWeight: FontWeight.w700,
+                            color: context.artC.ink.withValues(alpha: 0.36),
+                          ),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          disabledBorder: InputBorder.none,
+                          errorBorder: InputBorder.none,
+                          focusedErrorBorder: InputBorder.none,
+                          filled: false,
+                          isCollapsed: true,
+                          contentPadding: EdgeInsets.zero,
+                        ),
                       ),
                     ),
-                  ),
-                  ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: _searchController,
-                    builder: (context, value, _) {
-                      if (value.text.isEmpty) {
-                        return const SizedBox(width: 2);
-                      }
-                      return GestureDetector(
-                        onTap: _clearSearch,
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _searchController,
+                      builder: (context, value, _) {
+                        if (value.text.isEmpty) {
+                          return const SizedBox(width: 2);
+                        }
+                        return GestureDetector(
+                          onTap: _clearSearch,
+                          child: SizedBox(
+                            width: 30,
+                            height: 34,
+                            child: Icon(
+                              Icons.close_rounded,
+                              size: 17,
+                              color: context.artC.ink.withValues(alpha: 0.4),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    GestureDetector(
+                      onTap: () => _handleSubmit(_searchController.text),
+                      child: OpticalGlassSurface(
+                        padding: EdgeInsets.zero,
+                        radius: 12,
+                        surfaceOpacity: isFocused ? 0.23 : 0.15,
+                        blurSigma: 10,
+                        elevated: false,
+                        emphasized: isFocused,
                         child: SizedBox(
-                          width: 30,
+                          width: 34,
                           height: 34,
                           child: Icon(
-                            Icons.close_rounded,
-                            size: 17,
-                            color: context.artC.ink.withValues(alpha: 0.4),
+                            Icons.arrow_forward_rounded,
+                            size: 20,
+                            color: isFocused
+                                ? kGlassAccent
+                                : context.artC.ink.withValues(alpha: 0.5),
                           ),
                         ),
-                      );
-                    },
-                  ),
-                  GestureDetector(
-                    onTap: () => _handleSubmit(_searchController.text),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 160),
-                      curve: Curves.easeOutCubic,
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: isFocused
-                            ? activeColor
-                            : context.artC.silver.withValues(alpha: 0.34),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        Icons.arrow_forward_rounded,
-                        size: 20,
-                        color: isFocused
-                            ? Colors.white
-                            : context.artC.ink.withValues(alpha: 0.5),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -2064,29 +2034,31 @@ class _TopHeaderState extends State<_TopHeader> {
             const SizedBox(width: 8),
             GestureDetector(
               onTap: widget.onActionTap,
-              child: Container(
-                width: widget.actionLabel == null ? 40 : 58,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: context.artC.deepPanel,
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: widget.actionLabel == null
-                    ? Icon(
-                        widget.actionIcon,
-                        size: widget.showCreateIcon ? 21 : 18,
-                        color: Colors.white,
-                      )
-                    : Center(
-                        child: Text(
-                          widget.actionLabel!,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
+              child: OpticalGlassSurface(
+                padding: EdgeInsets.zero,
+                radius: 14,
+                surfaceOpacity: 0.2,
+                blurSigma: 12,
+                child: SizedBox(
+                  width: widget.actionLabel == null ? 40 : 58,
+                  height: 40,
+                  child: widget.actionLabel == null
+                      ? Icon(
+                          widget.actionIcon,
+                          size: widget.showCreateIcon ? 21 : 18,
+                          color: kGlassInk.withValues(alpha: 0.8),
+                        )
+                      : Center(
+                          child: Text(
+                            widget.actionLabel!,
+                            style: TextStyle(
+                              color: kGlassInk.withValues(alpha: 0.84),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
                         ),
-                      ),
+                ),
               ),
             ),
           ],
@@ -2433,62 +2405,71 @@ class _NavButtonState extends State<_NavButton> {
 
   @override
   Widget build(BuildContext context) {
-    final activeColor = Theme.of(context).brightness == Brightness.dark
-        ? kCobaltMuted
-        : kCobalt;
-    final inactiveColor = context.artC.ink.withValues(alpha: 0.42);
-    final itemColor = widget.isSelected ? activeColor : inactiveColor;
+    final itemColor = widget.isSelected
+        ? kDeepSeaMidnight
+        : kGlassInk.withValues(alpha: 0.56);
 
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) => setState(() => _pressed = false),
-      onTapCancel: () => setState(() => _pressed = false),
-      onTap: widget.onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Center(
-        child: AnimatedScale(
-          scale: _pressed ? 0.85 : 1.0,
-          duration: const Duration(milliseconds: 120),
-          curve: Curves.easeOutCubic,
-          child: SizedBox(
-            width: 52,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOutCubic,
-                  width: 30,
-                  height: 26,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: widget.isSelected
-                        ? activeColor.withValues(alpha: 0.1)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    widget.isSelected
-                        ? widget.item.activeIcon
-                        : widget.item.icon,
-                    size: 21,
-                    color: itemColor,
-                  ),
+    return Semantics(
+      button: true,
+      selected: widget.isSelected,
+      label: widget.item.label,
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
+        onTap: widget.onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Center(
+          child: AnimatedScale(
+            scale: _pressed ? 0.96 : 1.0,
+            duration: const Duration(milliseconds: 120),
+            curve: Curves.easeOutCubic,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeOutCubic,
+              layoutBuilder: (currentChild, previousChildren) => Stack(
+                alignment: Alignment.center,
+                children: [
+                  ...previousChildren,
+                  if (currentChild != null) currentChild
+                ],
+              ),
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: ScaleTransition(
+                  scale: Tween<double>(begin: 0.96, end: 1).animate(animation),
+                  child: child,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  widget.item.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.visible,
-                  style: TextStyle(
-                    color: itemColor,
-                    fontSize: 9,
-                    fontWeight:
-                        widget.isSelected ? FontWeight.w900 : FontWeight.w800,
-                    letterSpacing: 0,
-                  ),
-                ),
-              ],
+              ),
+              child: widget.isSelected
+                  ? OpticalGlassSurface(
+                      key: ValueKey('selected-${widget.item.tabIndex}'),
+                      padding: EdgeInsets.zero,
+                      radius: 22,
+                      surfaceOpacity: 0.18,
+                      blurSigma: 13,
+                      emphasized: true,
+                      child: SizedBox(
+                        width: 58,
+                        height: 50,
+                        child: Icon(
+                          widget.item.activeIcon,
+                          size: 21,
+                          color: itemColor,
+                        ),
+                      ),
+                    )
+                  : SizedBox(
+                      key: ValueKey('idle-${widget.item.tabIndex}'),
+                      width: 54,
+                      height: 50,
+                      child: Icon(
+                        widget.item.icon,
+                        size: 21,
+                        color: itemColor,
+                      ),
+                    ),
             ),
           ),
         ),
@@ -2511,8 +2492,6 @@ class _AiNavButtonState extends State<_AiNavButton> {
 
   @override
   Widget build(BuildContext context) {
-    const aiColor = kCobalt;
-
     return Semantics(
       button: true,
       label: 'AI 助手',
@@ -2522,44 +2501,39 @@ class _AiNavButtonState extends State<_AiNavButton> {
         onTapCancel: () => setState(() => _pressed = false),
         onTap: widget.onTap,
         behavior: HitTestBehavior.opaque,
-        child: AnimatedScale(
-          scale: _pressed ? 0.9 : 1,
-          duration: const Duration(milliseconds: 120),
-          curve: Curves.easeOutCubic,
-          child: Container(
-            width: 58,
-            height: 40,
-            decoration: BoxDecoration(
-              color: aiColor.withValues(alpha: 0.94),
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                  color: aiColor.withValues(alpha: 0.2),
-                  blurRadius: 12,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: const Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.auto_awesome_rounded,
-                  size: 17,
-                  color: Colors.white,
-                ),
-                SizedBox(height: 1),
-                Text(
+        child: Center(
+          child: AnimatedScale(
+            scale: _pressed ? 0.96 : 1,
+            duration: const Duration(milliseconds: 120),
+            curve: Curves.easeOutCubic,
+            child: const SizedBox(
+              width: 54,
+              height: 50,
+              child: Center(
+                child: Text(
                   'AI',
                   style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w900,
+                    color: kGlassInk,
+                    fontFamily: 'Didot',
+                    fontFamilyFallback: [
+                      'Bodoni 72',
+                      'Times New Roman',
+                      'serif',
+                    ],
+                    fontSize: 18,
+                    fontStyle: FontStyle.italic,
+                    fontWeight: FontWeight.w700,
                     letterSpacing: 0,
                     height: 1,
+                    shadows: [
+                      Shadow(
+                        color: Colors.white54,
+                        blurRadius: 6,
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         ),

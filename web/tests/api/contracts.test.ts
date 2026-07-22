@@ -41,8 +41,8 @@ function resetDb() {
   db.organizations = [
     {
       id: ORG_ID,
-      name: "艺见留学",
-      type: "study_abroad_agency",
+      name: "艺见美术馆",
+      type: "gallery_exhibition",
       status: "active",
       city: "上海",
       province: "上海",
@@ -51,8 +51,8 @@ function resetDb() {
     },
     {
       id: OTHER_ORG_ID,
-      name: "另一个机构",
-      type: "portfolio_training",
+      name: "另一个美术馆",
+      type: "official_association",
       status: "active",
       city: "北京",
       metadata: {},
@@ -274,7 +274,7 @@ describe("contracts API", () => {
     expect(res.status).toBe(200);
     expect(body.success).toBe(true);
     expect(body.data).toHaveLength(1);
-    expect(body.data[0].organization.name).toBe("艺见留学");
+    expect(body.data[0].organization.name).toBe("艺见美术馆");
     expect(body.data[0].organization.avatar_url).toBe("https://example.com/logo.png");
   });
 
@@ -342,6 +342,18 @@ describe("contracts API", () => {
     expect(body.success).toBe(true);
     expect(body.data).toHaveLength(1);
     expect(body.data[0].user_profile.nickname).toBe("学生 A");
+  });
+
+  it("旧留学机构不再进入机构工作台合同列表", async () => {
+    const organization = db.organizations.find((row) => row.id === ORG_ID);
+    if (organization) organization.type = "study_abroad_agency";
+
+    const res = await getWorkbenchContracts(
+      req("/api/v1/me/workbench/contracts", "owner")
+    );
+    const body = await res.json();
+    expect(res.status).toBe(403);
+    expect(body.error).toBe("仅机构所有者或管理员可查看合同存档");
   });
 
   it("普通顾问不能查看全机构合同列表", async () => {

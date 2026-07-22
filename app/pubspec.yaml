@@ -49,9 +49,11 @@ flutter:
           weight: 700
     - family: Noto Serif SC
       fonts:
-        - asset: assets/fonts/NotoSerifSC-Regular.otf
+        # The bundled NotoSerifSC*.otf files are invalid HTML placeholders.
+        # Keep the family stable for existing UI code and fall back to valid local fonts.
+        - asset: assets/fonts/NotoSansSC-Regular.ttf
           weight: 400
-        - asset: assets/fonts/NotoSerifSC-SemiBold.otf
+        - asset: assets/fonts/NotoSansSC-Medium.ttf
           weight: 600
-        - asset: assets/fonts/NotoSerifSC-Bold.otf
+        - asset: assets/fonts/NotoSansSC-Bold.ttf
           weight: 700

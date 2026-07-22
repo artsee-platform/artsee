@@ -564,7 +564,7 @@ class _CooperationRecommendTabState extends State<_CooperationRecommendTab> {
     );
 
     return ListView(
-      padding: EdgeInsets.fromLTRB(24, 8, 24, widget.bottom + 36),
+      padding: EdgeInsets.fromLTRB(18, 6, 18, widget.bottom + 38),
       children: [
         if (feedItems.isEmpty)
           _EmptyPanel(
@@ -581,9 +581,9 @@ class _CooperationRecommendTabState extends State<_CooperationRecommendTab> {
             itemCount: feedItems.length,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
-              crossAxisSpacing: 24,
-              mainAxisSpacing: 28,
-              mainAxisExtent: 188,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              mainAxisExtent: 152,
             ),
             itemBuilder: (context, index) {
               final feedItem = feedItems[index];
@@ -2889,8 +2889,15 @@ class _CompactOpportunityCard extends StatelessWidget {
       child: InkWell(
         onTap: onOpen,
         borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Ink(
+          padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+          decoration: BoxDecoration(
+            color: context.artC.cardIconBg.withValues(alpha: 0.76),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: context.artC.silver.withValues(alpha: 0.24),
+            ),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -2924,36 +2931,46 @@ class _CompactOpportunityCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: Align(
-                  alignment: Alignment.topLeft,
-                  child: Text(
-                    title,
-                    maxLines: 4,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: context.artC.ink,
-                      fontSize: 16,
-                      height: 1.22,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 9),
               Text(
-                meta.isEmpty ? '详情待补充' : meta,
-                maxLines: 2,
+                title,
+                maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: context.artC.ink.withValues(alpha: 0.42),
-                  fontSize: 11,
-                  height: 1.35,
-                  fontWeight: FontWeight.w700,
+                  color: context.artC.ink,
+                  fontSize: 15.2,
+                  height: 1.18,
+                  fontWeight: FontWeight.w900,
                   letterSpacing: 0,
                 ),
+              ),
+              const Spacer(),
+              Row(
+                children: [
+                  Container(
+                    width: 5,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: kCobalt.withValues(alpha: 0.48),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      meta.isEmpty ? '详情待补充' : meta,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: context.artC.ink.withValues(alpha: 0.42),
+                        fontSize: 11,
+                        height: 1.35,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -3380,68 +3397,106 @@ class _CompactArtistCard extends StatelessWidget {
     final cooperationStatus =
         artist['cooperation_status']?.toString() ?? 'available';
     final isCertified = _isCertifiedArtist(artist);
+    final intent = artist['cooperation_intent']?.toString().trim();
     final subtitle = [
       if (city != null && city.isNotEmpty) city,
       if (fields.isNotEmpty) fields.take(2).join('/'),
       if ((city == null || city.isEmpty) && fields.isEmpty) handle,
     ].join(' · ');
+    final description = intent != null && intent.isNotEmpty
+        ? intent
+        : fields.isNotEmpty
+            ? '${fields.take(2).join(' / ')}创作者'
+            : handle;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: () => _openArtistProfile(context, artist),
         borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Ink(
+          padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+          decoration: BoxDecoration(
+            color: context.artC.cardIconBg.withValues(alpha: 0.76),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: context.artC.silver.withValues(alpha: 0.24),
+            ),
+          ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 4),
-              _ArtistAvatar(name: name, avatarUrl: avatarUrl, size: 66),
-              const SizedBox(height: 13),
               Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Flexible(
-                    child: Text(
-                      name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: context.artC.ink,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0,
-                      ),
+                  _ArtistAvatar(name: name, avatarUrl: avatarUrl, size: 42),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: context.artC.ink,
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w900,
+                                  height: 1,
+                                  letterSpacing: 0,
+                                ),
+                              ),
+                            ),
+                            if (isCertified) ...[
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.verified_rounded,
+                                color: kCobalt,
+                                size: 14,
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 7),
+                        Text(
+                          subtitle.isEmpty ? handle : subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: context.artC.ink.withValues(alpha: 0.42),
+                            fontSize: 10.5,
+                            height: 1,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  if (isCertified) ...[
-                    const SizedBox(width: 4),
-                    const Icon(
-                      Icons.verified_rounded,
-                      color: kCobalt,
-                      size: 14,
-                    ),
-                  ],
                 ],
               ),
-              const SizedBox(height: 5),
+              const Spacer(),
               Text(
-                subtitle.isEmpty ? handle : subtitle,
+                description,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: context.artC.ink.withValues(alpha: 0.42),
-                  fontSize: 10.5,
-                  height: 1.3,
-                  fontWeight: FontWeight.w700,
+                  color: context.artC.ink.withValues(alpha: 0.52),
+                  fontSize: 11.5,
+                  height: 1.28,
+                  fontWeight: FontWeight.w800,
                   letterSpacing: 0,
                 ),
               ),
-              const Spacer(),
-              _CooperationStatusInline(status: cooperationStatus),
+              const SizedBox(height: 9),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: _CooperationStatusInline(status: cooperationStatus),
+              ),
             ],
           ),
         ),

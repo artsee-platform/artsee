@@ -9,8 +9,9 @@ type Ctx = { params: Promise<{ id: string }> };
 type SupabaseServiceClient = ReturnType<typeof createServiceClient>;
 
 const BUSINESS_ROLES = new Set([
-  "study_abroad_agency",
-  "portfolio_training",
+  "official_association",
+  "official_partner",
+  "school_official",
   "gallery_exhibition",
   "event_organizer",
   "hotel_culture_space",

@@ -144,6 +144,16 @@ class _PublicUserProfileScreenState extends State<PublicUserProfileScreen> {
               const SizedBox(height: 14),
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 180),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeOutCubic,
+                transitionBuilder: (child, animation) => FadeTransition(
+                  opacity: animation,
+                  child: ScaleTransition(
+                    scale:
+                        Tween<double>(begin: 0.98, end: 1).animate(animation),
+                    child: child,
+                  ),
+                ),
                 child: _buildTabBody(profile),
               ),
             ],
@@ -400,90 +410,107 @@ class _PublicProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _PublicAvatar(profile: profile, size: 82),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    profile.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: context.artC.ink,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      fontFamily: 'Noto Serif SC',
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    profile.handle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: context.artC.ink.withValues(alpha: 0.46),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 9),
-                  _IdentityChip(label: profile.roleLabel),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        Text(
-          profile.bio,
-          style: TextStyle(
-            color: context.artC.ink.withValues(alpha: 0.72),
-            fontSize: 13,
-            height: 1.5,
-            fontWeight: FontWeight.w700,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.artC.cardIconBg.withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: context.artC.silver.withValues(alpha: 0.26)),
+        boxShadow: [
+          BoxShadow(
+            color: context.artC.ink.withValues(alpha: 0.025),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
-        ),
-        const SizedBox(height: 16),
-        _StatsRow(profile: profile),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: _ProfileCommandButton(
-                label: isSelf
-                    ? '本人'
-                    : following
-                        ? '已是好友'
-                        : '加好友',
-                icon: following
-                    ? Icons.check_rounded
-                    : Icons.person_add_alt_1_outlined,
-                filled: !following && !isSelf,
-                busy: friendBusy,
-                onTap: onFollow,
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _PublicAvatar(profile: profile, size: 76),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      profile.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: context.artC.ink,
+                        fontSize: 21,
+                        fontWeight: FontWeight.w900,
+                        fontFamily: 'Noto Serif SC',
+                        height: 1.16,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      profile.handle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: context.artC.ink.withValues(alpha: 0.46),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 9),
+                    _IdentityChip(label: profile.roleLabel),
+                  ],
+                ),
               ),
+            ],
+          ),
+          const SizedBox(height: 13),
+          Text(
+            profile.bio,
+            style: TextStyle(
+              color: context.artC.ink.withValues(alpha: 0.68),
+              fontSize: 13,
+              height: 1.5,
+              fontWeight: FontWeight.w700,
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _ProfileCommandButton(
-                label: '私信',
-                icon: Icons.chat_bubble_outline_rounded,
-                filled: false,
-                busy: messageBusy,
-                onTap: onMessage,
+          ),
+          const SizedBox(height: 14),
+          _StatsRow(profile: profile),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _ProfileCommandButton(
+                  label: isSelf
+                      ? '本人'
+                      : following
+                          ? '已是好友'
+                          : '加好友',
+                  icon: following
+                      ? Icons.check_rounded
+                      : Icons.person_add_alt_1_outlined,
+                  filled: !following && !isSelf,
+                  busy: friendBusy,
+                  onTap: onFollow,
+                ),
               ),
-            ),
-          ],
-        ),
-      ],
+              const SizedBox(width: 10),
+              Expanded(
+                child: _ProfileCommandButton(
+                  label: '私信',
+                  icon: Icons.chat_bubble_outline_rounded,
+                  filled: false,
+                  busy: messageBusy,
+                  onTap: onMessage,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -503,7 +530,8 @@ class _PublicAvatar extends StatelessWidget {
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: kCobalt.withValues(alpha: 0.42), width: 1.4),
+        color: kCobalt.withValues(alpha: 0.05),
+        border: Border.all(color: kCobalt.withValues(alpha: 0.26), width: 1.2),
       ),
       child: ClipOval(
         child: profile.avatarUrl.isNotEmpty
@@ -552,7 +580,7 @@ class _IdentityChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: kCobalt.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: kCobalt.withValues(alpha: 0.18)),
       ),
       child: Row(
@@ -588,33 +616,90 @@ class _StatsRow extends StatelessWidget {
       ('作品', '${profile.works}'),
     ];
     return Row(
-      children: stats
-          .map(
-            (item) => Expanded(
+      children: [
+        for (var i = 0; i < stats.length; i++) ...[
+          if (i != 0) const SizedBox(width: 8),
+          Expanded(
+            child: Container(
+              height: 54,
+              decoration: BoxDecoration(
+                color: context.artC.porcelain.withValues(alpha: 0.58),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: context.artC.silver.withValues(alpha: 0.22),
+                ),
+              ),
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    item.$2,
+                    stats[i].$2,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: context.artC.ink,
-                      fontSize: 17,
+                      fontSize: 16,
                       fontWeight: FontWeight.w900,
+                      height: 1,
                     ),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 5),
                   Text(
-                    item.$1,
+                    stats[i].$1,
                     style: TextStyle(
                       color: context.artC.ink.withValues(alpha: 0.42),
-                      fontSize: 11,
+                      fontSize: 10,
                       fontWeight: FontWeight.w800,
+                      height: 1,
                     ),
                   ),
                 ],
               ),
             ),
-          )
-          .toList(),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _ProfilePressable extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final double pressedScale;
+
+  const _ProfilePressable({
+    required this.child,
+    required this.onTap,
+    this.pressedScale = 0.97,
+  });
+
+  @override
+  State<_ProfilePressable> createState() => _ProfilePressableState();
+}
+
+class _ProfilePressableState extends State<_ProfilePressable> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value || widget.onTap == null) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onTap,
+      onTapDown: (_) => _setPressed(true),
+      onTapCancel: () => _setPressed(false),
+      onTapUp: (_) => _setPressed(false),
+      child: AnimatedScale(
+        scale: _pressed ? widget.pressedScale : 1,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOutCubic,
+        child: widget.child,
+      ),
     );
   }
 }
@@ -636,35 +721,61 @@ class _ProfileCommandButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return _ProfilePressable(
       onTap: busy ? null : onTap,
-      child: Container(
-        height: 42,
+      pressedScale: 0.96,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        height: 44,
         decoration: BoxDecoration(
-          color: filled ? kCobalt : context.artC.cardIconBg,
-          borderRadius: BorderRadius.circular(10),
+          color:
+              filled ? kCobalt : context.artC.cardIconBg.withValues(alpha: 0.8),
+          borderRadius: BorderRadius.circular(8),
           border: filled
               ? null
-              : Border.all(color: context.artC.silver.withValues(alpha: 0.55)),
+              : Border.all(color: context.artC.silver.withValues(alpha: 0.28)),
+          boxShadow: filled && !busy
+              ? [
+                  BoxShadow(
+                    color: kCobalt.withValues(alpha: 0.16),
+                    blurRadius: 14,
+                    offset: const Offset(0, 7),
+                  ),
+                ]
+              : null,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (busy)
-              SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: filled ? Colors.white : context.artC.ink,
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 140),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeOutCubic,
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: ScaleTransition(
+                  scale: Tween<double>(begin: 0.96, end: 1).animate(animation),
+                  child: child,
                 ),
-              )
-            else
-              Icon(
-                icon,
-                size: 17,
-                color: filled ? Colors.white : context.artC.ink,
               ),
+              child: busy
+                  ? SizedBox(
+                      key: const ValueKey('busy'),
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: filled ? Colors.white : context.artC.ink,
+                      ),
+                    )
+                  : Icon(
+                      icon,
+                      key: ValueKey(icon),
+                      size: 17,
+                      color: filled ? Colors.white : context.artC.ink,
+                    ),
+            ),
             const SizedBox(width: 6),
             Text(
               label,
@@ -696,28 +807,31 @@ class _PublicProfileTabs extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: context.artC.silver.withValues(alpha: 0.22),
-        borderRadius: BorderRadius.circular(12),
+        color: context.artC.silver.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: context.artC.silver.withValues(alpha: 0.22)),
       ),
       child: Row(
         children: List.generate(tabs.length, (index) {
           final active = selectedIndex == index;
           return Expanded(
-            child: GestureDetector(
+            child: _ProfilePressable(
               onTap: () => onChanged(index),
+              pressedScale: 0.97,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 160),
-                height: 36,
+                curve: Curves.easeOutCubic,
+                height: 38,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: active ? context.artC.cardIconBg : Colors.transparent,
-                  borderRadius: BorderRadius.circular(9),
+                  color: active ? kCobalt : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
                   boxShadow: active
                       ? [
                           BoxShadow(
-                            color: context.artC.ink.withValues(alpha: 0.045),
-                            blurRadius: 10,
-                            offset: const Offset(0, 3),
+                            color: kCobalt.withValues(alpha: 0.14),
+                            blurRadius: 12,
+                            offset: const Offset(0, 5),
                           ),
                         ]
                       : null,
@@ -728,7 +842,7 @@ class _PublicProfileTabs extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: active
-                        ? context.artC.ink
+                        ? Colors.white
                         : context.artC.ink.withValues(alpha: 0.46),
                     fontSize: 11,
                     fontWeight: FontWeight.w900,
@@ -758,8 +872,8 @@ class _WorksGrid extends StatelessWidget {
       itemCount: itemCount > 9 ? 9 : itemCount,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
-        mainAxisSpacing: 4,
-        crossAxisSpacing: 4,
+        mainAxisSpacing: 6,
+        crossAxisSpacing: 6,
       ),
       itemBuilder: (_, index) => _WorkTile(profile: profile, index: index),
     );
@@ -779,7 +893,7 @@ class _WorkTile extends StatelessWidget {
         : null;
     final seed = Uri.encodeComponent('${profile.seed}_${index + 1}');
     return ClipRRect(
-      borderRadius: BorderRadius.circular(4),
+      borderRadius: BorderRadius.circular(8),
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -796,7 +910,7 @@ class _WorkTile extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.48),
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Text(
                   '代表作',
@@ -961,9 +1075,16 @@ class _TextCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: context.artC.cardIconBg,
+        color: context.artC.cardIconBg.withValues(alpha: 0.82),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: context.artC.silver.withValues(alpha: 0.32)),
+        border: Border.all(color: context.artC.silver.withValues(alpha: 0.26)),
+        boxShadow: [
+          BoxShadow(
+            color: context.artC.ink.withValues(alpha: 0.02),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

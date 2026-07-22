@@ -6,11 +6,15 @@ type Row = Record<string, unknown>;
 
 const ORG_ID = "50000000-0000-4000-8000-000000000001";
 const EXPIRED_ORG_ID = "50000000-0000-4000-8000-000000000002";
+const COMMERCIAL_ORG_ID = "50000000-0000-4000-8000-000000000003";
+const PENDING_OFFICIAL_ORG_ID = "50000000-0000-4000-8000-000000000004";
 const organizations: Row[] = [
   {
     id: ORG_ID,
-    name: "艺见伦敦申请中心",
+    name: "国际艺术教育协会",
+    type: "official_association",
     status: "active",
+    verification_status: "verified",
     city: "上海",
     province: "上海",
     focus_areas: ["uk", "portfolio", "rca"],
@@ -19,18 +23,19 @@ const organizations: Row[] = [
     rating: 4.8,
     review_count: 32,
     contract_count: 6,
-    subscription_status: "active",
-    subscription_expires_at: "2099-01-01T00:00:00.000Z",
+    subscription_status: "inactive",
     metadata: {
+      is_official: true,
       address: "上海市静安区 88 号",
       phone: "021-0000",
       wechat_qr_url: "https://cdn.example.test/qr.png",
-      summary: "专注英国艺术院校申请。",
+      summary: "提供国际艺术教育交流与官方活动信息。",
     },
   },
   {
     id: EXPIRED_ORG_ID,
     name: "过期机构",
+    type: "study_abroad_agency",
     status: "active",
     city: "上海",
     province: "上海",
@@ -43,6 +48,40 @@ const organizations: Row[] = [
     subscription_status: "active",
     subscription_expires_at: "2020-01-01T00:00:00.000Z",
     metadata: {},
+  },
+  {
+    id: COMMERCIAL_ORG_ID,
+    name: "商业留学中心",
+    type: "study_abroad_agency",
+    status: "active",
+    city: "上海",
+    province: "上海",
+    focus_areas: ["uk"],
+    supports_online: true,
+    supports_offline: true,
+    rating: 5,
+    review_count: 12,
+    contract_count: 2,
+    subscription_status: "active",
+    subscription_expires_at: "2099-01-01T00:00:00.000Z",
+    metadata: {},
+  },
+  {
+    id: PENDING_OFFICIAL_ORG_ID,
+    name: "待认证官方协会",
+    type: "official_association",
+    status: "active",
+    verification_status: "pending",
+    city: "上海",
+    province: "上海",
+    focus_areas: ["uk"],
+    supports_online: true,
+    supports_offline: true,
+    rating: 5,
+    review_count: 4,
+    contract_count: 0,
+    subscription_status: "inactive",
+    metadata: { is_official: true },
   },
 ];
 
@@ -159,7 +198,7 @@ describe("GET /api/v1/organizations/:id", () => {
     const res = await getOrganization(req, ctx());
     const body = await res.json();
     expect(res.status).toBe(200);
-    expect(body.data.name).toBe("艺见伦敦申请中心");
+    expect(body.data.name).toBe("国际艺术教育协会");
     expect(body.data.contact_locked).toBe(true);
     expect(body.data.address).toBeNull();
     expect(body.data.phone).toBeNull();
@@ -198,6 +237,22 @@ describe("GET /api/v1/organizations/:id", () => {
       `http://localhost/api/v1/organizations/${EXPIRED_ORG_ID}`
     );
     const res = await getOrganization(req, ctx(EXPIRED_ORG_ID));
+    expect(res.status).toBe(404);
+  });
+
+  it("商业留学机构不公开展示", async () => {
+    const req = new NextRequest(
+      `http://localhost/api/v1/organizations/${COMMERCIAL_ORG_ID}`
+    );
+    const res = await getOrganization(req, ctx(COMMERCIAL_ORG_ID));
+    expect(res.status).toBe(404);
+  });
+
+  it("待认证官方组织不公开展示", async () => {
+    const req = new NextRequest(
+      `http://localhost/api/v1/organizations/${PENDING_OFFICIAL_ORG_ID}`
+    );
+    const res = await getOrganization(req, ctx(PENDING_OFFICIAL_ORG_ID));
     expect(res.status).toBe(404);
   });
 });

@@ -224,7 +224,7 @@ export default function AdminDashboardPage() {
       {
         label: "入驻机构",
         value: `${metrics.summary.organizations_subscribed}/${metrics.summary.organizations_total}`,
-        hint: `机构年费 ${money(metrics.summary.paid_org_subscription_amount)}`,
+        hint: `机构订阅 ${money(metrics.summary.paid_org_subscription_amount)}`,
         icon: Building2,
       },
       {
@@ -433,7 +433,7 @@ export default function AdminDashboardPage() {
               <Panel title="机构与会员制">
                 <div className="grid gap-4 lg:grid-cols-2">
                   <div>
-                    <p className="mb-2 text-xs font-black text-black/38">机构年费状态</p>
+                    <p className="mb-2 text-xs font-black text-black/38">机构订阅状态</p>
                     <MetricRows
                       data={metrics.sections.organizations.by_subscription_status}
                       total={metrics.sections.organizations.total}

@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { isAdminRole } from "./admin-roles";
 import { getUserFromBearer } from "./auth-user";
+import { isRetiredCommercialAgencyType } from "./organization-visibility";
 import { createServiceClient } from "./supabase-service";
 
 export type WorkbenchAuth =
@@ -87,7 +88,7 @@ export async function requireWorkbenchUser(req: NextRequest): Promise<WorkbenchA
     };
   }
 
-  const activeMemberships =
+  const normalizedMemberships =
     memberships
       ?.filter(isWorkbenchMembership)
       .map((membership) => ({
@@ -99,6 +100,17 @@ export async function requireWorkbenchUser(req: NextRequest): Promise<WorkbenchA
             ? (membership.metadata as Record<string, unknown>)
             : null,
       })) ?? [];
+  const { memberships: activeMemberships, error: organizationError } =
+    await filterRetiredAgencyMemberships(supabase, normalizedMemberships);
+
+  if (organizationError) {
+    return {
+      response: NextResponse.json(
+        { success: false, error: organizationError.message },
+        { status: 500 }
+      ),
+    };
+  }
 
   const organizationIds = uniqueStrings(
     activeMemberships.map((membership) => membership.organization_id)
@@ -117,6 +129,39 @@ export async function requireWorkbenchUser(req: NextRequest): Promise<WorkbenchA
     memberships: activeMemberships,
     memberIds,
     manageableOrganizationIds,
+  };
+}
+
+async function filterRetiredAgencyMemberships(
+  supabase: ReturnType<typeof createServiceClient>,
+  memberships: WorkbenchMembership[]
+) {
+  const organizationIds = uniqueStrings(
+    memberships.map((membership) => membership.organization_id)
+  );
+  if (organizationIds.length === 0) return { memberships, error: null };
+
+  const { data, error } = await supabase
+    .from("organizations")
+    .select("id,type")
+    .in("id", organizationIds);
+
+  if (error) return { memberships: [] as WorkbenchMembership[], error };
+
+  const typeByOrganizationId = new Map(
+    ((data ?? []) as Record<string, unknown>[])
+      .filter((row) => typeof row.id === "string")
+      .map((row) => [row.id as string, row.type])
+  );
+
+  return {
+    memberships: memberships.filter(
+      (membership) =>
+        !isRetiredCommercialAgencyType(
+          typeByOrganizationId.get(membership.organization_id)
+        )
+    ),
+    error: null,
   };
 }
 

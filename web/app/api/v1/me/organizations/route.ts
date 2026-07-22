@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromBearer } from "@/lib/api/auth-user";
 import { effectiveOrganizationSubscriptionStatus } from "@/lib/api/organization-subscription";
+import { isRetiredCommercialAgencyType } from "@/lib/api/organization-visibility";
 import { createServiceClient } from "@/lib/api/supabase-service";
 import { errorResponse, parsePagination } from "@/lib/api/route-helpers";
 
@@ -40,6 +41,11 @@ function normalizeMembership(row: Record<string, unknown>) {
   };
 }
 
+function isActiveOrganizationMembership(row: Record<string, unknown>) {
+  const organization = objectValue(row.organization);
+  return !isRetiredCommercialAgencyType(organization.type);
+}
+
 function isMissingOrganizationTables(error: unknown) {
   if (!error || typeof error !== "object") return false;
   const err = error as { code?: string; message?: string };
@@ -61,13 +67,12 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const { limit, offset } = parsePagination(searchParams);
     const supabase = createServiceClient();
-    const { data, error, count } = await supabase
+    const { data, error } = await supabase
       .from("organization_members")
       .select("role,status,organization:organizations(*)", { count: "exact" })
       .eq("user_id", user.id)
       .eq("status", "active")
-      .order("created_at", { ascending: false })
-      .range(offset, offset + limit - 1);
+      .order("created_at", { ascending: false });
 
     if (error) {
       if (isMissingOrganizationTables(error)) {
@@ -82,10 +87,15 @@ export async function GET(req: NextRequest) {
       return errorResponse(error);
     }
 
+    const allRows = ((data ?? []) as Record<string, unknown>[])
+      .filter(isActiveOrganizationMembership)
+      .map(normalizeMembership);
+    const rows = allRows.slice(offset, offset + limit);
+
     return NextResponse.json({
       success: true,
-      data: ((data ?? []) as Record<string, unknown>[]).map(normalizeMembership),
-      count,
+      data: rows,
+      count: allRows.length,
       pagination: { limit, offset },
     });
   } catch (e) {
@@ -105,13 +115,20 @@ export async function POST(req: NextRequest) {
     if (!name) {
       return NextResponse.json({ success: false, error: "机构名称必填" }, { status: 400 });
     }
+    const type = cleanText(body.type);
+    if (isRetiredCommercialAgencyType(type)) {
+      return NextResponse.json(
+        { success: false, error: "该机构类型已下线" },
+        { status: 400 }
+      );
+    }
 
     const supabase = createServiceClient();
     const { data: organization, error: organizationError } = await supabase
       .from("organizations")
       .insert({
         name,
-        type: cleanText(body.type) || null,
+        type: type || null,
         owner_user_id: user.id,
         status: "active",
         verification_status: "pending",

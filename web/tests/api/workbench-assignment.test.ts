@@ -46,7 +46,7 @@ function resetDb() {
     { id: ADVISOR_B_ID, role: "user", user_role: "student", nickname: "李老师" },
     { id: ADVISOR_C_ID, role: "user", user_role: "student", nickname: "王老师" },
   ];
-  db.organizations = [{ id: ORG_ID, name: "艺见留学", type: "study_abroad_agency" }];
+  db.organizations = [{ id: ORG_ID, name: "艺见美术馆", type: "gallery_exhibition" }];
   db.organization_members = [
     {
       id: OWNER_MEMBER_ID,
@@ -335,6 +335,18 @@ describe("workbench member assignment", () => {
     ]);
   });
 
+  it("旧留学机构不再进入机构工作台咨询列表", async () => {
+    const organization = db.organizations.find((row) => row.id === ORG_ID);
+    if (organization) organization.type = "study_abroad_agency";
+
+    const res = await getWorkbenchConsultations(
+      req("/api/v1/me/workbench/consultations", "owner")
+    );
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body.data).toEqual([]);
+  });
+
   it("lets organization owners add collaborators who can then open the consultation", async () => {
     const res = await patchWorkbenchCollaborators(
       req(
@@ -446,7 +458,7 @@ describe("workbench member assignment", () => {
     expect(list.status).toBe(200);
     expect(listBody.data).toHaveLength(1);
     expect(listBody.data[0].id).toBe(memberId);
-    expect(listBody.data[0].organization.name).toBe("艺见留学");
+    expect(listBody.data[0].organization.name).toBe("艺见美术馆");
 
     const accepted = await respondWorkbenchTeamInvitation(
       req(
