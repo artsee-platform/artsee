@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../config/dev_test_account.dart';
-import '../../services/supabase_service.dart';
+import '../../services/auth_service.dart';
 import '../../services/backend_api_service.dart';
+import '../../services/supabase_service.dart';
+import '../../services/tencent_captcha_service.dart';
 import '../../widgets/common.dart';
 import 'package:artsee_app/theme/artsee_ui_colors.dart';
 
@@ -44,18 +48,26 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordCtrl = TextEditingController();
   final _nicknameCtrl = TextEditingController();
   final _emailOtpCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _smsCodeCtrl = TextEditingController();
 
   final _emailFocus = FocusNode();
   final _passwordFocus = FocusNode();
   final _nicknameFocus = FocusNode();
   final _emailOtpFocus = FocusNode();
+  final _phoneFocus = FocusNode();
+  final _smsCodeFocus = FocusNode();
 
   bool _isLogin = true;
+  bool _usePhoneOtp = false;
   bool _loading = false;
   bool _sendingEmailOtp = false;
+  bool _sendingSmsOtp = false;
   bool _isColorful = false;
+  int _smsCountdown = 0;
   String? _error;
   String? _emailOtpHint;
+  Timer? _smsTimer;
 
   @override
   void initState() {
@@ -65,22 +77,30 @@ class _LoginScreenState extends State<LoginScreen> {
     _passwordCtrl.addListener(_updateColorfulState);
     _nicknameCtrl.addListener(_updateColorfulState);
     _emailOtpCtrl.addListener(_updateColorfulState);
+    _phoneCtrl.addListener(_updateColorfulState);
+    _smsCodeCtrl.addListener(_updateColorfulState);
 
     _emailFocus.addListener(_updateColorfulState);
     _passwordFocus.addListener(_updateColorfulState);
     _nicknameFocus.addListener(_updateColorfulState);
     _emailOtpFocus.addListener(_updateColorfulState);
+    _phoneFocus.addListener(_updateColorfulState);
+    _smsCodeFocus.addListener(_updateColorfulState);
   }
 
   void _updateColorfulState() {
     final hasFocus = _emailFocus.hasFocus ||
         _passwordFocus.hasFocus ||
         _nicknameFocus.hasFocus ||
-        _emailOtpFocus.hasFocus;
+        _emailOtpFocus.hasFocus ||
+        _phoneFocus.hasFocus ||
+        _smsCodeFocus.hasFocus;
     final hasText = _emailCtrl.text.isNotEmpty ||
         _passwordCtrl.text.isNotEmpty ||
         _nicknameCtrl.text.isNotEmpty ||
-        _emailOtpCtrl.text.isNotEmpty;
+        _emailOtpCtrl.text.isNotEmpty ||
+        _phoneCtrl.text.isNotEmpty ||
+        _smsCodeCtrl.text.isNotEmpty;
     final colorful = hasFocus || hasText;
     if (colorful != _isColorful) {
       setState(() => _isColorful = colorful);
@@ -93,22 +113,64 @@ class _LoginScreenState extends State<LoginScreen> {
     _passwordCtrl.removeListener(_updateColorfulState);
     _nicknameCtrl.removeListener(_updateColorfulState);
     _emailOtpCtrl.removeListener(_updateColorfulState);
+    _phoneCtrl.removeListener(_updateColorfulState);
+    _smsCodeCtrl.removeListener(_updateColorfulState);
 
     _emailFocus.removeListener(_updateColorfulState);
     _passwordFocus.removeListener(_updateColorfulState);
     _nicknameFocus.removeListener(_updateColorfulState);
     _emailOtpFocus.removeListener(_updateColorfulState);
+    _phoneFocus.removeListener(_updateColorfulState);
+    _smsCodeFocus.removeListener(_updateColorfulState);
 
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
     _nicknameCtrl.dispose();
     _emailOtpCtrl.dispose();
+    _phoneCtrl.dispose();
+    _smsCodeCtrl.dispose();
 
     _emailFocus.dispose();
     _passwordFocus.dispose();
     _nicknameFocus.dispose();
     _emailOtpFocus.dispose();
+    _phoneFocus.dispose();
+    _smsCodeFocus.dispose();
+    _smsTimer?.cancel();
     super.dispose();
+  }
+
+  String? _mainlandPhone() {
+    var phone = _phoneCtrl.text.trim().replaceAll(RegExp(r'[\s()\-]'), '');
+    if (phone.startsWith('+86')) phone = phone.substring(3);
+    if (phone.startsWith('0086')) phone = phone.substring(4);
+    return RegExp(r'^1[3-9]\d{9}$').hasMatch(phone) ? phone : null;
+  }
+
+  void _selectLoginMethod(bool usePhoneOtp) {
+    if (_usePhoneOtp == usePhoneOtp) return;
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _usePhoneOtp = usePhoneOtp;
+      _error = null;
+    });
+  }
+
+  void _startSmsCountdown() {
+    _smsTimer?.cancel();
+    setState(() => _smsCountdown = 60);
+    _smsTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_smsCountdown <= 1) {
+        timer.cancel();
+        setState(() => _smsCountdown = 0);
+      } else {
+        setState(() => _smsCountdown -= 1);
+      }
+    });
   }
 
   Future<void> _submit() async {
@@ -118,7 +180,18 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
     try {
-      if (_isLogin) {
+      if (_isLogin && _usePhoneOtp) {
+        final phone = _mainlandPhone();
+        if (phone == null) throw Exception('请填写有效的中国大陆手机号');
+        final result = await AuthService().verifySmsCode(
+          phone,
+          _smsCodeCtrl.text.trim(),
+        );
+        if (result['success'] != true) {
+          throw Exception(result['error'] ?? '验证码登录失败');
+        }
+        if (mounted) Navigator.pop(context);
+      } else if (_isLogin) {
         final res = await SupabaseService.signIn(
           _emailCtrl.text.trim(),
           _passwordCtrl.text,
@@ -160,6 +233,44 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _sendSmsOtp() async {
+    final phone = _mainlandPhone();
+    if (phone == null) {
+      setState(() => _error = '请先填写有效的中国大陆手机号');
+      FocusScope.of(context).requestFocus(_phoneFocus);
+      return;
+    }
+    setState(() {
+      _sendingSmsOtp = true;
+      _error = null;
+    });
+    try {
+      var result = await AuthService().sendSmsCode(phone);
+      if (result['captcha_required'] == true) {
+        if (!mounted) return;
+        final proof = await TencentCaptchaService.verify(context);
+        if (proof == null) return;
+        result = await AuthService().sendSmsCode(phone, captcha: proof);
+      }
+      if (result['success'] != true) {
+        throw Exception(result['error'] ?? '验证码发送失败');
+      }
+      if (!mounted) return;
+      _startSmsCountdown();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('验证码已发送，请注意查收')),
+      );
+      FocusScope.of(context).requestFocus(_smsCodeFocus);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      if (mounted) setState(() => _sendingSmsOtp = false);
     }
   }
 
@@ -382,7 +493,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             _AuthPressable(
                               onTap: () => setState(() {
                                 _isLogin = true;
+                                _usePhoneOtp = false;
                                 _emailOtpHint = null;
+                                _error = null;
                               }),
                               child: Container(
                                 padding: const EdgeInsets.all(8),
@@ -431,72 +544,152 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            if (!_isLogin) ...[
-                              _buildInput(
-                                controller: _nicknameCtrl,
-                                focusNode: _nicknameFocus,
-                                hint: '昵称',
-                                icon: Icons.person_outline,
-                                validator: (v) => v!.isEmpty ? '请填写昵称' : null,
+                            if (_isLogin) ...[
+                              _AuthLoginModeSwitch(
+                                usePhoneOtp: _usePhoneOtp,
+                                onChanged: _loading ? null : _selectLoginMethod,
                               ),
                               const SizedBox(height: 16),
                             ],
-                            _buildInput(
-                              controller: _emailCtrl,
-                              focusNode: _emailFocus,
-                              hint: '邮箱',
-                              icon: Icons.email_outlined,
-                              keyboardType: TextInputType.emailAddress,
-                              validator: (v) => v!.isEmpty
-                                  ? '请填写邮箱'
-                                  : (!v.contains('@') ? '邮箱格式不正确' : null),
-                            ),
-                            const SizedBox(height: 16),
-                            _buildInput(
-                              controller: _passwordCtrl,
-                              focusNode: _passwordFocus,
-                              hint: '密码',
-                              icon: Icons.lock_outline,
-                              obscureText: true,
-                              validator: (v) => v!.length < 6 ? '密码至少6位' : null,
-                            ),
-                            if (!_isLogin) ...[
+                            if (_isLogin && _usePhoneOtp) ...[
+                              _buildInput(
+                                controller: _phoneCtrl,
+                                focusNode: _phoneFocus,
+                                hint: '手机号（中国大陆 +86）',
+                                icon: Icons.phone_iphone_outlined,
+                                keyboardType: TextInputType.phone,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.allow(
+                                    RegExp(r'[0-9+\s()\-]'),
+                                  ),
+                                ],
+                                validator: (_) => _mainlandPhone() == null
+                                    ? '手机号格式不正确'
+                                    : null,
+                                onFieldSubmitted: () => FocusScope.of(context)
+                                    .requestFocus(_smsCodeFocus),
+                              ),
                               const SizedBox(height: 16),
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Expanded(
                                     child: _buildInput(
-                                      controller: _emailOtpCtrl,
-                                      focusNode: _emailOtpFocus,
-                                      hint: '邮箱验证码',
-                                      icon: Icons.mark_email_read_outlined,
+                                      controller: _smsCodeCtrl,
+                                      focusNode: _smsCodeFocus,
+                                      hint: '6位短信验证码',
+                                      icon: Icons.sms_outlined,
                                       keyboardType: TextInputType.number,
+                                      textInputAction: TextInputAction.done,
+                                      maxLength: 6,
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.digitsOnly,
+                                      ],
                                       validator: (v) =>
-                                          v!.trim().isEmpty ? '请填写邮箱验证码' : null,
+                                          !RegExp(r'^\d{6}$').hasMatch(v ?? '')
+                                              ? '请输入6位验证码'
+                                              : null,
+                                      onFieldSubmitted: _submit,
                                     ),
                                   ),
                                   const SizedBox(width: 10),
                                   _AuthOtpButton(
-                                    loading: _sendingEmailOtp,
-                                    onTap: _sendingEmailOtp || _loading
+                                    loading: _sendingSmsOtp,
+                                    onTap: _sendingSmsOtp ||
+                                            _loading ||
+                                            _smsCountdown > 0
                                         ? null
-                                        : _sendEmailOtp,
+                                        : _sendSmsOtp,
+                                    semanticLabel: '发送短信验证码',
+                                    label: _smsCountdown > 0
+                                        ? '${_smsCountdown}s'
+                                        : '发送',
+                                    width: 82,
                                   ),
                                 ],
                               ),
-                              if (_emailOtpHint != null) ...[
-                                const SizedBox(height: 8),
-                                Text(
-                                  _emailOtpHint!,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: context.artC.ink
-                                        .withValues(alpha: 0.45),
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                  textAlign: TextAlign.center,
+                              const SizedBox(height: 10),
+                              Text(
+                                '未注册手机号验证后将自动创建账号',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color:
+                                      context.artC.ink.withValues(alpha: 0.42),
+                                  fontWeight: FontWeight.w600,
                                 ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ] else ...[
+                              if (!_isLogin) ...[
+                                _buildInput(
+                                  controller: _nicknameCtrl,
+                                  focusNode: _nicknameFocus,
+                                  hint: '昵称',
+                                  icon: Icons.person_outline,
+                                  validator: (v) => v!.isEmpty ? '请填写昵称' : null,
+                                ),
+                                const SizedBox(height: 16),
+                              ],
+                              _buildInput(
+                                controller: _emailCtrl,
+                                focusNode: _emailFocus,
+                                hint: '邮箱',
+                                icon: Icons.email_outlined,
+                                keyboardType: TextInputType.emailAddress,
+                                validator: (v) => v!.isEmpty
+                                    ? '请填写邮箱'
+                                    : (!v.contains('@') ? '邮箱格式不正确' : null),
+                              ),
+                              const SizedBox(height: 16),
+                              _buildInput(
+                                controller: _passwordCtrl,
+                                focusNode: _passwordFocus,
+                                hint: '密码',
+                                icon: Icons.lock_outline,
+                                obscureText: true,
+                                validator: (v) =>
+                                    v!.length < 6 ? '密码至少6位' : null,
+                              ),
+                              if (!_isLogin) ...[
+                                const SizedBox(height: 16),
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: _buildInput(
+                                        controller: _emailOtpCtrl,
+                                        focusNode: _emailOtpFocus,
+                                        hint: '邮箱验证码',
+                                        icon: Icons.mark_email_read_outlined,
+                                        keyboardType: TextInputType.number,
+                                        validator: (v) => v!.trim().isEmpty
+                                            ? '请填写邮箱验证码'
+                                            : null,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    _AuthOtpButton(
+                                      loading: _sendingEmailOtp,
+                                      onTap: _sendingEmailOtp || _loading
+                                          ? null
+                                          : _sendEmailOtp,
+                                      semanticLabel: '发送邮箱验证码',
+                                    ),
+                                  ],
+                                ),
+                                if (_emailOtpHint != null) ...[
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    _emailOtpHint!,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: context.artC.ink
+                                          .withValues(alpha: 0.45),
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
                               ],
                             ],
                             if (_error != null) ...[
@@ -513,7 +706,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             ],
                             const SizedBox(height: 28),
                             _AuthPrimaryButton(
-                              label: _isLogin ? '登录' : '注册',
+                              label: _isLogin
+                                  ? (_usePhoneOtp ? '验证码登录' : '登录')
+                                  : '注册',
                               loading: _loading,
                               onTap: _loading ? null : _submit,
                             ),
@@ -541,7 +736,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                     action: _isLogin ? '去注册' : '去登录',
                                     onTap: () => setState(() {
                                       _isLogin = !_isLogin;
+                                      _usePhoneOtp = false;
                                       _emailOtpHint = null;
+                                      _error = null;
                                     }),
                                   ),
                                   if (_isLogin) ...[
@@ -624,6 +821,10 @@ class _LoginScreenState extends State<LoginScreen> {
     required IconData icon,
     bool obscureText = false,
     TextInputType keyboardType = TextInputType.text,
+    TextInputAction? textInputAction,
+    List<TextInputFormatter>? inputFormatters,
+    int? maxLength,
+    VoidCallback? onFieldSubmitted,
     String? Function(String?)? validator,
   }) {
     return GestureDetector(
@@ -635,8 +836,10 @@ class _LoginScreenState extends State<LoginScreen> {
         focusNode: focusNode,
         obscureText: obscureText,
         keyboardType: keyboardType,
-        textInputAction:
-            obscureText ? TextInputAction.done : TextInputAction.next,
+        textInputAction: textInputAction ??
+            (obscureText ? TextInputAction.done : TextInputAction.next),
+        inputFormatters: inputFormatters,
+        maxLength: maxLength,
         onTap: () {
           if (!focusNode.hasFocus) {
             FocusScope.of(context).requestFocus(focusNode);
@@ -646,7 +849,9 @@ class _LoginScreenState extends State<LoginScreen> {
           });
         },
         onFieldSubmitted: (_) {
-          if (obscureText) {
+          if (onFieldSubmitted != null) {
+            onFieldSubmitted();
+          } else if (obscureText) {
             _submit();
           } else {
             FocusScope.of(context).requestFocus(_passwordFocus);
@@ -664,6 +869,7 @@ class _LoginScreenState extends State<LoginScreen> {
           prefixIcon: Icon(icon,
               size: 20, color: context.artC.ink.withValues(alpha: 0.38)),
           contentPadding: const EdgeInsets.symmetric(vertical: 18),
+          counterText: '',
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide:
@@ -690,6 +896,100 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         style: TextStyle(fontSize: 15, color: context.artC.ink),
+      ),
+    );
+  }
+}
+
+class _AuthLoginModeSwitch extends StatelessWidget {
+  final bool usePhoneOtp;
+  final ValueChanged<bool>? onChanged;
+
+  const _AuthLoginModeSwitch({
+    required this.usePhoneOtp,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 42,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: context.artC.silver.withValues(alpha: 0.22),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          _AuthLoginModeOption(
+            label: '邮箱登录',
+            selected: !usePhoneOtp,
+            onTap: onChanged == null ? null : () => onChanged!(false),
+          ),
+          _AuthLoginModeOption(
+            label: '手机验证码',
+            selected: usePhoneOtp,
+            onTap: onChanged == null ? null : () => onChanged!(true),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AuthLoginModeOption extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  const _AuthLoginModeOption({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Semantics(
+        button: true,
+        enabled: onTap != null,
+        selected: selected,
+        label: label,
+        child: _AuthPressable(
+          onTap: onTap,
+          pressedScale: 0.98,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: selected ? context.artC.porcelain : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: selected
+                  ? [
+                      BoxShadow(
+                        color: context.artC.ink.withValues(alpha: 0.06),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOutCubic,
+              style: TextStyle(
+                color: selected
+                    ? kCobalt
+                    : context.artC.ink.withValues(alpha: 0.46),
+                fontSize: 12,
+                fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+              ),
+              child: Text(label),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -817,8 +1117,17 @@ class _AuthPrimaryButton extends StatelessWidget {
 class _AuthOtpButton extends StatelessWidget {
   final bool loading;
   final VoidCallback? onTap;
+  final String semanticLabel;
+  final String label;
+  final double width;
 
-  const _AuthOtpButton({required this.loading, required this.onTap});
+  const _AuthOtpButton({
+    required this.loading,
+    required this.onTap,
+    required this.semanticLabel,
+    this.label = '发送',
+    this.width = 72,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -826,12 +1135,12 @@ class _AuthOtpButton extends StatelessWidget {
     return Semantics(
       button: true,
       enabled: enabled,
-      label: '发送邮箱验证码',
+      label: semanticLabel,
       child: _AuthPressable(
         onTap: onTap,
         pressedScale: 0.98,
         child: AnimatedContainer(
-          width: 72,
+          width: width,
           height: 56,
           duration: const Duration(milliseconds: 160),
           curve: Curves.easeOutCubic,
@@ -853,9 +1162,9 @@ class _AuthOtpButton extends StatelessWidget {
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text(
-                  '发送',
-                  style: TextStyle(
+              : Text(
+                  label,
+                  style: const TextStyle(
                     color: kCobalt,
                     fontSize: 13,
                     fontWeight: FontWeight.w900,

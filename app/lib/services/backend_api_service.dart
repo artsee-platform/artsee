@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -22,6 +23,9 @@ class ApiException implements Exception {
 /// 通过 Next.js（`web/`）访问 Supabase 中的业务数据，与 Flutter 直连并存时可逐步迁移。
 class BackendApiService {
   BackendApiService._();
+
+  static const _requestTimeout = Duration(seconds: 20);
+  static const _uploadTimeout = Duration(seconds: 60);
 
   static Uri _api(String path, [Map<String, String>? query]) {
     final base = ApiConfig.baseUrl.replaceAll(RegExp(r'/$'), '');
@@ -84,6 +88,29 @@ class BackendApiService {
 
   static bool _refreshing = false;
 
+  static Future<http.Response> _sendJsonRequest(
+    String method,
+    Uri uri,
+    Map<String, String> headers,
+    String? payload,
+  ) async {
+    try {
+      final request = switch (method) {
+        'GET' => http.get(uri, headers: headers),
+        'POST' => http.post(uri, headers: headers, body: payload),
+        'PUT' => http.put(uri, headers: headers, body: payload),
+        'PATCH' => http.patch(uri, headers: headers, body: payload),
+        'DELETE' => http.delete(uri, headers: headers, body: payload),
+        _ => throw ArgumentError('Unsupported method $method'),
+      };
+      return await request.timeout(_requestTimeout);
+    } on TimeoutException {
+      throw ApiException(code: 504, message: '网络请求超时，请稍后重试');
+    } on http.ClientException {
+      throw ApiException(code: 0, message: '网络连接失败，请检查网络后重试');
+    }
+  }
+
   static Future<Map<String, dynamic>> _requestJson(
     String method,
     String path, {
@@ -97,14 +124,7 @@ class BackendApiService {
 
     http.Response r;
     try {
-      r = switch (method) {
-        'GET' => await http.get(uri, headers: headers),
-        'POST' => await http.post(uri, headers: headers, body: payload),
-        'PUT' => await http.put(uri, headers: headers, body: payload),
-        'PATCH' => await http.patch(uri, headers: headers, body: payload),
-        'DELETE' => await http.delete(uri, headers: headers, body: payload),
-        _ => throw ArgumentError('Unsupported method $method'),
-      };
+      r = await _sendJsonRequest(method, uri, headers, payload);
       return _decodeBody(r);
     } on ApiException catch (e) {
       if (e.code == 401 && withAuth && !_refreshing) {
@@ -114,15 +134,7 @@ class BackendApiService {
               await Supabase.instance.client.auth.refreshSession();
           if (refreshed.session != null) {
             headers = await _headers(withAuth: withAuth);
-            r = switch (method) {
-              'GET' => await http.get(uri, headers: headers),
-              'POST' => await http.post(uri, headers: headers, body: payload),
-              'PUT' => await http.put(uri, headers: headers, body: payload),
-              'PATCH' => await http.patch(uri, headers: headers, body: payload),
-              'DELETE' =>
-                await http.delete(uri, headers: headers, body: payload),
-              _ => throw ArgumentError('Unsupported method $method'),
-            };
+            r = await _sendJsonRequest(method, uri, headers, payload);
             return _decodeBody(r);
           }
         } finally {
@@ -910,6 +922,22 @@ class BackendApiService {
       ),
     );
     return _paginated(decoded, limit: limit, offset: offset);
+  }
+
+  static Future<Map<String, dynamic>> geocodeAddressWithAmap({
+    required String address,
+    String? city,
+  }) async {
+    final decoded = await _requestJson(
+      'POST',
+      '/api/v1/maps/geocode',
+      withAuth: true,
+      body: {
+        'address': address.trim(),
+        if (city != null && city.trim().isNotEmpty) 'city': city.trim(),
+      },
+    );
+    return decoded['data'] as Map<String, dynamic>;
   }
 
   static Future<Map<String, dynamic>> fetchOrganization(String id) async {
@@ -2098,6 +2126,28 @@ class BackendApiService {
       },
     );
     return decoded['data'] as Map<String, dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> createContentReport({
+    required String targetType,
+    required String targetId,
+    required String reason,
+    String? detail,
+    Map<String, dynamic>? metadata,
+  }) async {
+    final decoded = await _requestJson(
+      'POST',
+      '/api/v1/reports',
+      withAuth: true,
+      body: {
+        'target_type': targetType,
+        'target_id': targetId,
+        'reason': reason,
+        if (detail != null && detail.trim().isNotEmpty) 'detail': detail.trim(),
+        if (metadata != null && metadata.isNotEmpty) 'metadata': metadata,
+      },
+    );
+    return decoded['data'] as Map<String, dynamic>? ?? {};
   }
 
   static Future<
@@ -3376,7 +3426,7 @@ class BackendApiService {
         folder: folder,
       );
     } on ApiException catch (e) {
-      if (e.code == 503) {
+      if (_shouldFallbackFromCos(e)) {
         return _uploadFileLegacy(
           bytes: bytes,
           filename: filename,
@@ -3386,6 +3436,14 @@ class BackendApiService {
       }
       rethrow;
     }
+  }
+
+  static bool _shouldFallbackFromCos(ApiException error) {
+    return error.code == 0 ||
+        error.code == 403 ||
+        error.code == 502 ||
+        error.code == 503 ||
+        error.code == 504;
   }
 
   static Future<Map<String, dynamic>> _uploadFileToCos({
@@ -3418,11 +3476,20 @@ class BackendApiService {
         headers[entry.key.toString()] = entry.value.toString();
       }
     }
-    final uploaded = await http.put(
-      Uri.parse(uploadUrl),
-      headers: headers,
-      body: bytes,
-    );
+    late final http.Response uploaded;
+    try {
+      uploaded = await http
+          .put(
+            Uri.parse(uploadUrl),
+            headers: headers,
+            body: bytes,
+          )
+          .timeout(_uploadTimeout);
+    } on TimeoutException {
+      throw ApiException(code: 504, message: 'COS 上传超时');
+    } on http.ClientException {
+      throw ApiException(code: 0, message: 'COS 上传网络连接失败');
+    }
     if (uploaded.statusCode < 200 || uploaded.statusCode >= 300) {
       throw ApiException(
         code: uploaded.statusCode,
@@ -3430,18 +3497,13 @@ class BackendApiService {
       );
     }
 
-    final publicUrl = signed['public_url']?.toString() ?? '';
     final completeDecoded = await _requestJson(
       'POST',
       '/api/v1/uploads/cos/complete',
       withAuth: true,
       body: {
+        'upload_id': signed['upload_id']?.toString() ?? '',
         'key': signed['key']?.toString() ?? '',
-        'url': publicUrl,
-        'bucket': signed['bucket']?.toString(),
-        'file_type': contentType,
-        'scene': folder,
-        'size': bytes.length,
       },
     );
     final completed =
@@ -3449,10 +3511,8 @@ class BackendApiService {
     return {
       ...signed,
       ...completed,
-      'url': completed['url']?.toString().isNotEmpty == true
-          ? completed['url']
-          : publicUrl,
-      'public_url': publicUrl,
+      'url': completed['url']?.toString() ?? '',
+      'public_url': completed['public_url'],
       'provider': 'tencent_cos',
     };
   }
@@ -3472,24 +3532,53 @@ class BackendApiService {
       filename: filename,
       contentType: _mediaType(contentType),
     ));
-    final streamed = await request.send();
-    final r = await http.Response.fromStream(streamed);
-    final decoded = _decodeBody(r);
-    final data = decoded['data'];
-    final result = data is Map<String, dynamic>
-        ? {...data}
-        : <String, dynamic>{...decoded};
-    final url = result['url']?.toString() ?? decoded['url']?.toString() ?? '';
-    if (url.isNotEmpty) result['url'] = url;
-    return result;
+    try {
+      final streamed = await request.send().timeout(_uploadTimeout);
+      final r =
+          await http.Response.fromStream(streamed).timeout(_uploadTimeout);
+      if (r.statusCode < 200 || r.statusCode >= 300) {
+        _decodeBody(r);
+      }
+      final decoded = _decodeBody(r);
+      final data = decoded['data'];
+      final result = data is Map<String, dynamic>
+          ? {...data}
+          : <String, dynamic>{...decoded};
+      final url = result['url']?.toString() ?? decoded['url']?.toString() ?? '';
+      if (url.isNotEmpty) result['url'] = url;
+      return result;
+    } on TimeoutException {
+      throw ApiException(code: 504, message: '文件上传超时');
+    } on http.ClientException {
+      throw ApiException(code: 0, message: '文件上传网络连接失败');
+    }
   }
 
-  static Future<String> signSubmissionMaterial(String material) async {
+  static Future<void> deleteTencentCosUpload(String uploadId) async {
+    final normalizedId = uploadId.trim();
+    if (normalizedId.isEmpty) {
+      throw ArgumentError.value(uploadId, 'uploadId', '上传会话不能为空');
+    }
+    await _requestJson(
+      'DELETE',
+      '/api/v1/uploads/cos/$normalizedId',
+      withAuth: true,
+    );
+  }
+
+  static Future<String> signSubmissionMaterial(
+    String material, {
+    String? contractId,
+  }) async {
     final decoded = await _requestJson(
       'POST',
       '/api/v1/uploads/materials/sign',
       withAuth: true,
-      body: {'url': material},
+      body: {
+        'url': material,
+        if (contractId != null && contractId.trim().isNotEmpty)
+          'contract_id': contractId.trim(),
+      },
     );
     final signedUrl = decoded['signed_url']?.toString() ?? '';
     if (signedUrl.isEmpty) throw Exception('材料签名链接生成失败');
@@ -3748,6 +3837,8 @@ class BackendApiService {
     required String phone,
     String countryCode = '+86',
     String purpose = 'login',
+    String? captchaTicket,
+    String? captchaRandstr,
   }) {
     return _requestJson(
       'POST',
@@ -3756,6 +3847,8 @@ class BackendApiService {
         'phone': phone,
         'country_code': countryCode,
         'purpose': purpose,
+        if (captchaTicket != null) 'captcha_ticket': captchaTicket,
+        if (captchaRandstr != null) 'captcha_randstr': captchaRandstr,
       },
     );
   }

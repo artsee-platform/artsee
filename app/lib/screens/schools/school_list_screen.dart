@@ -373,7 +373,7 @@ class SchoolListScreenState extends State<SchoolListScreen>
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: Colors.transparent,
       child: RefreshIndicator(
         color: kCobalt,
         onRefresh: _refresh,
@@ -715,7 +715,8 @@ class _SchoolDecisionFilterSheet extends StatelessWidget {
                         fontSize: 20,
                         fontWeight: FontWeight.w900,
                         color: context.artC.ink,
-                        fontFamily: 'Noto Serif SC',
+                        fontFamily: kAppFontFamily,
+                        fontFamilyFallback: kAppFontFallback,
                       ),
                     ),
                   ),

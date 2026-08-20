@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../services/backend_api_service.dart';
 import '../../services/supabase_service.dart';
+import '../../services/tencent_push_service.dart';
 import '../../widgets/common.dart';
 import '../auth/login_screen.dart';
 import '../community/community_post_detail_screen.dart';
@@ -25,7 +26,6 @@ import 'team_invitations_screen.dart';
 import 'package:artsee_app/theme/artsee_theme_controller.dart';
 import 'package:artsee_app/theme/artsee_ui_colors.dart';
 
-const _profileCanvas = Color(0xFFFFFFFF);
 const _profileSoftCanvas = Color(0xFFF7F8FB);
 const _profileLine = Color(0xFFECEFF4);
 const _profileInk = Color(0xFF111827);
@@ -386,7 +386,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
     if (_loading) {
       return Scaffold(
-        backgroundColor: context.artC.porcelain,
+        backgroundColor: Colors.transparent,
         body: const Center(
             child: CircularProgressIndicator(color: kCobalt, strokeWidth: 2.5)),
       );
@@ -397,7 +397,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildGuestView() {
     final topInset = MediaQuery.paddingOf(context).top;
     return Scaffold(
-      backgroundColor: context.artC.porcelain,
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
           Positioned.fill(
@@ -594,7 +594,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final bottomSpacer = MediaQuery.of(context).padding.bottom + 148;
 
     return Scaffold(
-      backgroundColor: _profileCanvas,
+      backgroundColor: Colors.transparent,
       drawerScrimColor: Colors.black.withValues(alpha: 0.36),
       drawer: _buildProfileDrawer(),
       onDrawerChanged: widget.onDrawerChanged,
@@ -625,7 +625,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final title = _isBusinessUser ? _businessName : _nickname;
     final topInset = MediaQuery.of(context).padding.top;
     return Container(
-      color: _profileCanvas,
+      color: Colors.transparent,
       padding: EdgeInsets.fromLTRB(10, topInset + 4, 10, 22),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3342,7 +3342,7 @@ String _marketDateText(String raw) {
   return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
 }
 
-class _SettingsScreen extends StatelessWidget {
+class _SettingsScreen extends StatefulWidget {
   final bool isBusinessUser;
   final VoidCallback onSignOut;
 
@@ -3350,6 +3350,56 @@ class _SettingsScreen extends StatelessWidget {
     required this.isBusinessUser,
     required this.onSignOut,
   });
+
+  @override
+  State<_SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<_SettingsScreen> {
+  bool _pushConsent = false;
+  bool _loadingPushConsent = true;
+  bool _updatingPushConsent = false;
+  String _pushStatus = '读取通知偏好…';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPushConsent();
+  }
+
+  Future<void> _loadPushConsent() async {
+    final consent = await TencentPushService.getConsent();
+    if (!mounted) return;
+    setState(() {
+      _pushConsent = consent;
+      _loadingPushConsent = false;
+      _pushStatus = consent ? '已允许，登录后自动注册设备' : '关闭';
+    });
+  }
+
+  Future<void> _setPushConsent(bool enabled) async {
+    if (_updatingPushConsent) return;
+    setState(() => _updatingPushConsent = true);
+    try {
+      final result = await TencentPushService.setConsent(enabled);
+      if (!mounted) return;
+      setState(() {
+        _pushConsent = enabled;
+        _pushStatus = result.message;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.message)),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _pushStatus = '更新失败，请稍后重试');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('推送设置更新失败：$error')),
+      );
+    } finally {
+      if (mounted) setState(() => _updatingPushConsent = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -3387,7 +3437,21 @@ class _SettingsScreen extends StatelessWidget {
               _SettingsItem(
                 icon: Icons.notifications_outlined,
                 title: '推送通知',
-                onTap: () => _showComingSoon(context),
+                subtitle: _pushStatus,
+                trailing: _loadingPushConsent
+                    ? const SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Switch(
+                        value: _pushConsent,
+                        onChanged:
+                            _updatingPushConsent ? null : _setPushConsent,
+                        activeThumbColor: kCobalt,
+                      ),
+                onTap: _loadingPushConsent || _updatingPushConsent
+                    ? () {}
+                    : () => _setPushConsent(!_pushConsent),
               ),
               _SettingsItem(
                 icon: Icons.message_outlined,
@@ -3444,7 +3508,7 @@ class _SettingsScreen extends StatelessWidget {
             child: OutlinedButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                onSignOut();
+                widget.onSignOut();
               },
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.red,
@@ -3501,12 +3565,14 @@ class _SettingsSection extends StatelessWidget {
 class _SettingsItem extends StatelessWidget {
   final IconData icon;
   final String title;
+  final String? subtitle;
   final Widget? trailing;
   final VoidCallback onTap;
 
   const _SettingsItem({
     required this.icon,
     required this.title,
+    this.subtitle,
     this.trailing,
     required this.onTap,
   });
@@ -3523,6 +3589,15 @@ class _SettingsItem extends StatelessWidget {
           color: context.artC.ink,
         ),
       ),
+      subtitle: subtitle == null
+          ? null
+          : Text(
+              subtitle!,
+              style: TextStyle(
+                fontSize: 12,
+                color: context.artC.ink.withValues(alpha: 0.48),
+              ),
+            ),
       trailing: trailing ??
           Icon(
             Icons.chevron_right,

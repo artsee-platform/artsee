@@ -33,6 +33,9 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Large curated 3D sources are uploaded to Tencent COS.
+/web/immersive/assets/*.sog
+
 # Symbolication related
 app.*.symbols
 
@@ -43,3 +46,11 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Tencent Push credentials downloaded from Tencent/vendor consoles.
+/android/app/src/main/assets/timpush-configs.json
+/android/app/google-services.json
+/android/app/agconnect-services.json
+/android/app/mcs-services.json
+/ios/Runner/*.p8
+/ios/Runner/*.p12

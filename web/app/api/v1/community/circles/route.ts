@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromBearer } from "@/lib/api/auth-user";
+import { requireUser } from "@/lib/api/authz";
+import { auditContent, collectAuditText } from "@/lib/api/content-safety";
+import {
+  contentSafetyErrorResponse,
+  rejectedAuditResponse,
+} from "@/lib/api/content-safety-http";
 import { createServiceClient } from "@/lib/api/supabase-service";
 import { errorResponse, parsePagination } from "@/lib/api/route-helpers";
+import { recordUploadAuditResults } from "@/lib/api/upload-audit";
 
 export async function GET(req: NextRequest) {
   try {
@@ -56,33 +63,57 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const user = await getUserFromBearer(req);
-  if (!user) {
-    return NextResponse.json({ success: false, error: "未授权" }, { status: 401 });
-  }
-
   try {
+    const auth = await requireUser(req);
+    if ("response" in auth) return auth.response;
+
     const body = await req.json();
     const title = String(body.title ?? "").trim();
     if (!title) {
       return NextResponse.json({ success: false, error: "请填写圈子名称" }, { status: 400 });
     }
+    if (body.status !== undefined) {
+      return NextResponse.json(
+        { success: false, error: "圈子状态不能由客户端直接修改" },
+        { status: 400 }
+      );
+    }
+
+    const subtitle = String(body.subtitle ?? "").trim();
+    const category = String(body.category ?? "art").trim() || "art";
+    const city = String(body.city ?? "").trim();
+    const coverUrl = String(body.cover_url ?? "").trim();
+    const metadata =
+      body.metadata && typeof body.metadata === "object" && !Array.isArray(body.metadata)
+        ? body.metadata
+        : {};
+    const audit = await auditContent({
+      userId: auth.user.id,
+      text: collectAuditText(title, subtitle, category, city, metadata),
+      imageUrls: coverUrl ? [coverUrl] : [],
+      scene: "community_circle",
+    });
+    const rejected = rejectedAuditResponse(audit, "圈子内容");
+    if (rejected) return rejected;
 
     const supabase = createServiceClient();
+    await recordUploadAuditResults(
+      supabase,
+      auth.user.id,
+      coverUrl ? [coverUrl] : [],
+      audit
+    );
     const { data, error } = await supabase
       .from("community_circles")
       .insert({
-        creator_id: user.id,
+        creator_id: auth.user.id,
         title,
-        subtitle: body.subtitle ?? null,
-        category: body.category ?? "art",
-        city: body.city ?? null,
-        cover_url: body.cover_url ?? null,
-        status: body.status ?? "published",
-        metadata:
-          body.metadata && typeof body.metadata === "object" && !Array.isArray(body.metadata)
-            ? body.metadata
-            : {},
+        subtitle: subtitle || null,
+        category,
+        city: city || null,
+        cover_url: coverUrl || null,
+        status: "published",
+        metadata,
       })
       .select()
       .single();
@@ -92,7 +123,7 @@ export async function POST(req: NextRequest) {
       await supabase.from("community_circle_members").upsert(
         {
           circle_id: data.id,
-          user_id: user.id,
+          user_id: auth.user.id,
           status: "joined",
           updated_at: new Date().toISOString(),
         },
@@ -104,6 +135,8 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (e) {
+    const auditError = contentSafetyErrorResponse(e);
+    if (auditError) return auditError;
     return errorResponse(e);
   }
 }

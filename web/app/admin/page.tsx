@@ -16,6 +16,7 @@ import {
   LogIn,
   LogOut,
   MessageSquareWarning,
+  PlugZap,
   ReceiptText,
   RotateCcw,
   ShieldCheck,
@@ -23,6 +24,12 @@ import {
 } from "lucide-react";
 
 const ADMIN_LINKS = [
+  {
+    href: "/admin/integrations",
+    title: "第三方集成自检",
+    description: "脱敏检查凭证、数据库迁移、控制台配置和冒烟验收状态。",
+    icon: PlugZap,
+  },
   {
     href: "/admin/dashboard",
     title: "数据看板",

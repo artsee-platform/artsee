@@ -15,8 +15,14 @@ import {
   normalizeAiPersona,
   resolveAiConversation,
 } from '@/lib/ai/general-context';
+import { classifyIntent } from '@/lib/ai/intent';
 import { logChatInteraction } from '@/lib/logging/chat-logger';
-import { buildRoleSystemPrompt, runConsultStages, streamGenerate } from '@/lib/pipelines/consult-pipeline';
+import {
+  buildRoleSystemPrompt,
+  runConsultStages,
+  streamGenerate,
+  type ConsultStages,
+} from '@/lib/pipelines/consult-pipeline';
 import { loadPersona } from '@/lib/knowledge/persona-loader';
 
 // Grayscale flag
@@ -108,7 +114,7 @@ async function handleUnifiedPath(
 ) {
   console.log('[chat] Using unified pipeline');
 
-  let stages;
+  let stages: ConsultStages;
   try {
     // Run unified consult pipeline
     stages = await runConsultStages({
@@ -215,7 +221,7 @@ function buildNoRetrievalStages({
   lastUserMessage: string;
   history: Array<{ role?: string; content?: string }>;
   userProfile: any;
-}) {
+}): ConsultStages {
   const recentHistory = (history || [])
     .slice(-8)
     .map((message) => {
@@ -238,7 +244,7 @@ function buildNoRetrievalStages({
       .filter(Boolean)
       .join('\n\n'),
     sources: [],
-    intent: 'general_chat' as any,
+    intent: classifyIntent(lastUserMessage).intent,
     lowConfidence: true,
     retrievedChunkIds: [],
   };

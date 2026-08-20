@@ -259,6 +259,9 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
+# 高德 Web 服务 API Key（服务端专用，不要放进 Flutter）
+AMAP_WEB_SERVICE_KEY=your_amap_web_service_key
+
 # OpenAI（AI 咨询功能）
 OPENAI_API_KEY=sk-...
 

@@ -3,23 +3,14 @@ import { getUserFromBearer } from "@/lib/api/auth-user";
 import { recordCreatorContent } from "@/lib/api/creator-level";
 import { requireUser } from "@/lib/api/authz";
 import { createServiceClient } from "@/lib/api/supabase-service";
-import { auditContent } from "@/lib/api/content-safety";
-import { TencentCloudConfigError } from "@/lib/api/tencent-cloud";
-
-function postStatusForAudit(auditStatus: string) {
-  if (auditStatus === "approved") return "published";
-  if (auditStatus === "rejected") return "rejected";
-  return "reviewing";
-}
-
-function auditReasonFromItems(
-  items: Array<{ label: string | null; sub_label: string | null }>
-) {
-  return items
-    .map((item) => [item.label, item.sub_label].filter(Boolean).join("/"))
-    .filter(Boolean)
-    .join(", ");
-}
+import {
+  auditContent,
+  auditReasonFromItems,
+  collectAuditText,
+  contentStatusForAudit,
+} from "@/lib/api/content-safety";
+import { contentSafetyErrorResponse } from "@/lib/api/content-safety-http";
+import { recordUploadAuditResults } from "@/lib/api/upload-audit";
 
 /** GET /api/v1/community/posts — 图文社区列表（数据库 community_posts） */
 export async function GET(req: NextRequest) {
@@ -119,12 +110,18 @@ export async function POST(req: NextRequest) {
 
     const audit = await auditContent({
       userId: auth.user.id,
-      text: [title, text].filter(Boolean).join("\n\n"),
+      text: collectAuditText(title, text, metadata),
       imageUrls,
       scene: "community_post",
     });
-    const status = postStatusForAudit(audit.audit_status);
+    const status = contentStatusForAudit(audit.audit_status);
     const supabase = createServiceClient();
+    await recordUploadAuditResults(
+      supabase,
+      auth.user.id,
+      imageUrls,
+      audit
+    );
     const { data, error } = await supabase
       .from("community_posts")
       .insert({
@@ -158,12 +155,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, data });
   } catch (e: unknown) {
-    if (e instanceof TencentCloudConfigError) {
-      return NextResponse.json(
-        { success: false, error: e.message, missing: e.missing },
-        { status: 503 }
-      );
-    }
+    const auditError = contentSafetyErrorResponse(e);
+    if (auditError) return auditError;
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }

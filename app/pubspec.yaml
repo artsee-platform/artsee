@@ -21,11 +21,18 @@ dependencies:
   image_picker: ^1.0.7
   http: ^1.2.2
   http_parser: ^4.0.0
-  tencent_cloud_chat_sdk: ^9.0.7652+1
+  # 9.0.7652+1 has a Web compile regression: its native dummy adapter omits
+  # muteAllGroupMembers. 8.7.7201+3 includes the Web receive/listener fixes
+  # required by this app and builds with the current Flutter toolchain.
+  tencent_cloud_chat_sdk: 8.7.7201+3
+  # Keep TIMPush on the same 8.7 release line as the IM SDK. The client-side
+  # registration code stays disabled until TENCENT_PUSH_ENABLED is supplied.
+  tencent_cloud_chat_push: 8.7.7201
   speech_to_text: ^7.0.0
   permission_handler: ^11.3.0
   fl_chart: ^0.69.0
   qr_flutter: ^4.1.0
+  webview_flutter: ^4.14.1
 
 dev_dependencies:
   flutter_test:

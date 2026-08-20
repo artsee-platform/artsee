@@ -4,6 +4,7 @@ import '../../models/models.dart';
 import '../../services/backend_api_service.dart';
 import '../../widgets/artsee_ui.dart';
 import '../../widgets/common.dart';
+import '../../widgets/deep_sea_ui.dart';
 import '../profile/public_user_profile_screen.dart';
 import 'package:artsee_app/theme/artsee_ui_colors.dart';
 
@@ -287,122 +288,124 @@ class _CommunityPostDetailScreenState extends State<CommunityPostDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final post = _post;
-    return Scaffold(
-      backgroundColor: context.artC.porcelain,
-      appBar: AppBar(
-        backgroundColor: context.artC.cardIconBg,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: false,
-        titleSpacing: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, color: context.artC.ink, size: 20),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: post == null
-            ? Text(
-                _isQa ? '问题详情' : '动态详情',
-                style: TextStyle(
-                  color: context.artC.ink,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
-              )
-            : _DetailAuthorTitle(
-                post: post,
-                isQa: _isQa,
-                onTap: () => _openPostAuthorProfile(post),
-              ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.ios_share, color: context.artC.ink, size: 23),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('分享功能即将开放')),
-              );
-            },
+    return HomeArtworkBackdrop(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          centerTitle: false,
+          titleSpacing: 0,
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back_ios, color: context.artC.ink, size: 20),
+            onPressed: () => Navigator.of(context).pop(),
           ),
-          const SizedBox(width: 4),
-        ],
-      ),
-      body: SafeArea(
-        child: _loading && post == null
-            ? const LoadingIndicator()
-            : post == null
-                ? _ErrorView(
-                    message: _error ?? '内容不存在或已下架',
-                    onRetry: () => _load(),
-                  )
-                : Column(
-                    children: [
-                      Expanded(
-                        child: RefreshIndicator(
-                          color: kCobalt,
-                          onRefresh: _refreshAll,
-                          child: CustomScrollView(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            slivers: [
-                              if (!_isQa)
-                                SliverToBoxAdapter(
-                                  child: _ImageGallery(
-                                    post: post,
-                                    edgeToEdge: true,
-                                  ),
-                                ),
-                              SliverToBoxAdapter(
-                                child: _PostBody(
-                                  post: post,
-                                  isQa: _isQa,
-                                ),
-                              ),
-                              if (_isQa && post.imageUrls.isNotEmpty)
-                                SliverToBoxAdapter(
-                                  child: _ImageGallery(post: post),
-                                ),
-                              SliverToBoxAdapter(
-                                child: _CommentsSection(
-                                  comments: _comments,
-                                  loading: _commentsLoading,
-                                  isQa: _isQa,
-                                  commentCount: _commentCount,
-                                  engagementCount: _likeCount + _saveCount,
-                                  composer: KeyedSubtree(
-                                    key: _commentComposerKey,
-                                    child: _CommentComposer(
-                                      controller: _commentCtrl,
-                                      focusNode: _commentFocusNode,
-                                      sending: _sendingComment,
-                                      isQa: _isQa,
-                                      onSend: _sendComment,
+          title: post == null
+              ? Text(
+                  _isQa ? '问题详情' : '动态详情',
+                  style: TextStyle(
+                    color: context.artC.ink,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                )
+              : _DetailAuthorTitle(
+                  post: post,
+                  isQa: _isQa,
+                  onTap: () => _openPostAuthorProfile(post),
+                ),
+          actions: [
+            IconButton(
+              icon: Icon(Icons.ios_share, color: context.artC.ink, size: 23),
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('分享功能即将开放')),
+                );
+              },
+            ),
+            const SizedBox(width: 4),
+          ],
+        ),
+        body: SafeArea(
+          child: _loading && post == null
+              ? const LoadingIndicator()
+              : post == null
+                  ? _ErrorView(
+                      message: _error ?? '内容不存在或已下架',
+                      onRetry: () => _load(),
+                    )
+                  : Column(
+                      children: [
+                        Expanded(
+                          child: RefreshIndicator(
+                            color: kCobalt,
+                            onRefresh: _refreshAll,
+                            child: CustomScrollView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              slivers: [
+                                if (!_isQa)
+                                  SliverToBoxAdapter(
+                                    child: _ImageGallery(
+                                      post: post,
+                                      edgeToEdge: true,
                                     ),
                                   ),
-                                  onAuthorTap: _openCommentAuthorProfile,
+                                SliverToBoxAdapter(
+                                  child: _PostBody(
+                                    post: post,
+                                    isQa: _isQa,
+                                  ),
                                 ),
-                              ),
-                              SliverToBoxAdapter(
-                                child: SizedBox(
-                                  height: 18 + mainTabBottomInset(context),
+                                if (_isQa && post.imageUrls.isNotEmpty)
+                                  SliverToBoxAdapter(
+                                    child: _ImageGallery(post: post),
+                                  ),
+                                SliverToBoxAdapter(
+                                  child: _CommentsSection(
+                                    comments: _comments,
+                                    loading: _commentsLoading,
+                                    isQa: _isQa,
+                                    commentCount: _commentCount,
+                                    engagementCount: _likeCount + _saveCount,
+                                    composer: KeyedSubtree(
+                                      key: _commentComposerKey,
+                                      child: _CommentComposer(
+                                        controller: _commentCtrl,
+                                        focusNode: _commentFocusNode,
+                                        sending: _sendingComment,
+                                        isQa: _isQa,
+                                        onSend: _sendComment,
+                                      ),
+                                    ),
+                                    onAuthorTap: _openCommentAuthorProfile,
+                                  ),
                                 ),
-                              ),
-                            ],
+                                SliverToBoxAdapter(
+                                  child: SizedBox(
+                                    height: 18 + mainTabBottomInset(context),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                      _DetailBottomActions(
-                        isQa: _isQa,
-                        liked: _liked,
-                        saved: _saved,
-                        likeBusy: _likeBusy,
-                        saveBusy: _saveBusy,
-                        likeCount: _likeCount,
-                        saveCount: _saveCount,
-                        commentCount: _commentCount,
-                        onLike: _toggleLike,
-                        onSave: _toggleSave,
-                        onComment: _focusCommentComposer,
-                      ),
-                    ],
-                  ),
+                        _DetailBottomActions(
+                          isQa: _isQa,
+                          liked: _liked,
+                          saved: _saved,
+                          likeBusy: _likeBusy,
+                          saveBusy: _saveBusy,
+                          likeCount: _likeCount,
+                          saveCount: _saveCount,
+                          commentCount: _commentCount,
+                          onLike: _toggleLike,
+                          onSave: _toggleSave,
+                          onComment: _focusCommentComposer,
+                        ),
+                      ],
+                    ),
+        ),
       ),
     );
   }
@@ -620,7 +623,8 @@ class _PostBody extends StatelessWidget {
               fontWeight: FontWeight.w900,
               height: 1.24,
               color: context.artC.ink,
-              fontFamily: 'Noto Serif SC',
+              fontFamily: kAppFontFamily,
+              fontFamilyFallback: kAppFontFallback,
             ),
           ),
           if (body.isNotEmpty) ...[

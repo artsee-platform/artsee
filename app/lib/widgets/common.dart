@@ -71,22 +71,35 @@ final kShadowElevated = BoxShadow(
 // 字体样式
 // ═══════════════════════════════════════════════════════════════
 
-/// 衬线体标题
+const kAppFontFamily = 'SF Pro Display';
+const kAppFontFallback = [
+  'PingFang SC',
+  'SF Pro Text',
+  'Helvetica Neue',
+  'Noto Sans SC',
+  'Noto Sans',
+];
+
+/// 标题
 const kSerifTitle = TextStyle(
   fontSize: 20,
   fontWeight: FontWeight.w700,
   color: kInk,
   height: 1.3,
   letterSpacing: 0,
+  fontFamily: kAppFontFamily,
+  fontFamilyFallback: kAppFontFallback,
 );
 
-/// 衬线体大标题
+/// 大标题
 const kSerifHeadline = TextStyle(
   fontSize: 28,
   fontWeight: FontWeight.w700,
   color: kInk,
   height: 1.2,
   letterSpacing: 0,
+  fontFamily: kAppFontFamily,
+  fontFamilyFallback: kAppFontFallback,
 );
 
 /// 标签文字
@@ -94,6 +107,8 @@ const kLabelStyle = TextStyle(
   fontSize: 10,
   fontWeight: FontWeight.w600,
   letterSpacing: 0,
+  fontFamily: kAppFontFamily,
+  fontFamilyFallback: kAppFontFallback,
 );
 
 /// 正文文字
@@ -101,12 +116,16 @@ const kBodyStyle = TextStyle(
   fontSize: 13,
   color: kInk,
   height: 1.5,
+  fontFamily: kAppFontFamily,
+  fontFamilyFallback: kAppFontFallback,
 );
 
 /// 次要文字
 final kCaptionStyle = TextStyle(
   fontSize: 11,
   color: kInk.withOpacity(0.5),
+  fontFamily: kAppFontFamily,
+  fontFamilyFallback: kAppFontFallback,
 );
 
 // ═══════════════════════════════════════════════════════════════

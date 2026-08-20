@@ -103,8 +103,22 @@ class _WorkbenchContractsScreenState extends State<WorkbenchContractsScreen> {
     }
   }
 
-  Future<void> _openFile(String? url) async {
-    final uri = Uri.tryParse(url ?? '');
+  Future<void> _openFile(String? url, {String? contractId}) async {
+    String signedUrl;
+    try {
+      signedUrl = await BackendApiService.signSubmissionMaterial(
+        url ?? '',
+        contractId: contractId,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('合同文件签名失败：$error')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    final uri = Uri.tryParse(signedUrl);
     if (uri == null || !uri.hasScheme) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('合同文件链接无效')),
@@ -233,7 +247,10 @@ class _WorkbenchContractsScreenState extends State<WorkbenchContractsScreen> {
             _ContractCard(
               contract: contract,
               savingId: _savingId,
-              onOpenFile: _openFile,
+              onOpenFile: (url) => _openFile(
+                url,
+                contractId: contract['id']?.toString(),
+              ),
               onSetStatus: _setStatus,
             ),
             const SizedBox(height: 10),

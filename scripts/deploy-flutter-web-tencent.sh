@@ -72,6 +72,9 @@ if [[ "${SKIP_BUILD:-0}" != "1" ]]; then
   fi
   
   cd "${APP_DIR}"
+
+  # Tencent's Flutter Web bridge expects the pinned JS SDK files under web/node_modules.
+  npm ci --prefix web --omit=dev --no-audit --no-fund
   
   # 清理旧构建
   rm -rf build/web

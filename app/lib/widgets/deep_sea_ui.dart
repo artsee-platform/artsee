@@ -2,6 +2,8 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import 'common.dart';
+
 const kDeepSeaBackground = Color(0xFF09111B);
 const kDeepSeaMidnight = Color(0xFF050A10);
 const kDeepSeaPanel = Color(0xFF14243A);
@@ -17,10 +19,12 @@ const kGlassInk = Color(0xFF30333A);
 const kGlassMuted = Color(0xFF6B6C73);
 const kGlassAccent = Color(0xFF647180);
 const kPageArtworkAsset = 'assets/images/soft_peach_light_background.jpg';
+const kHomeArtworkBackground = Color(0xFFF2F3F4);
+const kHomeArtworkScrim = Color(0xFFF7F8F8);
 
 const kDeepSeaTextStyle = TextStyle(
-  fontFamily: 'SF Pro Text',
-  fontFamilyFallback: ['PingFang SC', 'Noto Sans SC'],
+  fontFamily: kAppFontFamily,
+  fontFamilyFallback: kAppFontFallback,
   letterSpacing: 0,
 );
 
@@ -114,6 +118,27 @@ class DeepSeaBackdrop extends StatelessWidget {
           child,
         ],
       ),
+    );
+  }
+}
+
+class HomeArtworkBackdrop extends StatelessWidget {
+  final Widget child;
+
+  const HomeArtworkBackdrop({
+    super.key,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DeepSeaBackdrop(
+      artworkAsset: kPageArtworkAsset,
+      blurSigma: 28,
+      scrimOpacity: 0.58,
+      backgroundColor: kHomeArtworkBackground,
+      scrimColor: kHomeArtworkScrim,
+      child: child,
     );
   }
 }
@@ -215,6 +240,12 @@ class OpticalGlassSurface extends StatelessWidget {
   final double blurSigma;
   final bool elevated;
   final bool emphasized;
+  final double borderOpacity;
+  final double innerBorderOpacity;
+  final double highlightOpacity;
+  final double bottomShadeOpacity;
+  final double shadowOpacity;
+  final double glowOpacity;
 
   const OpticalGlassSurface({
     super.key,
@@ -225,6 +256,12 @@ class OpticalGlassSurface extends StatelessWidget {
     this.blurSigma = 14,
     this.elevated = true,
     this.emphasized = false,
+    this.borderOpacity = 0.68,
+    this.innerBorderOpacity = 0.2,
+    this.highlightOpacity = 0.52,
+    this.bottomShadeOpacity = 0.055,
+    this.shadowOpacity = 0.1,
+    this.glowOpacity = 0.25,
   });
 
   @override
@@ -242,13 +279,13 @@ class OpticalGlassSurface extends StatelessWidget {
         boxShadow: elevated
             ? [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
+                  color: Colors.black.withValues(alpha: shadowOpacity),
                   blurRadius: 28,
                   spreadRadius: -9,
                   offset: const Offset(0, 12),
                 ),
                 BoxShadow(
-                  color: Colors.white.withValues(alpha: 0.25),
+                  color: Colors.white.withValues(alpha: glowOpacity),
                   blurRadius: 13,
                   spreadRadius: -9,
                   offset: const Offset(-3, -3),
@@ -277,7 +314,7 @@ class OpticalGlassSurface extends StatelessWidget {
                     border: Border.all(
                       color: emphasized
                           ? kGlassAccent.withValues(alpha: 0.28)
-                          : Colors.white.withValues(alpha: 0.68),
+                          : Colors.white.withValues(alpha: borderOpacity),
                       width: 0.75,
                     ),
                   ),
@@ -290,7 +327,8 @@ class OpticalGlassSurface extends StatelessWidget {
                     decoration: BoxDecoration(
                       borderRadius: innerRadius,
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.2),
+                        color:
+                            Colors.white.withValues(alpha: innerBorderOpacity),
                         width: 0.55,
                       ),
                     ),
@@ -309,7 +347,7 @@ class OpticalGlassSurface extends StatelessWidget {
                   child: Container(
                     height: 0.9,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.52),
+                      color: Colors.white.withValues(alpha: highlightOpacity),
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
@@ -323,7 +361,7 @@ class OpticalGlassSurface extends StatelessWidget {
                   child: Container(
                     height: 1.1,
                     decoration: BoxDecoration(
-                      color: kGlassInk.withValues(alpha: 0.055),
+                      color: kGlassInk.withValues(alpha: bottomShadeOpacity),
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),

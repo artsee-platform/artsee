@@ -5,9 +5,10 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config/app_config.dart';
 import 'screens/main_scaffold.dart';
+import 'screens/messages/light_message_screen.dart';
 import 'screens/onboarding/art_interest_onboarding_screen.dart';
 import 'services/supabase_service.dart';
-import 'services/tencent_im_service.dart';
+import 'services/tencent_push_service.dart';
 import 'theme/artsee_app_themes.dart';
 import 'theme/artsee_theme_controller.dart';
 import 'theme/artsee_ui_colors.dart';
@@ -95,10 +96,14 @@ class _AuthWrapperState extends State<AuthWrapper> {
   bool _loadingProfile = true;
   bool _onboardingDoneThisSession = false;
   StreamSubscription<AuthState>? _authSub;
+  StreamSubscription<TencentPushNotificationClick>? _pushClickSub;
+  bool _openingPushNotification = false;
 
   @override
   void initState() {
     super.initState();
+    _pushClickSub =
+        TencentPushService.notificationClicks.listen(_onPushNotification);
     _init();
     _authSub = Supabase.instance.client.auth.onAuthStateChange
         .listen((_) => _reload());
@@ -111,12 +116,14 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   void dispose() {
     _authSub?.cancel();
+    _pushClickSub?.cancel();
     super.dispose();
   }
 
   Future<void> _reload() async {
     if (!SupabaseService.isLoggedIn) {
-      unawaited(TencentImService.logout());
+      unawaited(TencentPushService.unregister());
+      TencentPushService.consumePendingNotification();
       if (mounted) {
         setState(() {
           _profile = null;
@@ -129,7 +136,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
     if (mounted) setState(() => _loadingProfile = true);
     final p = await SupabaseService.fetchProfile();
     if (!mounted) return;
-    unawaited(_syncTencentImLogin());
     setState(() {
       _profile = p;
       _loadingProfile = false;
@@ -140,6 +146,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!context.mounted) return;
         Navigator.of(context, rootNavigator: true).popUntil((r) => r.isFirst);
+      });
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_openPendingPushNotification());
       });
     }
   }
@@ -168,17 +178,53 @@ class _AuthWrapperState extends State<AuthWrapper> {
         };
         _loadingProfile = false;
       });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_openPendingPushNotification());
+      });
     }
   }
 
-  Future<void> _syncTencentImLogin() async {
+  void _onPushNotification(TencentPushNotificationClick _) {
+    if (!SupabaseService.isLoggedIn) {
+      TencentPushService.consumePendingNotification();
+      return;
+    }
+    unawaited(_openPendingPushNotification());
+  }
+
+  Future<void> _openPendingPushNotification() async {
+    if (!mounted || _openingPushNotification || _loadingProfile) return;
+    if (!SupabaseService.isLoggedIn) {
+      TencentPushService.consumePendingNotification();
+      return;
+    }
+    final dbDone =
+        _profile != null && _profile!['has_completed_onboarding'] == true;
+    final devSkip = AppConfig.devLoginEnabled &&
+        SupabaseService.currentUser?.email == 'dev.test@artsee.app';
+    if (!dbDone && !_onboardingDoneThisSession && !devSkip) return;
+
+    final click = TencentPushService.consumePendingNotification();
+    if (click == null) return;
+    if (!click.opensConversation) {
+      debugPrint('Ignoring unsupported Tencent Push ext: ${click.rawExt}');
+      return;
+    }
+
+    _openingPushNotification = true;
     try {
-      await TencentImService.ensureLoggedIn();
-    } catch (error) {
-      if (error is UnsupportedError) {
-        return;
-      }
-      debugPrint('Tencent IM login error: $error');
+      await Navigator.of(context, rootNavigator: true).push<void>(
+        MaterialPageRoute(
+          builder: (_) => LightMessageScreen(
+            conversation: {
+              'id': click.conversationId,
+              'title': '消息',
+            },
+          ),
+        ),
+      );
+    } finally {
+      _openingPushNotification = false;
     }
   }
 

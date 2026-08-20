@@ -19,6 +19,14 @@ class AppConfig {
   static const bool _devLogin =
       bool.fromEnvironment('DEV_LOGIN', defaultValue: false);
   static const String _apiBaseUrl = String.fromEnvironment('API_BASE_URL');
+  static const String _publicSiteBaseUrl = String.fromEnvironment(
+    'PUBLIC_SITE_URL',
+    defaultValue: 'https://artiqore.com/',
+  );
+  static const String _immersiveViewerUrl = String.fromEnvironment(
+    'IMMERSIVE_VIEWER_URL',
+    defaultValue: 'https://artiqore.com/immersive/index.html',
+  );
   static const String _webDevPort =
       String.fromEnvironment('WEB_DEV_PORT', defaultValue: '3003');
 
@@ -38,4 +46,13 @@ class AppConfig {
     if (_apiBaseUrl.isNotEmpty) return _apiBaseUrl;
     return resolveApiBaseUrl(_webDevPort);
   }
+
+  /// Flutter Web public origin, used by mobile shells for shared static tools.
+  static String get publicSiteBaseUrl => _publicSiteBaseUrl;
+
+  /// Platform-owned Gaussian Splat viewer.
+  ///
+  /// The HTML shell stays on the public site while the large binary is served
+  /// by COS with a restricted CORS rule.
+  static String get immersiveViewerUrl => _immersiveViewerUrl;
 }

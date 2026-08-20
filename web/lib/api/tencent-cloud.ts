@@ -7,6 +7,16 @@ export class TencentCloudConfigError extends Error {
   }
 }
 
+export class TencentCloudApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status?: number
+  ) {
+    super(message);
+    this.name = "TencentCloudApiError";
+  }
+}
+
 export type TencentCloudCredentials = {
   secretId: string;
   secretKey: string;
@@ -53,6 +63,19 @@ function hmacSha256Hex(key: string | Buffer, value: string) {
 
 function normalizeEndpoint(endpoint: string) {
   return endpoint.replace(/^https?:\/\//, "").replace(/\/+$/, "");
+}
+
+function positiveInteger(value: string | undefined, fallback: number) {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function shouldRetry(status: number) {
+  return status === 429 || status >= 500;
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export async function requestTencentCloudApi<T>(
@@ -102,18 +125,56 @@ export async function requestTencentCloudApi<T>(
   if (options.region) headers["X-TC-Region"] = options.region;
   if (credentials.token) headers["X-TC-Token"] = credentials.token;
 
-  const response = await fetch(`https://${host}`, {
-    method: "POST",
-    headers,
-    body: payload,
-  });
-  const json = (await response.json().catch(() => null)) as T | null;
+  const timeoutMs = Math.min(
+    positiveInteger(process.env.TENCENT_CLOUD_TIMEOUT_MS, 10_000),
+    30_000
+  );
+  const maxAttempts = Math.min(
+    positiveInteger(process.env.TENCENT_CLOUD_MAX_ATTEMPTS, 2),
+    3
+  );
 
-  if (!response.ok) {
-    throw new Error(
-      `腾讯云接口请求失败: ${response.status} ${response.statusText}`
-    );
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(`https://${host}`, {
+        method: "POST",
+        headers,
+        body: payload,
+        signal: controller.signal,
+      });
+      const json = (await response.json().catch(() => null)) as T | null;
+
+      if (!response.ok) {
+        if (attempt < maxAttempts && shouldRetry(response.status)) {
+          await wait(150 * attempt);
+          continue;
+        }
+        throw new TencentCloudApiError(
+          `腾讯云接口请求失败: ${response.status} ${response.statusText}`,
+          response.status
+        );
+      }
+      if (json == null) {
+        throw new TencentCloudApiError("腾讯云接口返回了无效 JSON");
+      }
+
+      return json;
+    } catch (error) {
+      if (error instanceof TencentCloudApiError) throw error;
+      if (attempt < maxAttempts) {
+        await wait(150 * attempt);
+        continue;
+      }
+      const timedOut = controller.signal.aborted;
+      throw new TencentCloudApiError(
+        timedOut ? "腾讯云接口请求超时" : "腾讯云接口网络异常"
+      );
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
-  return json as T;
+  throw new TencentCloudApiError("腾讯云接口请求失败");
 }

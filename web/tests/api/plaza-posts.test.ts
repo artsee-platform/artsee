@@ -25,7 +25,8 @@ vi.mock("@/lib/api/authz", () => ({
   },
 }));
 
-vi.mock("@/lib/api/content-safety", () => ({
+vi.mock("@/lib/api/content-safety", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api/content-safety")>()),
   auditContent: mocks.auditContent,
 }));
 

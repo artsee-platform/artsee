@@ -1,5 +1,7 @@
 // Stub implementation for platforms unsupported by Tencent IM SDK.
 
+import 'tencent_push_service.dart';
+
 class TencentImLoginState {
   final int sdkAppId;
   final String identifier;
@@ -32,12 +34,10 @@ class TencentImService {
     throw UnsupportedError('腾讯云 IM 不支持当前平台');
   }
 
-  static Future<Map<String, dynamic>> sendC2CText({
-    required String peerIdentifier,
-    required String text,
-  }) async {
-    throw UnsupportedError('腾讯云 IM 不支持当前平台');
-  }
+  static Future<bool> getPushConsent() => TencentPushService.getConsent();
+
+  static Future<TencentPushActionResult> setPushConsent(bool enabled) =>
+      TencentPushService.setConsent(enabled);
 
   static Future<void> addTextMessageHandler(
     void Function(Map<String, dynamic>) handler,

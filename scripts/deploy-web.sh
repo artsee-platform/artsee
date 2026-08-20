@@ -68,11 +68,17 @@ fi
 cp "${WEB_DIR}/package.json" "${BUILD_DIR}/package.json"
 [[ -f "${WEB_DIR}/package-lock.json" ]] && cp "${WEB_DIR}/package-lock.json" "${BUILD_DIR}/package-lock.json"
 [[ -f "${WEB_DIR}/ecosystem.config.js" ]] && cp "${WEB_DIR}/ecosystem.config.js" "${BUILD_DIR}/ecosystem.config.js"
+# Next standalone tracing may copy local .env files. They must never enter a release archive.
+find "${BUILD_DIR}" -type f -name '.env*' -delete
 
 log "打包: ${ARCHIVE_NAME}"
 rm -f "${ARCHIVE_PATH}"
 # 避免 macOS 扩展属性写入 tarball，防止 Linux 上 tar 报 LIBARCHIVE.xattr 警告
-COPYFILE_DISABLE=1 tar czf "${ARCHIVE_PATH}" -C "${BUILD_DIR}" .
+TAR_METADATA_OPTS=(--no-xattrs)
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  TAR_METADATA_OPTS+=(--no-mac-metadata)
+fi
+COPYFILE_DISABLE=1 tar "${TAR_METADATA_OPTS[@]}" -czf "${ARCHIVE_PATH}" -C "${BUILD_DIR}" .
 
 log "确保远程目录存在..."
 ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" "mkdir -p ${REMOTE_DIR}"
@@ -115,10 +121,22 @@ if [[ "\$PRESERVE" == "1" ]] && [[ -f /tmp/artsee-deploy-env.tar ]]; then
   rm -f /tmp/artsee-deploy-env.tar
 fi
 
+# The generated entrypoint runs from web/, so link that directory to the
+# server-owned environment files restored at the release root.
+if [[ -d web ]]; then
+  find web -maxdepth 1 \( -type f -o -type l \) -name '.env*' -delete
+  for ENV_FILE in .env*; do
+    [[ -f "\$ENV_FILE" ]] || continue
+    ln -s "../\$ENV_FILE" "web/\$ENV_FILE"
+  done
+fi
+
 mkdir -p logs
 
-echo "安装生产依赖（若 package.json 存在）..."
-if [[ -f package.json ]]; then
+if [[ -d node_modules ]]; then
+  echo "standalone 已包含生产依赖，跳过重复安装。"
+elif [[ -f package.json ]]; then
+  echo "standalone 未包含 node_modules，安装生产依赖..."
   if [[ -x /usr/local/bin/npm24 ]]; then
     /usr/local/bin/npm24 install --omit=dev --no-audit --no-fund
   else

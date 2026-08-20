@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromBearer } from "@/lib/api/auth-user";
+import { auditContent, collectAuditText } from "@/lib/api/content-safety";
+import {
+  contentSafetyErrorResponse,
+  rejectedAuditResponse,
+} from "@/lib/api/content-safety-http";
 import { isPlazaPost } from "@/lib/api/plaza";
 import { createServiceClient } from "@/lib/api/supabase-service";
 import {
@@ -141,6 +146,15 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       metadata.stance = String(body.stance).trim();
     }
 
+    const audit = await auditContent({
+      userId: user.id,
+      text: collectAuditText(text, metadata),
+      scene: "community_comment",
+      dataId: `comment-${id}`,
+    });
+    const rejected = rejectedAuditResponse(audit, "评论");
+    if (rejected) return rejected;
+
     const { data: comment, error } = await supabase
       .from("community_post_comments")
       .insert({
@@ -180,6 +194,8 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       { status: 201 }
     );
   } catch (e: unknown) {
+    const auditError = contentSafetyErrorResponse(e);
+    if (auditError) return auditError;
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }

@@ -1,12 +1,16 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:tencent_cloud_chat_sdk/enum/V2TimAdvancedMsgListener.dart';
+import 'package:tencent_cloud_chat_sdk/enum/V2TimSDKListener.dart';
+import 'package:tencent_cloud_chat_sdk/enum/login_status.dart';
 import 'package:tencent_cloud_chat_sdk/enum/log_level_enum.dart';
 import 'package:tencent_cloud_chat_sdk/manager/v2_tim_manager.dart';
 import 'package:tencent_cloud_chat_sdk/tencent_im_sdk_plugin.dart';
 
 import 'backend_api_service.dart';
+import 'tencent_push_service.dart';
 
 class TencentImLoginState {
   final int sdkAppId;
@@ -38,15 +42,33 @@ class TencentImService {
 
   static int? _initializedSdkAppId;
   static String? _loggedInIdentifier;
+  static TencentImLoginState? _loginState;
   static Future<TencentImLoginState?>? _loginFuture;
+  static Timer? _reloginTimer;
   static V2TimAdvancedMsgListener? _advancedMsgListener;
   static final Set<void Function(Map<String, dynamic>)> _messageHandlers = {};
 
   static V2TIMManager get _manager => TencentImSDKPlugin.v2TIMManager;
 
-  static Future<TencentImLoginState?> ensureLoggedIn() {
-    _loginFuture ??= _login();
-    return _loginFuture!.whenComplete(() => _loginFuture = null);
+  static Future<TencentImLoginState?> ensureLoggedIn() async {
+    if (_loggedInIdentifier != null && _loginState != null) {
+      final status = await _manager.getLoginStatus();
+      if (status.code == 0 && status.data == LoginStatus.V2TIM_STATUS_LOGINED) {
+        return _loginState;
+      }
+      _loggedInIdentifier = null;
+      _loginState = null;
+    }
+
+    final pending = _loginFuture;
+    if (pending != null) return pending;
+    final future = _login();
+    _loginFuture = future;
+    try {
+      return await future;
+    } finally {
+      if (identical(_loginFuture, future)) _loginFuture = null;
+    }
   }
 
   static Future<TencentImLoginState?> _login() async {
@@ -68,57 +90,45 @@ class TencentImService {
             ? LogLevelEnum.V2TIM_LOG_DEBUG
             : LogLevelEnum.V2TIM_LOG_INFO,
         showImLog: kDebugMode,
+        listener: V2TimSDKListener(
+          onUserSigExpired: _scheduleRelogin,
+          onKickedOffline: _handleKickedOffline,
+        ),
       );
       _throwIfFailed('腾讯云 IM 初始化失败', init.code, init.desc);
       _initializedSdkAppId = sdkAppId;
     }
 
-    if (_loggedInIdentifier == identifier) {
-      return TencentImLoginState.fromJson(config);
-    }
-
     final login = await _manager.login(userID: identifier, userSig: userSig);
     _throwIfFailed('腾讯云 IM 登录失败', login.code, login.desc);
     _loggedInIdentifier = identifier;
-
-    return TencentImLoginState.fromJson(config);
+    _loginState = TencentImLoginState.fromJson(config);
+    unawaited(_registerPushAfterLogin(_loginState!));
+    return _loginState;
   }
 
-  static Future<Map<String, dynamic>> sendC2CText({
-    required String peerIdentifier,
-    required String text,
-  }) async {
-    final loginState = await ensureLoggedIn();
-    final body = text.trim();
-    if (body.isEmpty) {
-      throw ArgumentError.value(text, 'text', '消息内容不能为空');
-    }
-    final messageManager = _manager.getMessageManager();
-    final created = await messageManager.createTextMessage(text: body);
-    _throwIfFailed('腾讯云 IM 创建消息失败', created.code, created.desc);
-    final createdInfo = created.data;
-    final sent = await messageManager.sendMessage(
-      // The current Web bridge still uses the create-message id.
-      // ignore: deprecated_member_use
-      id: createdInfo?.id,
-      message: createdInfo?.messageInfo,
-      receiver: peerIdentifier,
-      groupID: '',
-    );
-    _throwIfFailed('腾讯云 IM 消息发送失败', sent.code, sent.desc);
+  static Future<bool> getPushConsent() => TencentPushService.getConsent();
 
-    final imMessage = sent.data;
-    final mapped = _messageToMap(
-      imMessage,
-      fallbackBody: body,
-      fallbackPeerIdentifier: peerIdentifier,
-      fallbackSenderIdentifier: loginState?.identifier,
-      fallbackIsSelf: true,
+  static Future<TencentPushActionResult> setPushConsent(bool enabled) async {
+    final consentResult = await TencentPushService.setConsent(enabled);
+    if (!enabled) return consentResult;
+
+    final state = await ensureLoggedIn();
+    if (state == null) return consentResult;
+    var result = await TencentPushService.registerAfterImLogin(
+      sdkAppId: state.sdkAppId,
+      requestPermission: true,
     );
-    if (mapped == null) {
-      throw StateError('腾讯云 IM 消息发送成功，但返回内容无法解析');
+    // A background registration started by the just-completed IM login may
+    // have checked permission without prompting. Retry once after that shared
+    // operation completes so this explicit user action can show the OS dialog.
+    if (result.configured && !result.permissionGranted) {
+      result = await TencentPushService.registerAfterImLogin(
+        sdkAppId: state.sdkAppId,
+        requestPermission: true,
+      );
     }
-    return mapped;
+    return result;
   }
 
   static Future<void> addTextMessageHandler(
@@ -156,6 +166,9 @@ class TencentImService {
   }
 
   static Future<void> logout() async {
+    _reloginTimer?.cancel();
+    _reloginTimer = null;
+    await TencentPushService.unregister();
     final shouldLogout = _loggedInIdentifier != null;
     final listener = _advancedMsgListener;
     if (!shouldLogout && listener == null) return;
@@ -172,30 +185,66 @@ class TencentImService {
       }
     } finally {
       _loggedInIdentifier = null;
+      _loginState = null;
     }
   }
 
   static void resetLocalState() {
     _loggedInIdentifier = null;
+    _loginState = null;
     _loginFuture = null;
+    _reloginTimer?.cancel();
+    _reloginTimer = null;
   }
 
-  static Map<String, dynamic>? _messageToMap(
-    dynamic message, {
-    String? fallbackBody,
-    String? fallbackPeerIdentifier,
-    String? fallbackSenderIdentifier,
-    bool? fallbackIsSelf,
-  }) {
-    final body = _dynamicString(message?.textElem?.text) ?? fallbackBody;
+  static void _scheduleRelogin() {
+    _loggedInIdentifier = null;
+    _loginState = null;
+    _reloginTimer?.cancel();
+    _reloginTimer = Timer(const Duration(seconds: 1), () {
+      unawaited(
+        ensureLoggedIn().then<void>(
+          (_) {},
+          onError: (Object error, StackTrace stackTrace) {
+            debugPrint('Tencent IM UserSig refresh failed: $error');
+          },
+        ),
+      );
+    });
+  }
+
+  static void _handleKickedOffline() {
+    _loggedInIdentifier = null;
+    _loginState = null;
+    _loginFuture = null;
+    _reloginTimer?.cancel();
+    _reloginTimer = null;
+    unawaited(TencentPushService.unregister());
+    debugPrint(
+        'Tencent IM account was kicked offline; login will recover on next use.');
+  }
+
+  static Future<void> _registerPushAfterLogin(
+    TencentImLoginState state,
+  ) async {
+    final result = await TencentPushService.registerAfterImLogin(
+      sdkAppId: state.sdkAppId,
+    );
+    if (kDebugMode && result.consentEnabled && !result.registered) {
+      debugPrint('Tencent Push not registered: ${result.message}');
+    }
+  }
+
+  static Map<String, dynamic>? _messageToMap(dynamic message) {
+    final body = _dynamicString(message?.textElem?.text);
     if (body == null || body.trim().isEmpty) return null;
 
-    final isSelf = _dynamicBool(message?.isSelf) ?? fallbackIsSelf ?? false;
+    final isSelf = _dynamicBool(message?.isSelf) ?? false;
     final msgId = _dynamicString(message?.msgID) ?? _dynamicString(message?.id);
-    final peerIdentifier =
-        _dynamicString(message?.userID) ?? fallbackPeerIdentifier;
-    final senderIdentifier =
-        _dynamicString(message?.sender) ?? fallbackSenderIdentifier;
+    final peerIdentifier = _dynamicString(message?.userID);
+    final senderIdentifier = _dynamicString(message?.sender);
+    final groupId = _dynamicString(message?.groupID);
+    final cloudCustomData = _decodeCloudCustomData(message?.cloudCustomData);
 
     return <String, dynamic>{
       if (msgId != null && msgId.isNotEmpty) 'id': 'im_$msgId',
@@ -211,6 +260,8 @@ class TencentImService {
           'peer_im_identifier': peerIdentifier,
         if (senderIdentifier != null && senderIdentifier.isNotEmpty)
           'sender_im_identifier': senderIdentifier,
+        if (groupId != null && groupId.isNotEmpty) 'im_group_id': groupId,
+        ...cloudCustomData,
         'is_self': isSelf,
       },
     };
@@ -234,6 +285,19 @@ class TencentImService {
     if (value is bool) return value;
     if (value == null) return null;
     return value.toString() == 'true';
+  }
+
+  static Map<String, dynamic> _decodeCloudCustomData(dynamic value) {
+    final text = _dynamicString(value);
+    if (text == null) return const {};
+    try {
+      final decoded = jsonDecode(text);
+      return decoded is Map
+          ? Map<String, dynamic>.from(decoded)
+          : const <String, dynamic>{};
+    } catch (_) {
+      return const {};
+    }
   }
 
   static void _throwIfFailed(String prefix, int code, String desc) {

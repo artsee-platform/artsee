@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { POST as postConversation } from "@/app/api/v1/conversations/route";
 import { POST as postMessage } from "@/app/api/v1/conversations/[id]/messages/route";
+import { auditContent } from "@/lib/api/content-safety";
 
 type Row = Record<string, unknown>;
 
@@ -27,9 +28,26 @@ vi.mock("@/lib/api/auth-user", () => ({
   },
 }));
 
-vi.mock("@/lib/api/tencent-im", () => ({
-  buildTencentImIdentifier: (id: string) => `artsee_${id}`,
-  ensureTencentImAccounts: vi.fn(async () => undefined),
+vi.mock("@/lib/api/content-safety", () => ({
+  collectAuditText: (...values: unknown[]) =>
+    values.filter((value) => typeof value === "string" && value).join("\n"),
+  auditContent: vi.fn(async () => ({
+    provider: "tencent_cloud",
+    suggestion: "pass",
+    audit_status: "approved",
+    items: [],
+  })),
+}));
+
+vi.mock("@/lib/api/content-safety-http", () => ({
+  contentSafetyErrorResponse: () => null,
+  rejectedAuditResponse: (audit: { audit_status: string }) =>
+    audit.audit_status === "approved"
+      ? null
+      : Response.json(
+          { success: false, error: "消息需要进一步审核" },
+          { status: 422 }
+        ),
 }));
 
 class QueryStub {
@@ -220,7 +238,7 @@ describe("conversations API", () => {
       group_kind: "student_organization",
       organization_id: ORG_ID,
       student_user_id: STUDENT_ID,
-      tencent_im_mode: "bff_persisted_cos_url",
+      transport_provider: "supabase_realtime",
     });
     expect(db.conversation_participants).toEqual(
       expect.arrayContaining([
@@ -232,8 +250,8 @@ describe("conversations API", () => {
     expect(
       db.conversation_participants.some((row) => row.user_id === "disabled-member")
     ).toBe(false);
-    expect(body.data.peer_im_identifier).toBeNull();
-    expect(body.data.participant_im_identifiers[OWNER_ID]).toBe(`artsee_${OWNER_ID}`);
+    expect(body.data.realtime_topic).toBe("conversation:conv-1:messages");
+    expect(body.data.participant_profiles).toHaveLength(3);
   });
 
   it("reuses an existing organization conversation and backfills members", async () => {
@@ -270,9 +288,36 @@ describe("conversations API", () => {
     );
   });
 
+  it("creates a realtime group conversation without an external transport", async () => {
+    const res = await postConversation(
+      req("/api/v1/conversations", {
+        type: "group",
+        title: "作品集讨论组",
+        participant_ids: [OWNER_ID, ADVISOR_ID],
+      })
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(201);
+    expect(body.data.peer_user_id).toBeNull();
+    expect(body.data.realtime_topic).toBe("conversation:conv-1:messages");
+    expect(body.data.metadata).toMatchObject({
+      transport_provider: "supabase_realtime",
+    });
+  });
+
   it("persists image attachment messages by URL", async () => {
+    db.conversations = [
+      {
+        id: "conv-1",
+        type: "direct",
+        created_by: STUDENT_ID,
+        metadata: {},
+      },
+    ];
     db.conversation_participants = [
       { conversation_id: "conv-1", user_id: STUDENT_ID, role: "owner" },
+      { conversation_id: "conv-1", user_id: OWNER_ID, role: "member" },
     ];
 
     const res = await postMessage(
@@ -293,6 +338,9 @@ describe("conversations API", () => {
       attachment_url: "https://cdn.example.com/messages/a.jpg",
       attachment_name: "a.jpg",
       provider: "tencent_cos",
+      realtime_status: "persisted",
+      transport_provider: "supabase_realtime",
+      content_audit: { audit_status: "approved" },
     });
   });
 
@@ -312,5 +360,53 @@ describe("conversations API", () => {
 
     expect(res.status).toBe(400);
     expect(body.error).toBe("附件链接无效");
+  });
+
+  it("persists one canonical message for Realtime delivery", async () => {
+    db.conversations = [
+      { id: "conv-1", type: "direct", created_by: STUDENT_ID, metadata: {} },
+    ];
+    db.conversation_participants = [
+      { conversation_id: "conv-1", user_id: STUDENT_ID, role: "owner" },
+      { conversation_id: "conv-1", user_id: OWNER_ID, role: "member" },
+    ];
+
+    const res = await postMessage(
+      req("/api/v1/conversations/conv-1/messages", { body: "你好" }),
+      { params: Promise.resolve({ id: "conv-1" }) }
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(201);
+    expect(db.messages).toHaveLength(1);
+    expect(body.data.id).toBe(db.messages[0].id);
+    expect(db.messages[0].metadata).toMatchObject({
+      realtime_status: "persisted",
+      transport_provider: "supabase_realtime",
+    });
+  });
+
+  it("does not persist private messages awaiting content review", async () => {
+    vi.mocked(auditContent).mockResolvedValueOnce({
+      provider: "tencent_cloud",
+      suggestion: "review",
+      audit_status: "reviewing",
+      items: [],
+    });
+    db.conversations = [
+      { id: "conv-1", type: "direct", created_by: STUDENT_ID, metadata: {} },
+    ];
+    db.conversation_participants = [
+      { conversation_id: "conv-1", user_id: STUDENT_ID, role: "owner" },
+      { conversation_id: "conv-1", user_id: OWNER_ID, role: "member" },
+    ];
+
+    const res = await postMessage(
+      req("/api/v1/conversations/conv-1/messages", { body: "待复审内容" }),
+      { params: Promise.resolve({ id: "conv-1" }) }
+    );
+
+    expect(res.status).toBe(422);
+    expect(db.messages).toHaveLength(0);
   });
 });

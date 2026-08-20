@@ -5,6 +5,7 @@ import '../../services/backend_api_service.dart';
 import '../../theme/artsee_ui_colors.dart';
 import '../../utils/auth_gate.dart';
 import '../../utils/submission_review_feedback.dart';
+import '../../widgets/common.dart';
 
 class PublishArtistScreen extends StatefulWidget {
   const PublishArtistScreen({super.key});
@@ -395,7 +396,8 @@ class _SectionTitle extends StatelessWidget {
             fontSize: 18,
             fontWeight: FontWeight.w900,
             color: context.artC.ink,
-            fontFamily: 'Noto Serif SC',
+            fontFamily: kAppFontFamily,
+            fontFamilyFallback: kAppFontFallback,
           ),
         ),
         if (subtitle != null) ...[

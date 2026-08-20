@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#090909" />
+    <title>艺见心 · 数字典藏</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "playcanvas": "https://cdn.jsdelivr.net/npm/playcanvas@2.21.0/build/playcanvas.mjs"
+        }
+      }
+    </script>
+    <script
+      type="module"
+      src="https://cdn.jsdelivr.net/npm/@playcanvas/web-components@0.8.1/dist/pwc.mjs"
+    ></script>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: -apple-system, BlinkMacSystemFont, "Noto Sans SC", sans-serif;
+        background: #090909;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body,
+      pc-app {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: #090909;
+      }
+
+      body {
+        overscroll-behavior: none;
+        touch-action: none;
+      }
+
+      #poster {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        background-position: center;
+        background-size: cover;
+        opacity: 0.24;
+        filter: saturate(0.72) brightness(0.55);
+      }
+
+      pc-app {
+        position: relative;
+        z-index: 1;
+        display: block;
+      }
+
+      #loading {
+        position: fixed;
+        inset: 0;
+        z-index: 4;
+        display: grid;
+        place-items: center;
+        pointer-events: none;
+        background: rgba(9, 9, 9, 0.9);
+        opacity: 1;
+        transition: opacity 180ms cubic-bezier(0.23, 1, 0.32, 1);
+      }
+
+      #loading.is-ready {
+        opacity: 0;
+      }
+
+      .loading-content {
+        display: grid;
+        justify-items: center;
+        gap: 14px;
+      }
+
+      .spinner {
+        width: 28px;
+        height: 28px;
+        border: 2px solid rgba(255, 255, 255, 0.18);
+        border-top-color: rgba(255, 255, 255, 0.9);
+        border-radius: 50%;
+        animation: spin 720ms linear infinite;
+      }
+
+      #loading-label {
+        color: rgba(255, 255, 255, 0.62);
+        font-size: 12px;
+        font-weight: 650;
+        letter-spacing: 0.08em;
+      }
+
+      #error {
+        position: fixed;
+        left: 50%;
+        bottom: max(24px, env(safe-area-inset-bottom));
+        z-index: 5;
+        max-width: min(360px, calc(100vw - 40px));
+        padding: 11px 15px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 999px;
+        color: rgba(255, 255, 255, 0.74);
+        background: rgba(0, 0, 0, 0.68);
+        font-size: 11px;
+        line-height: 1.4;
+        text-align: center;
+        transform: translateX(-50%);
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        #loading {
+          transition: opacity 120ms ease;
+        }
+
+        .spinner {
+          animation: none;
+          border-top-color: rgba(255, 255, 255, 0.52);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="poster" aria-hidden="true"></div>
+    <pc-app antialias="false" high-resolution="false" backend="webgl2">
+      <pc-asset
+        src="https://cdn.jsdelivr.net/npm/playcanvas@2.21.0/scripts/esm/camera-controls.mjs"
+      ></pc-asset>
+      <pc-asset id="archive-splat" type="gsplat"></pc-asset>
+      <pc-scene>
+        <pc-entity id="archive-camera" position="0 0 2.5">
+          <pc-camera clear-color="0.035 0.035 0.035 1"></pc-camera>
+          <pc-scripts>
+            <pc-script name="cameraControls"></pc-script>
+          </pc-scripts>
+        </pc-entity>
+        <pc-entity id="archive-model">
+          <pc-gsplat asset="archive-splat"></pc-gsplat>
+        </pc-entity>
+      </pc-scene>
+    </pc-app>
+    <div id="loading" role="status" aria-live="polite">
+      <div class="loading-content">
+        <div class="spinner" aria-hidden="true"></div>
+        <div id="loading-label">正在进入数字现场</div>
+      </div>
+    </div>
+    <div id="error" hidden></div>
+    <script>
+      (() => {
+        const fallbackAsset =
+          "https://developer.playcanvas.com/assets/toy-cat.sog";
+        const params = new URLSearchParams(window.location.search);
+        const safeUrl = (value, fallback) => {
+          try {
+            const url = new URL(value || fallback, window.location.href);
+            return ["http:", "https:"].includes(url.protocol)
+              ? url.href
+              : fallback;
+          } catch (_) {
+            return fallback;
+          }
+        };
+        const parseVector = (value, fallback) => {
+          const parts = (value || "")
+            .trim()
+            .split(/[\s,]+/)
+            .map(Number);
+          return parts.length === 3 && parts.every(Number.isFinite)
+            ? parts
+            : fallback;
+        };
+        const formatVector = (value) => value.join(" ");
+
+        const assetUrl = safeUrl(params.get("asset"), fallbackAsset);
+        const posterValue = params.get("poster");
+        const posterUrl = posterValue ? safeUrl(posterValue, "") : "";
+        const title = (params.get("title") || "艺见心数字典藏").slice(0, 80);
+        const asset = document.getElementById("archive-splat");
+        const camera = document.getElementById("archive-camera");
+        const model = document.getElementById("archive-model");
+        const loading = document.getElementById("loading");
+        const loadingLabel = document.getElementById("loading-label");
+        const error = document.getElementById("error");
+        const poster = document.getElementById("poster");
+
+        document.title = `${title} · 艺见心`;
+        asset.setAttribute("src", assetUrl);
+        const cameraPosition = parseVector(
+          params.get("camera"),
+          [0, 0, 2.5],
+        );
+        let portraitLayout = window.innerHeight > window.innerWidth;
+        const fitCamera = () => {
+          const aspect = window.innerWidth / Math.max(window.innerHeight, 1);
+          const portraitScale =
+            aspect < 0.72 ? Math.min(1.38, 0.64 / aspect) : 1;
+          camera.setAttribute(
+            "position",
+            formatVector(cameraPosition.map((value) => value * portraitScale)),
+          );
+        };
+        const handleViewportChange = () => {
+          const nextPortraitLayout = window.innerHeight > window.innerWidth;
+          if (nextPortraitLayout !== portraitLayout) {
+            portraitLayout = nextPortraitLayout;
+            window.location.reload();
+            return;
+          }
+          fitCamera();
+        };
+        fitCamera();
+        model.setAttribute(
+          "position",
+          formatVector(parseVector(params.get("position"), [0, 0, 0])),
+        );
+        model.setAttribute(
+          "rotation",
+          formatVector(parseVector(params.get("rotation"), [0, 0, 0])),
+        );
+        if (posterUrl) poster.style.backgroundImage = `url("${posterUrl}")`;
+
+        const finishLoading = () => {
+          loading.classList.add("is-ready");
+          window.setTimeout(() => loading.setAttribute("hidden", ""), 200);
+          window.parent?.postMessage(
+            { type: "artiqore-immersive-ready", asset: assetUrl },
+            window.location.origin,
+          );
+        };
+        const showError = () => {
+          loadingLabel.textContent = "数字现场加载时间较长";
+          error.hidden = false;
+          error.textContent = "请检查网络，或稍后重新进入沉浸观看";
+        };
+
+        const startedAt = performance.now();
+        const observeAsset = () => {
+          if (performance.getEntriesByName(assetUrl).length > 0) {
+            window.setTimeout(finishLoading, 180);
+            return;
+          }
+          if (performance.now() - startedAt > 30000) {
+            showError();
+            return;
+          }
+          window.setTimeout(observeAsset, 160);
+        };
+
+        window.addEventListener("error", (event) => {
+          if (event.target !== window) showError();
+        });
+        window.addEventListener("unhandledrejection", showError);
+        window.addEventListener("resize", handleViewportChange, {
+          passive: true,
+        });
+        observeAsset();
+      })();
+    </script>
+  </body>
+</html>

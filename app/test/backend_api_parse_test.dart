@@ -46,6 +46,77 @@ void main() {
     expect(p.imageUrls, ['https://x.com/work.jpg']);
   });
 
+  test('AppCommunityPost.fromJson 解析已发布 Gaussian 沉浸资产', () {
+    final p = AppCommunityPost.fromJson({
+      'id': 'immersive-1',
+      'title': '数字典藏作品',
+      'image_urls': ['https://x.com/poster.jpg'],
+      'metadata': {
+        'immersive_asset': {
+          'id': 'asset-1',
+          'type': 'gaussian',
+          'status': 'ready',
+          'asset_url': 'https://x.com/work.sog',
+          'source_url': 'https://x.com/artwork',
+          'license_name': 'CC BY 4.0',
+          'license_url': 'https://creativecommons.org/licenses/by/4.0/',
+          'camera_position': [0, 1, 3],
+          'model_rotation': '0 0 180',
+        },
+      },
+      'like_count': 0,
+      'comment_count': 0,
+      'view_count': 0,
+      'created_at': '2026-01-01T00:00:00Z',
+    });
+
+    expect(p.immersiveAsset, isNotNull);
+    expect(p.immersiveAsset!.isViewable, true);
+    expect(p.immersiveAsset!.type, ImmersiveAssetType.gaussian);
+    expect(p.immersiveAsset!.cameraPosition, [0, 1, 3]);
+    expect(p.immersiveAsset!.modelRotation, [0, 0, 180]);
+    expect(p.immersiveAsset!.sourceUrl, 'https://x.com/artwork');
+    expect(p.immersiveAsset!.licenseName, 'CC BY 4.0');
+  });
+
+  test('沉浸资产查看地址包含白名单配置，审核中资产不可展示', () {
+    final asset = ImmersiveAsset.fromJson({
+      'id': 'asset-review',
+      'type': '3dgs',
+      'status': 'reviewing',
+      'asset_url': 'https://x.com/work.sog',
+      'poster_url': 'https://x.com/poster.jpg',
+      'model_position': [0, -0.5, 0],
+    });
+
+    expect(asset, isNotNull);
+    expect(asset!.isViewable, false);
+    final uri = asset.buildViewerUri(
+      viewerBaseUri: Uri.parse('https://artiqore.com/immersive/index.html'),
+      fallbackTitle: '作品标题',
+    );
+    expect(uri.queryParameters['asset'], 'https://x.com/work.sog');
+    expect(uri.queryParameters['poster'], 'https://x.com/poster.jpg');
+    expect(uri.queryParameters['position'], '0 -0.5 0');
+  });
+
+  test('沉浸资产忽略非 HTTP 自定义查看地址', () {
+    const asset = ImmersiveAsset(
+      id: 'asset-safe-viewer',
+      type: ImmersiveAssetType.gaussian,
+      status: ImmersiveAssetStatus.published,
+      assetUrl: 'https://x.com/work.sog',
+      viewerUrl: 'javascript:alert(1)',
+    );
+
+    final uri = asset.buildViewerUri(
+      viewerBaseUri: Uri.parse('https://artiqore.com/immersive/index.html'),
+    );
+    expect(uri.scheme, 'https');
+    expect(uri.host, 'artiqore.com');
+    expect(uri.queryParameters['asset'], 'https://x.com/work.sog');
+  });
+
   test('AppCommunityComment.fromJson 解析评论作者资料', () {
     final c = AppCommunityComment.fromJson({
       'id': 'c1',

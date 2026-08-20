@@ -1244,6 +1244,14 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+    final homeBody = DefaultTextStyle.merge(
+      style: const TextStyle(
+        fontFamily: kAppFontFamily,
+        fontFamilyFallback: kAppFontFallback,
+        letterSpacing: 0,
+      ),
+      child: pageBody,
+    );
 
     return Scaffold(
       key: _scaffoldKey,
@@ -1265,8 +1273,8 @@ class _HomeScreenState extends State<HomeScreen> {
         onNewChat: _startNewChat,
       ),
       body: deepSeaMode && !widget.inheritDeepSeaBackdrop
-          ? DeepSeaBackdrop(child: pageBody)
-          : pageBody,
+          ? DeepSeaBackdrop(child: homeBody)
+          : homeBody,
     );
   }
 }
@@ -1298,6 +1306,40 @@ const _inkWashGradient = LinearGradient(
   colors: [_porcelainNightBlue, _inkWashBlue, _inkGlowBlue],
   stops: [0, 0.58, 1],
 );
+
+TextStyle _homeFeedTitleStyle({
+  required Color color,
+  double fontSize = 16,
+  double height = 1.2,
+  FontWeight fontWeight = FontWeight.w600,
+}) {
+  return TextStyle(
+    color: color,
+    fontSize: fontSize,
+    height: height,
+    fontWeight: fontWeight,
+    letterSpacing: 0,
+    fontFamily: kAppFontFamily,
+    fontFamilyFallback: kAppFontFallback,
+  );
+}
+
+TextStyle _homeFeedInfoStyle({
+  required Color color,
+  double fontSize = 12.8,
+  double height = 1.32,
+  FontWeight fontWeight = FontWeight.w500,
+}) {
+  return TextStyle(
+    color: color,
+    fontSize: fontSize,
+    height: height,
+    fontWeight: fontWeight,
+    letterSpacing: 0,
+    fontFamily: kAppFontFamily,
+    fontFamilyFallback: kAppFontFallback,
+  );
+}
 
 class _PressableScale extends StatefulWidget {
   final Widget child;
@@ -5409,8 +5451,8 @@ class _PlazaFeedTab extends StatelessWidget {
         fontSize: 12.8,
         fontWeight: active ? FontWeight.w900 : FontWeight.w700,
         letterSpacing: 0,
-        fontFamily: 'SF Pro Text',
-        fontFamilyFallback: const ['PingFang SC', 'Noto Sans SC'],
+        fontFamily: kAppFontFamily,
+        fontFamilyFallback: kAppFontFallback,
       ),
     );
     return _PressableScale(
@@ -5495,7 +5537,7 @@ class _PlazaDataStateCard extends StatelessWidget {
               border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
             ),
             child: loading
-                ? SizedBox(
+                ? const SizedBox(
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(
@@ -5516,20 +5558,18 @@ class _PlazaDataStateCard extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: kDeepSeaTextStyle.copyWith(
+                  style: _homeFeedTitleStyle(
                     color: kGlassInk,
                     fontSize: 16,
-                    fontWeight: FontWeight.w900,
                   ),
                 ),
                 const SizedBox(height: 5),
                 Text(
                   subtitle,
-                  style: kDeepSeaTextStyle.copyWith(
+                  style: _homeFeedInfoStyle(
                     color: kGlassMuted,
                     fontSize: 13,
                     height: 1.42,
-                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 if (!loading) ...[
@@ -5597,8 +5637,8 @@ class _PlazaStateAction extends StatelessWidget {
             fontSize: 12,
             fontWeight: FontWeight.w800,
             letterSpacing: 0,
-            fontFamily: 'SF Pro Text',
-            fontFamilyFallback: const ['PingFang SC', 'Noto Sans SC'],
+            fontFamily: kAppFontFamily,
+            fontFamilyFallback: kAppFontFallback,
           ),
         ),
       ),
@@ -5929,7 +5969,7 @@ class _PlazaCircleStateCard extends StatelessWidget {
               border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
             ),
             child: loading
-                ? SizedBox(
+                ? const SizedBox(
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(
@@ -5950,20 +5990,18 @@ class _PlazaCircleStateCard extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: kDeepSeaTextStyle.copyWith(
+                  style: _homeFeedTitleStyle(
                     color: kGlassInk,
                     fontSize: 15,
-                    fontWeight: FontWeight.w900,
                   ),
                 ),
                 const SizedBox(height: 5),
                 Text(
                   subtitle,
-                  style: kDeepSeaTextStyle.copyWith(
+                  style: _homeFeedInfoStyle(
                     color: kGlassMuted,
                     fontSize: 12.5,
                     height: 1.42,
-                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 if (!loading) ...[
@@ -6053,11 +6091,10 @@ class _PlazaCircleListCard extends StatelessWidget {
                           title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: kDeepSeaTextStyle.copyWith(
+                          style: _homeFeedTitleStyle(
                             color: kGlassInk,
                             fontSize: 15.2,
                             height: 1.2,
-                            fontWeight: FontWeight.w900,
                           ),
                         ),
                       ),
@@ -6073,11 +6110,10 @@ class _PlazaCircleListCard extends StatelessWidget {
                     subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: kDeepSeaTextStyle.copyWith(
+                    style: _homeFeedInfoStyle(
                       color: kGlassInk.withValues(alpha: 0.72),
                       fontSize: 12,
                       height: 1.25,
-                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -6085,11 +6121,10 @@ class _PlazaCircleListCard extends StatelessWidget {
                     '正在聊：$hotTopic',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: kDeepSeaTextStyle.copyWith(
+                    style: _homeFeedInfoStyle(
                       color: kGlassMuted.withValues(alpha: 0.82),
                       fontSize: 11.4,
                       height: 1.2,
-                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 7),
@@ -6156,8 +6191,8 @@ class _PlazaCircleStatusPill extends StatelessWidget {
           fontSize: 10,
           fontWeight: active ? FontWeight.w800 : FontWeight.w700,
           letterSpacing: 0,
-          fontFamily: 'SF Pro Text',
-          fontFamilyFallback: const ['PingFang SC', 'Noto Sans SC'],
+          fontFamily: kAppFontFamily,
+          fontFamilyFallback: kAppFontFallback,
         ),
       ),
     );
@@ -6185,8 +6220,8 @@ class _PlazaCircleMiniTag extends StatelessWidget {
           fontSize: 10,
           fontWeight: FontWeight.w700,
           letterSpacing: 0,
-          fontFamily: 'SF Pro Text',
-          fontFamilyFallback: const ['PingFang SC', 'Noto Sans SC'],
+          fontFamily: kAppFontFamily,
+          fontFamilyFallback: kAppFontFallback,
         ),
       ),
     );
@@ -6899,14 +6934,10 @@ class _DebateTopicCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final hotReply = _plazaTopicHotReply(topic);
     final summary = hotReply.trim().isNotEmpty ? hotReply : topic.lead;
-    return _PressableScale(
+    return _PressableInsetCard(
       onTap: onTap,
-      pressedScale: 0.985,
-      child: DeepSeaGlassPanel(
-        padding: const EdgeInsets.all(14),
-        radius: 28,
-        opacity: 0.58,
-        airy: true,
+      builder: (pressed) => _PlazaOverviewGlassCard(
+        pressed: pressed,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -6916,34 +6947,166 @@ class _DebateTopicCard extends StatelessWidget {
                 children: [
                   Text(
                     topic.title,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: kDeepSeaTextStyle.copyWith(
+                    style: _homeFeedTitleStyle(
                       color: kGlassInk,
-                      fontSize: 15.2,
-                      height: 1.2,
-                      fontWeight: FontWeight.w900,
+                      fontSize: 15.8,
+                      height: 1.24,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 7),
+                  _PlazaOverviewByline(
+                    source: _plazaSourceText('${topic.channel}圈子'),
+                    time: _plazaTopicTime(topic),
+                    icon: topic.icon,
+                    accent: topic.accent,
+                  ),
+                  const SizedBox(height: 7),
                   _PlazaHotReplyLine(
                     label: '',
                     text: summary,
                     accent: topic.accent,
                   ),
-                  const SizedBox(height: 6),
-                  _PlazaFeedMetaRow(
-                    source: _plazaSourceText('${topic.channel}圈子'),
-                    time: _plazaTopicTime(topic),
-                    primary:
-                        '${_plazaTopicLikeLabel(topic)} 喜欢 · ${topic.comments} 评论',
+                  const SizedBox(height: 10),
+                  _PlazaOverviewActionRow(
+                    upLabel: _plazaTopicLikeLabel(topic),
+                    favoriteLabel: topic.floor,
+                    commentLabel: topic.comments,
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 10),
-            _PlazaTopicThumb(topic: topic, size: 64),
+            const SizedBox(width: 12),
+            Padding(
+              padding: const EdgeInsets.only(top: 28),
+              child: _PlazaTopicThumb(topic: topic, size: 72),
+            ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PlazaOverviewGlassCard extends StatelessWidget {
+  final Widget child;
+  final bool pressed;
+
+  const _PlazaOverviewGlassCard({
+    required this.child,
+    this.pressed = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const radius = 26.0;
+    final borderRadius = BorderRadius.circular(radius);
+    return Stack(
+      children: [
+        OpticalGlassSurface(
+          padding: const EdgeInsets.fromLTRB(16, 14, 14, 12),
+          radius: radius,
+          surfaceOpacity: pressed ? 0.09 : 0.072,
+          blurSigma: pressed ? 28 : 34,
+          elevated: true,
+          borderOpacity: 0,
+          innerBorderOpacity: 0,
+          highlightOpacity: 0,
+          bottomShadeOpacity: 0,
+          shadowOpacity: pressed ? 0.003 : 0.028,
+          glowOpacity: pressed ? 0.008 : 0.04,
+          child: child,
+        ),
+        Positioned.fill(
+          child: IgnorePointer(
+            child: AnimatedOpacity(
+              opacity: pressed ? 1 : 0,
+              duration: const Duration(milliseconds: 110),
+              curve: Curves.easeOutCubic,
+              child: ClipRRect(
+                borderRadius: borderRadius,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF8D9299).withValues(alpha: 0.16),
+                    borderRadius: borderRadius,
+                    border: Border.all(
+                      color: kGlassInk.withValues(alpha: 0.07),
+                      width: 0.8,
+                    ),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        kGlassInk.withValues(alpha: 0.12),
+                        const Color(0xFF8D9299).withValues(alpha: 0.12),
+                        Colors.white.withValues(alpha: 0.018),
+                      ],
+                      stops: const [0, 0.5, 1],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PressableInsetCard extends StatefulWidget {
+  final Widget Function(bool pressed) builder;
+  final VoidCallback? onTap;
+
+  const _PressableInsetCard({
+    required this.builder,
+    required this.onTap,
+  });
+
+  @override
+  State<_PressableInsetCard> createState() => _PressableInsetCardState();
+}
+
+class _PressableInsetCardState extends State<_PressableInsetCard> {
+  bool _pressed = false;
+
+  void _setPressed(bool pressed) {
+    if (widget.onTap == null || _pressed == pressed) return;
+    setState(() => _pressed = pressed);
+  }
+
+  Future<void> _handleTap() async {
+    final onTap = widget.onTap;
+    if (onTap == null) return;
+    Feedback.forTap(context);
+    _setPressed(true);
+    await Future<void>.delayed(const Duration(milliseconds: 95));
+    if (!mounted) return;
+    _setPressed(false);
+    onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: widget.onTap != null,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _handleTap,
+        onTapDown: (_) => _setPressed(true),
+        onTapUp: (_) {},
+        onTapCancel: () => _setPressed(false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 105),
+          curve: Curves.easeOutCubic,
+          transform: Matrix4.translationValues(0, _pressed ? 2.4 : 0, 0),
+          child: AnimatedScale(
+            scale: _pressed ? 0.988 : 1,
+            duration: const Duration(milliseconds: 105),
+            curve: Curves.easeOutCubic,
+            child: widget.builder(_pressed),
+          ),
         ),
       ),
     );
@@ -6952,9 +7115,8 @@ class _DebateTopicCard extends StatelessWidget {
 
 class _PlazaMetaText extends StatelessWidget {
   final String text;
-  final bool strong;
 
-  const _PlazaMetaText(this.text, {this.strong = false});
+  const _PlazaMetaText(this.text);
 
   @override
   Widget build(BuildContext context) {
@@ -6962,39 +7124,136 @@ class _PlazaMetaText extends StatelessWidget {
       text,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: TextStyle(
-        color: strong
-            ? kGlassAccent.withValues(alpha: 0.92)
-            : kGlassMuted.withValues(alpha: 0.82),
+      style: _homeFeedInfoStyle(
+        color: kGlassMuted.withValues(alpha: 0.82),
         fontSize: 11,
-        fontWeight: strong ? FontWeight.w800 : FontWeight.w600,
-        letterSpacing: 0,
-        fontFamily: 'SF Pro Text',
-        fontFamilyFallback: const ['PingFang SC', 'Noto Sans SC'],
       ),
     );
   }
 }
 
-class _PlazaFeedMetaRow extends StatelessWidget {
+class _PlazaOverviewByline extends StatelessWidget {
   final String source;
   final String time;
-  final String primary;
+  final IconData icon;
+  final Color accent;
 
-  const _PlazaFeedMetaRow({
+  const _PlazaOverviewByline({
     required this.source,
     required this.time,
-    required this.primary,
+    required this.icon,
+    required this.accent,
   });
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(flex: 5, child: _PlazaMetaText('$source · $time')),
-        const SizedBox(width: 8),
-        Flexible(flex: 4, child: _PlazaMetaText(primary, strong: true)),
+        Container(
+          width: 20,
+          height: 20,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: accent.withValues(alpha: 0.13),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.44)),
+          ),
+          child: Icon(
+            icon,
+            size: 12,
+            color: accent.withValues(alpha: 0.86),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            '$source · $time',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: _homeFeedInfoStyle(
+              color: kGlassMuted.withValues(alpha: 0.78),
+              fontSize: 11.9,
+              height: 1.18,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+        ),
       ],
+    );
+  }
+}
+
+class _PlazaOverviewActionRow extends StatelessWidget {
+  final String upLabel;
+  final String favoriteLabel;
+  final String commentLabel;
+
+  const _PlazaOverviewActionRow({
+    required this.upLabel,
+    required this.favoriteLabel,
+    required this.commentLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _PlazaOverviewActionIcon(
+          icon: Icons.change_history_rounded,
+          label: upLabel,
+        ),
+        const SizedBox(width: 22),
+        _PlazaOverviewActionIcon(
+          icon: Icons.star_border_rounded,
+          label: favoriteLabel,
+        ),
+        const SizedBox(width: 22),
+        _PlazaOverviewActionIcon(
+          icon: Icons.chat_bubble_outline_rounded,
+          label: commentLabel,
+        ),
+      ],
+    );
+  }
+}
+
+class _PlazaOverviewActionIcon extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _PlazaOverviewActionIcon({
+    required this.icon,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Flexible(
+      fit: FlexFit.loose,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 17,
+            color: kGlassMuted.withValues(alpha: 0.82),
+          ),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: _homeFeedInfoStyle(
+                color: kGlassMuted.withValues(alpha: 0.76),
+                fontSize: 11.9,
+                height: 1.05,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -7022,14 +7281,11 @@ class _PlazaHotReplyLine extends StatelessWidget {
             padding: const EdgeInsets.only(top: 1),
             child: Text(
               '$label ·',
-              style: TextStyle(
-                color: kGlassAccent.withValues(alpha: 0.88),
+              style: _homeFeedInfoStyle(
+                color: accent.withValues(alpha: 0.76),
                 fontSize: 10.2,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w400,
                 height: 1.1,
-                letterSpacing: 0,
-                fontFamily: 'SF Pro Text',
-                fontFamilyFallback: const ['PingFang SC', 'Noto Sans SC'],
               ),
             ),
           ),
@@ -7038,13 +7294,13 @@ class _PlazaHotReplyLine extends StatelessWidget {
         Expanded(
           child: Text(
             displayText,
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: kDeepSeaTextStyle.copyWith(
-              color: kGlassInk.withValues(alpha: 0.74),
-              fontSize: 11.8,
-              height: 1.25,
-              fontWeight: FontWeight.w600,
+            style: _homeFeedInfoStyle(
+              color: kGlassInk.withValues(alpha: 0.68),
+              fontSize: 12.8,
+              height: 1.38,
+              fontWeight: FontWeight.w400,
             ),
           ),
         ),
@@ -7089,7 +7345,7 @@ class _PlazaTopicThumb extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.white.withValues(alpha: 0.56)),
         boxShadow: [
           BoxShadow(
@@ -7154,14 +7410,10 @@ class _PlazaRatingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _PressableScale(
+    return _PressableInsetCard(
       onTap: onTap,
-      pressedScale: 0.985,
-      child: DeepSeaGlassPanel(
-        padding: const EdgeInsets.all(14),
-        radius: 28,
-        opacity: 0.58,
-        airy: true,
+      builder: (pressed) => _PlazaOverviewGlassCard(
+        pressed: pressed,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -7170,30 +7422,39 @@ class _PlazaRatingCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _PlazaRatingTitle(item: item),
-                  const SizedBox(height: 6),
-                  Text(
-                    item.quote.trim().isEmpty ? item.subtitle : item.quote,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: kDeepSeaTextStyle.copyWith(
-                      color: kGlassInk.withValues(alpha: 0.74),
-                      fontSize: 11.8,
-                      height: 1.25,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  _PlazaFeedMetaRow(
+                  const SizedBox(height: 7),
+                  _PlazaOverviewByline(
                     source: _plazaSourceText(item.source),
                     time: item.time,
-                    primary:
-                        '${item.likes} 喜欢 · ${_plazaRatingCountLabel(item)}',
+                    icon: Icons.star_rate_rounded,
+                    accent: item.accent,
+                  ),
+                  const SizedBox(height: 7),
+                  Text(
+                    item.quote.trim().isEmpty ? item.subtitle : item.quote,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: _homeFeedInfoStyle(
+                      color: kGlassInk.withValues(alpha: 0.68),
+                      fontSize: 12.8,
+                      height: 1.38,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _PlazaOverviewActionRow(
+                    upLabel: item.likes,
+                    favoriteLabel: _compactPlazaMetric(item.ratingCount),
+                    commentLabel: item.comments,
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 10),
-            _PlazaRatingThumb(item: item, size: 64),
+            const SizedBox(width: 12),
+            Padding(
+              padding: const EdgeInsets.only(top: 28),
+              child: _PlazaRatingThumb(item: item, size: 72),
+            ),
           ],
         ),
       ),
@@ -7216,34 +7477,28 @@ class _PlazaRatingTitle extends StatelessWidget {
             item.title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: kDeepSeaTextStyle.copyWith(
+            style: _homeFeedTitleStyle(
               color: kGlassInk,
-              fontSize: 15.2,
-              height: 1.2,
-              fontWeight: FontWeight.w900,
+              fontSize: 15.6,
+              height: 1.24,
             ),
           ),
         ),
         const SizedBox(width: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-          decoration: BoxDecoration(
-            color: kGlassAccent.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: kGlassAccent.withValues(alpha: 0.24)),
-          ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 4),
           child: Text(
             '评分 ${item.score}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: kGlassAccent.withValues(alpha: 0.95),
+              color: kGlassAccent.withValues(alpha: 0.68),
               fontSize: 10.5,
               height: 1,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w500,
               letterSpacing: 0,
-              fontFamily: 'SF Pro Text',
-              fontFamilyFallback: const ['PingFang SC', 'Noto Sans SC'],
+              fontFamily: kAppFontFamily,
+              fontFamilyFallback: kAppFontFallback,
             ),
           ),
         ),
@@ -7267,7 +7522,7 @@ class _PlazaRatingThumb extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.white.withValues(alpha: 0.56)),
         boxShadow: [
           BoxShadow(
@@ -7299,10 +7554,30 @@ String _plazaRatingImageUrl(_PlazaRatingItem item) {
   return 'https://picsum.photos/seed/artsee_rating_${Uri.encodeComponent(item.coverSeed)}/240/240';
 }
 
-String _plazaRatingCountLabel(_PlazaRatingItem item) {
-  final count = _compactPlazaMetric(item.ratingCount);
-  if (count.contains('人')) return count;
-  return '$count 人评分';
+const _ratingDetailAccent = kGlassAccent;
+const _ratingDetailFontFamily = '方正刻本仿宋简体';
+const _ratingDetailFontFallback = <String>[
+  'FZKeBenFangSongS-R-GB',
+  'STFangsong',
+  'Songti SC',
+  'STSong',
+  'SimSong',
+];
+
+TextStyle _ratingDetailTextStyle({
+  required Color color,
+  double fontSize = 14,
+  double height = 1.32,
+}) {
+  return TextStyle(
+    color: color,
+    fontSize: fontSize,
+    height: height,
+    fontWeight: FontWeight.w400,
+    letterSpacing: 0,
+    fontFamily: _ratingDetailFontFamily,
+    fontFamilyFallback: _ratingDetailFontFallback,
+  );
 }
 
 class _PlazaRatingDetailScreen extends StatefulWidget {
@@ -7397,7 +7672,7 @@ class _PlazaRatingDetailScreenState extends State<_PlazaRatingDetailScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => _RatingReplyComposerSheet(
         reply: reply,
-        accent: widget.item.accent,
+        accent: _ratingDetailAccent,
       ),
     );
     if (body == null || body.trim().isEmpty || !mounted) return;
@@ -7408,7 +7683,7 @@ class _PlazaRatingDetailScreenState extends State<_PlazaRatingDetailScreen> {
           date: '刚刚',
           body: body.trim(),
           likes: 0,
-          avatarColor: widget.item.accent,
+          avatarColor: _ratingDetailAccent,
         ),
       );
     });
@@ -7421,60 +7696,80 @@ class _PlazaRatingDetailScreenState extends State<_PlazaRatingDetailScreen> {
   Widget build(BuildContext context) {
     final item = widget.item;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _PlazaRatingDetailHeader(
-              item: item,
-              onShare: _shareRating,
-              leadSaved: _leadSaved,
-              leadBusy: _leadBusy,
-              onSaveLead: _hasLeadActions ? _toggleLeadSave : null,
-              onConvertLead: _hasLeadActions ? _convertLead : null,
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(16, 18, 16, 22 + bottomInset),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _PlazaRatingHero(item: item),
-                    const SizedBox(height: 18),
-                    _PlazaRatingScorePanel(
-                      item: item,
-                      selectedRating: _myRating,
-                      onRatingSelected: _setRating,
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      '亮回复 ${_replies.length}',
-                      style: TextStyle(
-                        color: context.artC.ink,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0,
+    return HomeArtworkBackdrop(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: DefaultTextStyle.merge(
+          style: const TextStyle(
+            fontFamily: _ratingDetailFontFamily,
+            fontFamilyFallback: _ratingDetailFontFallback,
+            letterSpacing: 0,
+          ),
+          child: SafeArea(
+            child: Column(
+              children: [
+                _PlazaRatingDetailHeader(
+                  item: item,
+                  onShare: _shareRating,
+                  leadSaved: _leadSaved,
+                  leadBusy: _leadBusy,
+                  onSaveLead: _hasLeadActions ? _toggleLeadSave : null,
+                  onConvertLead: _hasLeadActions ? _convertLead : null,
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.fromLTRB(18, 4, 18, 24 + bottomInset),
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 640),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _PlazaRatingHero(item: item),
+                            const SizedBox(height: 10),
+                            _PlazaRatingScorePanel(
+                              item: item,
+                              selectedRating: _myRating,
+                              onRatingSelected: _setRating,
+                            ),
+                            const SizedBox(height: 22),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 4),
+                              child: Text(
+                                '亮回复 ${_replies.length}',
+                                style: _ratingDetailTextStyle(
+                                  color: kGlassInk,
+                                  fontSize: 20,
+                                  height: 1.2,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            ..._replies.asMap().entries.map(
+                                  (entry) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 10),
+                                    child: _PlazaRatingReplyTile(
+                                      reply: entry.value,
+                                      accent: _ratingDetailAccent,
+                                      liked:
+                                          _litReplyIndexes.contains(entry.key),
+                                      onLike: () =>
+                                          _toggleReplyLight(entry.key),
+                                      onReply: () => _replyTo(entry.value),
+                                    ),
+                                  ),
+                                ),
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    ..._replies.asMap().entries.map(
-                          (entry) => Padding(
-                            padding: const EdgeInsets.only(bottom: 18),
-                            child: _PlazaRatingReplyTile(
-                              reply: entry.value,
-                              accent: item.accent,
-                              liked: _litReplyIndexes.contains(entry.key),
-                              onLike: () => _toggleReplyLight(entry.key),
-                              onReply: () => _replyTo(entry.value),
-                            ),
-                          ),
-                        ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -7500,74 +7795,69 @@ class _PlazaRatingDetailHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 58,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          bottom: BorderSide(
-            color: context.artC.silver.withValues(alpha: 0.38),
-          ),
-        ),
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 116),
-            child: Text(
-              item.collection,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: context.artC.ink,
-                fontSize: 17,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0,
+    return SizedBox(
+      height: 62,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 112),
+              child: Text(
+                item.collection,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: _ratingDetailTextStyle(
+                  color: kGlassInk,
+                  fontSize: 16.5,
+                  height: 1.1,
+                ),
               ),
             ),
-          ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: IconButton(
-              onPressed: () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-              color: context.artC.ink,
-              tooltip: '返回',
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OpticalGlassIconButton(
+                icon: Icons.arrow_back_ios_new_rounded,
+                onTap: () => Navigator.of(context).pop(),
+                tooltip: '返回',
+                size: 40,
+                iconSize: 18,
+              ),
             ),
-          ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (onSaveLead != null)
-                  _PlazaLeadHeaderIcon(
-                    icon: leadSaved
-                        ? Icons.bookmark_rounded
-                        : Icons.bookmark_border_rounded,
-                    tooltip: leadSaved ? '取消收藏线索' : '收藏线索',
-                    active: leadSaved,
-                    busy: leadBusy,
-                    onTap: onSaveLead,
+            Align(
+              alignment: Alignment.centerRight,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (onSaveLead != null)
+                    _PlazaLeadHeaderIcon(
+                      icon: leadSaved
+                          ? Icons.bookmark_rounded
+                          : Icons.bookmark_border_rounded,
+                      tooltip: leadSaved ? '取消收藏线索' : '收藏线索',
+                      active: leadSaved,
+                      busy: leadBusy,
+                      onTap: onSaveLead,
+                    ),
+                  OpticalGlassIconButton(
+                    icon: Icons.ios_share_rounded,
+                    onTap: onShare,
+                    tooltip: '分享',
+                    size: 40,
+                    iconSize: 20,
                   ),
-                IconButton(
-                  onPressed: onShare,
-                  icon: const Icon(Icons.ios_share_rounded, size: 20),
-                  color: context.artC.ink,
-                  tooltip: '分享',
-                ),
-                if (onConvertLead != null)
-                  _PlazaLeadMoreButton(
-                    busy: leadBusy,
-                    onConvertLead: onConvertLead!,
-                  ),
-              ],
+                  if (onConvertLead != null)
+                    _PlazaLeadMoreButton(
+                      busy: leadBusy,
+                      onConvertLead: onConvertLead!,
+                    ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -7580,40 +7870,48 @@ class _PlazaRatingHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _PlazaRatingThumb(item: item, size: 88),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                item.title,
-                style: TextStyle(
-                  color: context.artC.ink,
-                  fontSize: 24,
-                  height: 1.14,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0,
+    return OpticalGlassSurface(
+      padding: const EdgeInsets.all(16),
+      radius: 26,
+      surfaceOpacity: 0.1,
+      blurSigma: 28,
+      borderOpacity: 0.58,
+      innerBorderOpacity: 0.14,
+      highlightOpacity: 0.36,
+      bottomShadeOpacity: 0.025,
+      shadowOpacity: 0.045,
+      glowOpacity: 0.06,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          _PlazaRatingThumb(item: item, size: 92),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  style: _ratingDetailTextStyle(
+                    color: kGlassInk,
+                    fontSize: 21.5,
+                    height: 1.2,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                item.subtitle,
-                style: TextStyle(
-                  color: context.artC.ink.withValues(alpha: 0.54),
-                  fontSize: 13,
-                  height: 1.45,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0,
+                const SizedBox(height: 9),
+                Text(
+                  item.subtitle,
+                  style: _ratingDetailTextStyle(
+                    color: kGlassMuted.withValues(alpha: 0.88),
+                    fontSize: 13.2,
+                    height: 1.46,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -7631,75 +7929,81 @@ class _PlazaRatingScorePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
-      decoration: BoxDecoration(
-        color: item.accent.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(4),
-      ),
+    const accent = _ratingDetailAccent;
+    return OpticalGlassSurface(
+      padding: const EdgeInsets.fromLTRB(17, 17, 17, 16),
+      radius: 26,
+      surfaceOpacity: 0.11,
+      blurSigma: 30,
+      borderOpacity: 0.58,
+      innerBorderOpacity: 0.14,
+      highlightOpacity: 0.38,
+      bottomShadeOpacity: 0.025,
+      shadowOpacity: 0.045,
+      glowOpacity: 0.06,
       child: Column(
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(
-                width: 96,
+                width: 92,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       '大家评分',
-                      style: TextStyle(
-                        color: item.accent,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      item.score,
-                      style: TextStyle(
-                        color: item.accent,
-                        fontSize: 34,
-                        height: 1,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0,
+                      style: _ratingDetailTextStyle(
+                        color: accent,
+                        fontSize: 13.5,
+                        height: 1.2,
                       ),
                     ),
                     const SizedBox(height: 7),
                     Text(
+                      item.score,
+                      style: _ratingDetailTextStyle(
+                        color: accent,
+                        fontSize: 34,
+                        height: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
                       '${item.ratingCount} 人评分',
-                      style: TextStyle(
-                        color: context.artC.ink.withValues(alpha: 0.52),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0,
+                      style: _ratingDetailTextStyle(
+                        color: kGlassMuted.withValues(alpha: 0.86),
+                        fontSize: 11.5,
                       ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 14),
-              Expanded(child: _RatingDistribution(accent: item.accent)),
+              const Expanded(
+                child: _RatingDistribution(accent: accent),
+              ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 15),
+          Container(
+            height: 1,
+            color: Colors.white.withValues(alpha: 0.48),
+          ),
+          const SizedBox(height: 11),
           Row(
             children: [
               Text(
                 selectedRating == 0 ? '立即评分' : '已评分 $selectedRating 星',
-                style: TextStyle(
-                  color: context.artC.ink.withValues(alpha: 0.62),
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0,
+                style: _ratingDetailTextStyle(
+                  color: kGlassInk.withValues(alpha: 0.72),
+                  fontSize: 14.5,
                 ),
               ),
               const Spacer(),
               _RatingStars(
-                accent: item.accent,
-                size: 28,
+                accent: accent,
+                size: 27,
                 activeCount: selectedRating,
                 outlined: selectedRating == 0,
                 onSelected: onRatingSelected,
@@ -7769,11 +8073,9 @@ class _RatingDistribution extends StatelessWidget {
                     child: Text(
                       row.label,
                       textAlign: TextAlign.right,
-                      style: TextStyle(
+                      style: _ratingDetailTextStyle(
                         color: context.artC.ink.withValues(alpha: 0.52),
                         fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0,
                       ),
                     ),
                   ),
@@ -7807,24 +8109,86 @@ class _RatingStars extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         for (var index = 0; index < 5; index++)
-          GestureDetector(
-            onTap: onSelected == null ? null : () => onSelected!(index + 1),
-            behavior: HitTestBehavior.opaque,
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: onSelected == null ? 0 : 3,
-                vertical: onSelected == null ? 0 : 4,
-              ),
-              child: Icon(
-                outlined || index >= activeCount
-                    ? Icons.star_border_rounded
-                    : Icons.star_rounded,
-                color: accent,
-                size: size,
-              ),
+          if (onSelected == null)
+            Icon(
+              outlined || index >= activeCount
+                  ? Icons.star_border_rounded
+                  : Icons.star_rounded,
+              color: accent,
+              size: size,
+            )
+          else
+            _RatingStarButton(
+              value: index + 1,
+              icon: outlined || index >= activeCount
+                  ? Icons.star_border_rounded
+                  : Icons.star_rounded,
+              color: accent,
+              size: size,
+              onSelected: onSelected!,
+            ),
+      ],
+    );
+  }
+}
+
+class _RatingStarButton extends StatefulWidget {
+  final int value;
+  final IconData icon;
+  final Color color;
+  final double size;
+  final ValueChanged<int> onSelected;
+
+  const _RatingStarButton({
+    required this.value,
+    required this.icon,
+    required this.color,
+    required this.size,
+    required this.onSelected,
+  });
+
+  @override
+  State<_RatingStarButton> createState() => _RatingStarButtonState();
+}
+
+class _RatingStarButtonState extends State<_RatingStarButton> {
+  bool _pressed = false;
+
+  void _setPressed(bool pressed) {
+    if (_pressed == pressed) return;
+    setState(() => _pressed = pressed);
+  }
+
+  void _handleTap() {
+    Feedback.forTap(context);
+    widget.onSelected(widget.value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: '${widget.value} 星',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => _setPressed(true),
+        onTapUp: (_) => _setPressed(false),
+        onTapCancel: () => _setPressed(false),
+        onTap: _handleTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 4),
+          child: AnimatedScale(
+            scale: _pressed ? 0.94 : 1,
+            duration: const Duration(milliseconds: 120),
+            curve: Curves.easeOutCubic,
+            child: Icon(
+              widget.icon,
+              color: widget.color,
+              size: widget.size,
             ),
           ),
-      ],
+        ),
+      ),
     );
   }
 }
@@ -7847,27 +8211,36 @@ class _PlazaRatingReplyTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final displayedLikes = reply.likes + (liked ? 1 : 0);
-    return Container(
-      padding: const EdgeInsets.only(bottom: 18),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: context.artC.silver.withValues(alpha: 0.5),
-          ),
-        ),
-      ),
+    return OpticalGlassSurface(
+      padding: const EdgeInsets.all(14),
+      radius: 22,
+      surfaceOpacity: 0.1,
+      blurSigma: 24,
+      borderOpacity: 0.54,
+      innerBorderOpacity: 0.12,
+      highlightOpacity: 0.32,
+      bottomShadeOpacity: 0.02,
+      shadowOpacity: 0.035,
+      glowOpacity: 0.05,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: reply.avatarColor.withValues(alpha: 0.16),
+          Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: accent.withValues(alpha: 0.12),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.5),
+              ),
+            ),
             child: Text(
               reply.author.characters.first,
-              style: TextStyle(
-                color: reply.avatarColor,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0,
+              style: _ratingDetailTextStyle(
+                color: accent,
+                fontSize: 16,
               ),
             ),
           ),
@@ -7883,21 +8256,17 @@ class _PlazaRatingReplyTile extends StatelessWidget {
                   children: [
                     Text(
                       reply.author,
-                      style: TextStyle(
-                        color: context.artC.ink,
+                      style: _ratingDetailTextStyle(
+                        color: kGlassInk,
                         fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0,
                       ),
                     ),
-                    _RatingStars(accent: accent, size: 16),
+                    _RatingStars(accent: accent, size: 15),
                     Text(
                       reply.date,
-                      style: TextStyle(
-                        color: context.artC.ink.withValues(alpha: 0.45),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0,
+                      style: _ratingDetailTextStyle(
+                        color: kGlassMuted.withValues(alpha: 0.76),
+                        fontSize: 11.8,
                       ),
                     ),
                   ],
@@ -7905,12 +8274,10 @@ class _PlazaRatingReplyTile extends StatelessWidget {
                 const SizedBox(height: 10),
                 Text(
                   reply.body,
-                  style: TextStyle(
-                    color: context.artC.ink,
-                    fontSize: 16.5,
+                  style: _ratingDetailTextStyle(
+                    color: kGlassInk.withValues(alpha: 0.92),
+                    fontSize: 15.5,
                     height: 1.55,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -7973,8 +8340,19 @@ class _RatingReplyComposerSheetState extends State<_RatingReplyComposerSheet> {
         margin: const EdgeInsets.all(10),
         padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomInset),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          color: Colors.white.withValues(alpha: 0.82),
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.72),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.09),
+              blurRadius: 28,
+              spreadRadius: -8,
+              offset: const Offset(0, 12),
+            ),
+          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -7984,21 +8362,19 @@ class _RatingReplyComposerSheetState extends State<_RatingReplyComposerSheet> {
               '回复 ${widget.reply.author}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: context.artC.ink,
+              style: _ratingDetailTextStyle(
+                color: kGlassInk,
                 fontSize: 18,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0,
               ),
             ),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: context.artC.porcelain,
-                borderRadius: BorderRadius.circular(8),
+                color: Colors.white.withValues(alpha: 0.42),
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: context.artC.silver.withValues(alpha: 0.42),
+                  color: Colors.white.withValues(alpha: 0.7),
                 ),
               ),
               child: TextField(
@@ -8007,18 +8383,16 @@ class _RatingReplyComposerSheetState extends State<_RatingReplyComposerSheet> {
                 minLines: 3,
                 maxLines: 5,
                 onChanged: (_) => setState(() {}),
-                style: TextStyle(
-                  color: context.artC.ink,
+                style: _ratingDetailTextStyle(
+                  color: kGlassInk,
                   fontSize: 15,
                   height: 1.42,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0,
                 ),
                 decoration: InputDecoration(
                   hintText: '写下你的回应',
-                  hintStyle: TextStyle(
-                    color: context.artC.ink.withValues(alpha: 0.38),
-                    fontWeight: FontWeight.w700,
+                  hintStyle: _ratingDetailTextStyle(
+                    color: kGlassMuted.withValues(alpha: 0.62),
+                    fontSize: 15,
                   ),
                   border: InputBorder.none,
                   isCollapsed: true,
@@ -8032,9 +8406,9 @@ class _RatingReplyComposerSheetState extends State<_RatingReplyComposerSheet> {
                   onPressed: () => Navigator.of(context).pop(),
                   child: Text(
                     '取消',
-                    style: TextStyle(
-                      color: context.artC.ink.withValues(alpha: 0.58),
-                      fontWeight: FontWeight.w900,
+                    style: _ratingDetailTextStyle(
+                      color: kGlassMuted,
+                      fontSize: 13.5,
                     ),
                   ),
                 ),
@@ -8052,15 +8426,13 @@ class _RatingReplyComposerSheetState extends State<_RatingReplyComposerSheet> {
                       color: canSubmit
                           ? widget.accent
                           : widget.accent.withValues(alpha: 0.22),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Text(
+                    child: Text(
                       '发布',
-                      style: TextStyle(
+                      style: _ratingDetailTextStyle(
                         color: Colors.white,
                         fontSize: 13,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0,
                       ),
                     ),
                   ),
@@ -8091,12 +8463,11 @@ class _RatingReplyAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final actionColor = active
-        ? (color ?? context.artC.ink)
-        : context.artC.ink.withValues(alpha: 0.46);
-    return GestureDetector(
+    final actionColor =
+        active ? (color ?? kGlassInk) : kGlassMuted.withValues(alpha: 0.82);
+    return _PressableScale(
       onTap: onTap,
-      behavior: HitTestBehavior.opaque,
+      pressedScale: 0.96,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
@@ -8110,11 +8481,9 @@ class _RatingReplyAction extends StatelessWidget {
             const SizedBox(width: 5),
             Text(
               label,
-              style: TextStyle(
+              style: _ratingDetailTextStyle(
                 color: actionColor,
                 fontSize: 13,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0,
               ),
             ),
           ],
@@ -8615,96 +8984,99 @@ class _DebateTopicDetailScreenState extends State<_DebateTopicDetailScreen> {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     final associatedRating = _associatedRatingForTopic(topic);
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _DebateDetailHeader(
-              onShare: _openShareSheet,
-              leadSaved: _leadSaved,
-              leadBusy: _leadBusy,
-              onSaveLead: _hasLeadActions ? _toggleLeadSave : null,
-              onConvertLead: _hasLeadActions ? _convertLead : null,
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(16, 24, 16, 18 + bottomInset),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _DebateDetailHero(topic: topic),
-                    if (associatedRating != null) ...[
-                      const SizedBox(height: 14),
-                      _LinkedRatingOverviewCard(
-                        item: associatedRating,
-                        onTap: () => _openAssociatedRating(associatedRating),
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    _PlazaTopicReplyActions(
-                      onlyMine: _filter == _DebateCommentFilter.mine,
-                      liked: _postLiked,
-                      saved: _postSaved,
-                      onReply: () => _openStanceSheet(
-                        initialSide: _DebateSide.watch,
-                        initialDraft: '我想接着这个话题说：',
-                      ),
-                      onShare: _openShareSheet,
-                      onLike: _togglePostLike,
-                      onSave: _togglePostSave,
-                      onOnlyHost: () => setState(
-                        () => _filter = _filter == _DebateCommentFilter.mine
-                            ? _DebateCommentFilter.all
-                            : _DebateCommentFilter.mine,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    _DebateDetailSectionTitle(
-                      title: _filter == _DebateCommentFilter.mine
-                          ? '楼主回复 / ${_visibleComments.length}'
-                          : '全部回复 / ${_comments.length}',
-                      body: '$_currentCommentCount 条评论 · ${topic.heat} 喜欢',
-                    ),
-                    const SizedBox(height: 10),
-                    if (_visibleComments.isEmpty)
-                      _EmptyDebateFilterHint(filter: _filter)
-                    else
-                      ..._visibleComments.map(
-                        (comment) => Padding(
-                          padding: const EdgeInsets.only(bottom: 9),
-                          child: _DebateCommentTile(
-                            side: comment.side,
-                            author: comment.author,
-                            body: comment.body,
-                            likes: comment.likes.toString(),
-                            replies: comment.replies.toString(),
-                            isAgent: comment.isAgent,
-                            isMine: comment.isMine,
-                            liked: _likedCommentIds.contains(comment.id),
-                            onLike: () => _toggleLike(comment),
-                            onReply: () {
-                              if (comment.isAgent) {
-                                _openStanceSheet(
-                                  initialSide: _DebateSide.con,
-                                  initialDraft: '我想反驳${comment.author}刚才这句，因为：',
-                                );
-                                return;
-                              }
-                              _openStanceSheet(
-                                initialSide: comment.side == _DebateSide.pro
-                                    ? _DebateSide.con
-                                    : _DebateSide.pro,
-                              );
-                            },
-                          ),
+    return HomeArtworkBackdrop(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _DebateDetailHeader(
+                onShare: _openShareSheet,
+                leadSaved: _leadSaved,
+                leadBusy: _leadBusy,
+                onSaveLead: _hasLeadActions ? _toggleLeadSave : null,
+                onConvertLead: _hasLeadActions ? _convertLead : null,
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(16, 24, 16, 18 + bottomInset),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _DebateDetailHero(topic: topic),
+                      if (associatedRating != null) ...[
+                        const SizedBox(height: 14),
+                        _LinkedRatingOverviewCard(
+                          item: associatedRating,
+                          onTap: () => _openAssociatedRating(associatedRating),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      _PlazaTopicReplyActions(
+                        onlyMine: _filter == _DebateCommentFilter.mine,
+                        liked: _postLiked,
+                        saved: _postSaved,
+                        onReply: () => _openStanceSheet(
+                          initialSide: _DebateSide.watch,
+                          initialDraft: '我想接着这个话题说：',
+                        ),
+                        onShare: _openShareSheet,
+                        onLike: _togglePostLike,
+                        onSave: _togglePostSave,
+                        onOnlyHost: () => setState(
+                          () => _filter = _filter == _DebateCommentFilter.mine
+                              ? _DebateCommentFilter.all
+                              : _DebateCommentFilter.mine,
                         ),
                       ),
-                  ],
+                      const SizedBox(height: 18),
+                      _DebateDetailSectionTitle(
+                        title: _filter == _DebateCommentFilter.mine
+                            ? '楼主回复 / ${_visibleComments.length}'
+                            : '全部回复 / ${_comments.length}',
+                        body: '$_currentCommentCount 条评论 · ${topic.heat} 喜欢',
+                      ),
+                      const SizedBox(height: 10),
+                      if (_visibleComments.isEmpty)
+                        _EmptyDebateFilterHint(filter: _filter)
+                      else
+                        ..._visibleComments.map(
+                          (comment) => Padding(
+                            padding: const EdgeInsets.only(bottom: 9),
+                            child: _DebateCommentTile(
+                              side: comment.side,
+                              author: comment.author,
+                              body: comment.body,
+                              likes: comment.likes.toString(),
+                              replies: comment.replies.toString(),
+                              isAgent: comment.isAgent,
+                              isMine: comment.isMine,
+                              liked: _likedCommentIds.contains(comment.id),
+                              onLike: () => _toggleLike(comment),
+                              onReply: () {
+                                if (comment.isAgent) {
+                                  _openStanceSheet(
+                                    initialSide: _DebateSide.con,
+                                    initialDraft:
+                                        '我想反驳${comment.author}刚才这句，因为：',
+                                  );
+                                  return;
+                                }
+                                _openStanceSheet(
+                                  initialSide: comment.side == _DebateSide.pro
+                                      ? _DebateSide.con
+                                      : _DebateSide.pro,
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -8923,10 +9295,11 @@ class _DebateDetailHeader extends StatelessWidget {
       height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Colors.transparent,
         border: Border(
           bottom: BorderSide(
-            color: context.artC.silver.withValues(alpha: 0.38),
+            color: context.artC.silver.withValues(alpha: 0.18),
+            width: 0.7,
           ),
         ),
       ),

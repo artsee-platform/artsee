@@ -454,7 +454,8 @@ class _Header extends StatelessWidget {
                 Text(
                   '开始咨询',
                   style: TextStyle(
-                    fontFamily: 'Noto Serif SC',
+                    fontFamily: kAppFontFamily,
+                    fontFamilyFallback: kAppFontFallback,
                     fontSize: 28,
                     fontWeight: FontWeight.w900,
                     color: context.artC.ink,
@@ -1372,7 +1373,8 @@ class _OrganizationPublicHeader extends StatelessWidget {
                             style: TextStyle(
                               color: context.artC.ink,
                               fontSize: 22,
-                              fontFamily: 'Noto Serif SC',
+                              fontFamily: kAppFontFamily,
+                              fontFamilyFallback: kAppFontFallback,
                               fontWeight: FontWeight.w900,
                               height: 1.12,
                             ),
@@ -2357,7 +2359,7 @@ class _OfflineContactSheet extends StatelessWidget {
                   }
                 },
                 icon: const Icon(Icons.map_outlined, size: 17),
-                label: const Text('在地图中打开'),
+                label: const Text('用高德地图打开'),
               ),
             ),
           ],
@@ -2755,7 +2757,8 @@ class _SheetShell extends StatelessWidget {
                 title,
                 style: TextStyle(
                   color: context.artC.ink,
-                  fontFamily: 'Noto Serif SC',
+                  fontFamily: kAppFontFamily,
+                  fontFamilyFallback: kAppFontFallback,
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
                 ),
@@ -2937,6 +2940,13 @@ Future<bool> _openOrganizationMap(Map<String, dynamic> org) async {
 
   if (lat != null && lon != null) {
     final encodedName = Uri.encodeComponent(name);
+    urls.add(Uri.https('uri.amap.com', '/marker', {
+      'position': '$lon,$lat',
+      'name': name,
+      'src': 'artiqore',
+      'coordinate': 'gaode',
+      'callnative': '1',
+    }));
     urls.add(Uri.parse('geo:$lat,$lon?q=$lat,$lon($encodedName)'));
     urls.add(Uri.https('maps.apple.com', '/', {
       'll': '$lat,$lon',
@@ -2949,6 +2959,12 @@ Future<bool> _openOrganizationMap(Map<String, dynamic> org) async {
   }
 
   if (query.isNotEmpty) {
+    urls.add(Uri.https('uri.amap.com', '/search', {
+      'keyword': query,
+      'view': 'map',
+      'src': 'artiqore',
+      'callnative': '1',
+    }));
     urls.add(Uri.https('maps.apple.com', '/', {'q': query}));
     urls.add(Uri.https('www.google.com', '/maps/search/', {
       'api': '1',

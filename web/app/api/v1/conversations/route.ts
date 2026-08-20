@@ -3,10 +3,11 @@ import { getUserFromBearer } from "@/lib/api/auth-user";
 import { effectiveOrganizationSubscriptionStatus } from "@/lib/api/organization-subscription";
 import { createServiceClient } from "@/lib/api/supabase-service";
 import { errorResponse, parsePagination } from "@/lib/api/route-helpers";
+import { auditContent } from "@/lib/api/content-safety";
 import {
-  buildTencentImIdentifier,
-  ensureTencentImAccounts,
-} from "@/lib/api/tencent-im";
+  contentSafetyErrorResponse,
+  rejectedAuditResponse,
+} from "@/lib/api/content-safety-http";
 
 type Row = Record<string, unknown>;
 type ProfileRow = {
@@ -16,6 +17,16 @@ type ProfileRow = {
   user_type?: string | null;
   user_role?: string | null;
 };
+
+const ALLOWED_CONVERSATION_TYPES = new Set([
+  "direct",
+  "organization",
+  "group",
+  "cooperation",
+  "opportunity",
+  "circle",
+  "salon",
+]);
 
 function cleanText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -34,7 +45,6 @@ function profilePayload(profile: ProfileRow | null | undefined) {
     avatar_url: profile.avatar_url,
     user_type: profile.user_type ?? null,
     user_role: profile.user_role ?? null,
-    im_identifier: buildTencentImIdentifier(profile.id),
   };
 }
 
@@ -48,10 +58,8 @@ function organizationAvatar(row: Row) {
   );
 }
 
-function participantImIdentifiers(userIds: string[]) {
-  return Object.fromEntries(
-    userIds.map((id) => [id, buildTencentImIdentifier(id)])
-  );
+function realtimeTopic(conversationId: unknown) {
+  return `conversation:${cleanText(conversationId)}:messages`;
 }
 
 async function findDirectConversation(
@@ -230,7 +238,7 @@ async function createOrReuseOrganizationConversation(
     organization_type: cleanText((organization as Row).type) || null,
     organization_avatar_url: organizationAvatar(organization as Row),
     student_user_id: userId,
-    tencent_im_mode: "bff_persisted_cos_url",
+    transport_provider: "supabase_realtime",
   };
   const participants = allUserIds.map((participantId) => {
     const memberRole =
@@ -252,8 +260,8 @@ async function createOrReuseOrganizationConversation(
   if (conversation) {
     const conversationId = cleanText((conversation as Row).id);
     const mergedMetadata = {
-      ...metadata,
       ...objectValue((conversation as Row).metadata),
+      ...metadata,
     };
     await ensureConversationParticipants(
       supabase,
@@ -279,7 +287,7 @@ async function createOrReuseOrganizationConversation(
       .from("conversations")
       .insert({
         type: "organization",
-        title: cleanText(body.title) || organizationName,
+        title: organizationName,
         created_by: userId,
         metadata,
       })
@@ -301,15 +309,7 @@ async function createOrReuseOrganizationConversation(
   }
 
   const profiles = await loadProfiles(supabase, allUserIds);
-  ensureTencentImAccounts(
-    allUserIds.map((participantId) => ({
-      userId: participantId,
-      nickname: profiles[participantId]?.nickname ?? null,
-      avatarUrl: profiles[participantId]?.avatar_url ?? null,
-    }))
-  ).catch((error) => {
-    console.warn("[tencent-im] failed to sync organization conversation participants", error);
-  });
+  const conversationId = cleanText((conversation as Row).id);
 
   return NextResponse.json({
     success: true,
@@ -318,8 +318,8 @@ async function createOrReuseOrganizationConversation(
       type: "organization",
       title: cleanText((conversation as Row).title) || organizationName,
       metadata: {
-        ...metadata,
         ...objectValue((conversation as Row).metadata),
+        ...metadata,
       },
       organization: {
         id: organizationId,
@@ -329,9 +329,7 @@ async function createOrReuseOrganizationConversation(
       },
       peer_user_id: null,
       peer_profile: null,
-      peer_im_identifier: null,
-      current_user_im_identifier: buildTencentImIdentifier(userId),
-      participant_im_identifiers: participantImIdentifiers(allUserIds),
+      realtime_topic: realtimeTopic(conversationId),
       participant_profiles: allUserIds.map((participantId) =>
         profilePayload(profiles[participantId])
       ),
@@ -395,7 +393,6 @@ export async function GET(req: NextRequest) {
         avatar_url: string | null;
         user_type: string | null;
         user_role: string | null;
-        im_identifier: string;
       }
     > = {};
     if (otherUserIds.length > 0) {
@@ -412,7 +409,6 @@ export async function GET(req: NextRequest) {
             avatar_url: profile.avatar_url,
             user_type: profile.user_type ?? null,
             user_role: profile.user_role ?? null,
-            im_identifier: buildTencentImIdentifier(profile.id),
           },
         ])
       );
@@ -432,32 +428,21 @@ export async function GET(req: NextRequest) {
         const metadata = objectValue((conversation as Row | undefined)?.metadata);
         const isOrganizationConversation =
           conversation?.type === "organization" || Boolean(metadata.organization_id);
-        const otherParticipant = isOrganizationConversation
-          ? null
-          : (allParticipants ?? []).find(
+        const isDirectConversation = conversation?.type === "direct";
+        const otherParticipant = isDirectConversation
+          ? (allParticipants ?? []).find(
               (item: { conversation_id: string; user_id: string }) =>
                 item.conversation_id === id && item.user_id !== user.id
-            );
+            )
+          : null;
         const otherProfile = otherParticipant ? profileMap[otherParticipant.user_id] : null;
-        const participantImIdentifiers = Object.fromEntries(
-          (allParticipants ?? [])
-            .filter((item: { conversation_id: string }) => item.conversation_id === id)
-            .map((item: { user_id: string }) => [
-              item.user_id,
-              buildTencentImIdentifier(item.user_id),
-            ])
-        );
         return {
           ...conversation,
           latest_message: latest ?? null,
           unread_count: unread,
           peer_profile: otherProfile,
-          peer_user_id: isOrganizationConversation ? null : otherParticipant?.user_id ?? null,
-          peer_im_identifier: !isOrganizationConversation && otherParticipant
-            ? buildTencentImIdentifier(otherParticipant.user_id)
-            : null,
-          current_user_im_identifier: buildTencentImIdentifier(user.id),
-          participant_im_identifiers: participantImIdentifiers,
+          peer_user_id: isDirectConversation ? otherParticipant?.user_id ?? null : null,
+          realtime_topic: realtimeTopic(id),
           organization: isOrganizationConversation
             ? {
                 id: cleanText(metadata.organization_id) || null,
@@ -504,6 +489,41 @@ export async function POST(req: NextRequest) {
     if (uniqueIds.length < 2) {
       return NextResponse.json({ success: false, error: "请至少选择一个对话对象" }, { status: 400 });
     }
+    const conversationType = cleanText(body.type) || "direct";
+    if (!ALLOWED_CONVERSATION_TYPES.has(conversationType)) {
+      return NextResponse.json(
+        { success: false, error: "会话类型无效" },
+        { status: 400 }
+      );
+    }
+    if (conversationType === "direct" && uniqueIds.length !== 2) {
+      return NextResponse.json(
+        { success: false, error: "一对一会话只能包含两名成员" },
+        { status: 400 }
+      );
+    }
+    if (conversationType !== "direct" && uniqueIds.length > 100) {
+      return NextResponse.json(
+        { success: false, error: "群聊最多包含 100 名成员" },
+        { status: 400 }
+      );
+    }
+    const conversationTitle = cleanText(body.title);
+    if (Buffer.byteLength(conversationTitle, "utf8") > 100) {
+      return NextResponse.json(
+        { success: false, error: "会话名称不能超过 100 字节" },
+        { status: 400 }
+      );
+    }
+    if (conversationType !== "direct" && conversationTitle) {
+      const audit = await auditContent({
+        userId: user.id,
+        text: conversationTitle,
+        scene: "conversation_title",
+      });
+      const rejected = rejectedAuditResponse(audit, "会话名称");
+      if (rejected) return rejected;
+    }
 
     const { data: profiles } = await supabase
       .from("user_profiles")
@@ -525,26 +545,13 @@ export async function POST(req: NextRequest) {
             avatar_url: profile.avatar_url,
             user_type: profile.user_type ?? null,
             user_role: profile.user_role ?? null,
-            im_identifier: buildTencentImIdentifier(profile.id),
           },
         ]
       )
     );
 
-    ensureTencentImAccounts(
-      (profiles ?? []).map(
-        (profile: { id: string; nickname: string | null; avatar_url: string | null }) => ({
-          userId: profile.id,
-          nickname: profile.nickname,
-          avatarUrl: profile.avatar_url,
-        })
-      )
-    ).catch((error) => {
-      console.warn("[tencent-im] failed to sync conversation participants", error);
-    });
-
-    const peerId = participantIds[0] ?? null;
-    if ((body.type ?? "direct") === "direct" && uniqueIds.length === 2 && peerId) {
+    const peerId = conversationType === "direct" ? participantIds[0] ?? null : null;
+    if (conversationType === "direct" && peerId) {
       const existing = await findDirectConversation(supabase, user.id, peerId);
       if (existing) {
         return NextResponse.json({
@@ -553,31 +560,33 @@ export async function POST(req: NextRequest) {
             ...existing,
             peer_user_id: peerId,
             peer_profile: profileMap[peerId] ?? null,
-            peer_im_identifier: buildTencentImIdentifier(peerId),
-            current_user_im_identifier: buildTencentImIdentifier(user.id),
-            participant_im_identifiers: participantImIdentifiers(uniqueIds),
+            realtime_topic: realtimeTopic(existing.id),
           },
         });
       }
     }
 
-    const { data: conversation, error } = await supabase
+    const { data: insertedConversation, error } = await supabase
       .from("conversations")
       .insert({
-        type: body.type ?? "direct",
-        title: body.title ?? null,
+        type: conversationType,
+        title: conversationTitle || null,
         created_by: user.id,
-        metadata: body.metadata ?? {},
+        metadata: {
+          ...objectValue(body.metadata),
+          transport_provider: "supabase_realtime",
+        },
       })
       .select()
       .single();
     if (error) return errorResponse(error);
+    const conversation = insertedConversation as Row;
 
     const { error: participantError } = await supabase
       .from("conversation_participants")
       .insert(
         uniqueIds.map((id) => ({
-          conversation_id: conversation.id,
+          conversation_id: cleanText(conversation.id),
           user_id: id,
           role: id === user.id ? "owner" : "member",
         }))
@@ -591,14 +600,14 @@ export async function POST(req: NextRequest) {
           ...conversation,
           peer_user_id: peerId,
           peer_profile: peerId ? profileMap[peerId] ?? null : null,
-          peer_im_identifier: peerId ? buildTencentImIdentifier(peerId) : null,
-          current_user_im_identifier: buildTencentImIdentifier(user.id),
-          participant_im_identifiers: participantImIdentifiers(uniqueIds),
+          realtime_topic: realtimeTopic(conversation.id),
         },
       },
       { status: 201 }
     );
   } catch (e) {
+    const auditError = contentSafetyErrorResponse(e);
+    if (auditError) return auditError;
     return errorResponse(e);
   }
 }

@@ -245,6 +245,7 @@ class _ContractCard extends StatelessWidget {
     final orgName = _text(organization['name'], fallback: '机构');
     final targetName = _text(consultation['target_name']);
     final status = _text(contract['status'], fallback: 'pending');
+    final contractId = _text(contract['id']);
     final fileUrl = _text(contract['file_url']);
     final notes = _text(contract['notes']);
     final signedAt = _dateText(contract['signed_at']);
@@ -304,7 +305,11 @@ class _ContractCard extends StatelessWidget {
             Align(
               alignment: Alignment.centerLeft,
               child: OutlinedButton.icon(
-                onPressed: () => _openUrl(fileUrl),
+                onPressed: () => _openPrivateFile(
+                  context,
+                  fileUrl,
+                  contractId: contractId,
+                ),
                 icon: const Icon(Icons.open_in_new, size: 16),
                 label: const Text('查看文件'),
               ),
@@ -772,8 +777,24 @@ String _mimeForFileName(String name) {
   return 'image/png';
 }
 
-Future<void> _openUrl(String url) async {
-  final uri = Uri.tryParse(url);
-  if (uri == null) return;
-  await launchUrl(uri, mode: LaunchMode.externalApplication);
+Future<void> _openPrivateFile(
+  BuildContext context,
+  String url, {
+  String? contractId,
+}) async {
+  try {
+    final signedUrl = await BackendApiService.signSubmissionMaterial(
+      url,
+      contractId: contractId,
+    );
+    final uri = Uri.tryParse(signedUrl);
+    if (uri == null) throw Exception('文件链接无效');
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened) throw Exception('无法打开合同文件');
+  } catch (error) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('打开文件失败：$error')),
+    );
+  }
 }

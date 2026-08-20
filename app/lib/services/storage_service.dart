@@ -6,7 +6,7 @@ import 'backend_api_service.dart';
 import 'supabase_service.dart';
 
 /// 基于 Next.js 后端上传接口的对象存储封装。
-/// 优先使用腾讯云 COS 直传，服务端未配置时自动回退到旧 `/api/v1/upload`。
+/// 优先使用腾讯云 COS 直传；服务不可用或私有资料需受保护存储时回退 `/api/v1/upload`。
 class StorageService {
   StorageService._();
 

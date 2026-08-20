@@ -12,6 +12,12 @@ class SupabaseService {
   static Future<AuthResponse> signIn(String email, String password) =>
       _client.auth.signInWithPassword(email: email, password: password);
 
+  static Future<AuthResponse> restoreSession({
+    required String refreshToken,
+    String? accessToken,
+  }) =>
+      _client.auth.setSession(refreshToken, accessToken: accessToken);
+
   /// 注册方法已废弃，请使用 BackendApiService.signup()
   /// 该方法通过 Next.js API 统一处理 Auth 和 user_profiles 创建
   @Deprecated('Use BackendApiService.signup() instead')

@@ -109,7 +109,7 @@ List<String> mainNavigationLabelsForProfile(
   )) {
     return const ['工作台', '发现', '消息', '我的'];
   }
-  return const ['院校', '发现', '消息', '我的'];
+  return const ['首页', '发现', '消息', '我的'];
 }
 
 class MainScaffold extends StatefulWidget {
@@ -244,7 +244,7 @@ class _MainScaffoldState extends State<MainScaffold> {
             tabIndex: 1,
             icon: Icons.home_outlined,
             activeIcon: Icons.home_rounded,
-            label: '院校',
+            label: '首页',
           ),
           _NavItem(
             tabIndex: 2,
@@ -623,7 +623,8 @@ class _MainScaffoldState extends State<MainScaffold> {
                             color: context.artC.ink,
                             fontSize: 24,
                             fontWeight: FontWeight.w900,
-                            fontFamily: 'Noto Serif SC',
+                            fontFamily: kAppFontFamily,
+                            fontFamilyFallback: kAppFontFallback,
                           ),
                         ),
                         const SizedBox(height: 6),
@@ -924,7 +925,8 @@ class _MainScaffoldState extends State<MainScaffold> {
                             color: context.artC.ink,
                             fontSize: 24,
                             fontWeight: FontWeight.w900,
-                            fontFamily: 'Noto Serif SC',
+                            fontFamily: kAppFontFamily,
+                            fontFamilyFallback: kAppFontFallback,
                           ),
                         ),
                         const SizedBox(height: 6),
@@ -1651,116 +1653,205 @@ class _MainScaffoldState extends State<MainScaffold> {
         : statusBarHeight + (showTopHeader ? _headerHeight : 0);
     final hideFloatingNav = _homeNavHidden || _profileDrawerOpen;
 
-    return Scaffold(
-      backgroundColor: context.artC.porcelain,
-      extendBody: true,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
+    final scaffoldBody = Stack(
+      fit: StackFit.expand,
+      children: [
+        Positioned(
+          top: contentTop,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: IndexedStack(
+            index: _currentIndex,
+            children: [
+              HomeScreen(showWorkbenchShortcut: _usesWorkspaceTab),
+              _usesWorkspaceTab
+                  ? _buildWorkspaceScreen()
+                  : NewsScaffold(
+                      key: _newsKey,
+                    ),
+              ExploreScreen(
+                key: _exploreKey,
+                onCreateTap: _showCreateSheet,
+                onTabChanged: () {
+                  if (mounted) setState(() {});
+                },
+              ),
+              ForumScreen(
+                key: _forumKey,
+                onTabChanged: () {
+                  if (mounted) setState(() {});
+                },
+              ),
+              ProfileScreen(
+                onOpenMainTab: switchToTab,
+                onDrawerChanged: _setProfileDrawerOpen,
+              ),
+            ],
+          ),
+        ),
+        if (showTopHeader)
           Positioned(
-            top: contentTop,
+            top: statusBarHeight,
             left: 0,
             right: 0,
-            bottom: 0,
-            child: IndexedStack(
-              index: _currentIndex,
-              children: [
-                HomeScreen(showWorkbenchShortcut: _usesWorkspaceTab),
-                _usesWorkspaceTab
-                    ? _buildWorkspaceScreen()
-                    : NewsScaffold(
-                        key: _newsKey,
-                      ),
-                ExploreScreen(
-                  key: _exploreKey,
-                  onCreateTap: _showCreateSheet,
-                  onTabChanged: () {
-                    if (mounted) setState(() {});
-                  },
-                ),
-                ForumScreen(
-                  key: _forumKey,
-                  onTabChanged: () {
-                    if (mounted) setState(() {});
-                  },
-                ),
-                ProfileScreen(
-                  onOpenMainTab: switchToTab,
-                  onDrawerChanged: _setProfileDrawerOpen,
-                ),
-              ],
+            child: _TopHeader(
+              showCreateIcon: _currentIndex == 2 || _currentIndex == 3,
+              searchHint: _headerSearchHint,
+              searchValue: _headerSearchValue,
+              actionIcon: _headerActionIcon,
+              actionLabel: _headerActionLabel,
+              onSearchSubmit: _handleHeaderSearch,
+              onActionTap: _handleHeaderAction,
             ),
           ),
-          if (showTopHeader)
-            Positioned(
-              top: statusBarHeight,
-              left: 0,
-              right: 0,
-              child: _TopHeader(
-                showCreateIcon: _currentIndex == 2 || _currentIndex == 3,
-                searchHint: _headerSearchHint,
-                searchValue: _headerSearchValue,
-                actionIcon: _headerActionIcon,
-                actionLabel: _headerActionLabel,
-                onSearchSubmit: _handleHeaderSearch,
-                onActionTap: _handleHeaderAction,
-              ),
-            ),
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            left: 0,
-            right: 0,
-            bottom: hideFloatingNav ? -88 : 0,
-            child: IgnorePointer(
-              ignoring: hideFloatingNav,
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 180),
-                opacity: hideFloatingNav ? 0 : 1,
-                child: Material(
-                  color: Colors.transparent,
-                  child: SafeArea(
-                    top: false,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                          child: Center(child: _buildFloatingNav()),
-                        ),
-                      ],
-                    ),
+        AnimatedPositioned(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          left: 0,
+          right: 0,
+          bottom: hideFloatingNav ? -88 : 0,
+          child: IgnorePointer(
+            ignoring: hideFloatingNav,
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 180),
+              opacity: hideFloatingNav ? 0 : 1,
+              child: Material(
+                color: Colors.transparent,
+                child: SafeArea(
+                  top: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                        child: Center(child: _buildFloatingNav()),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
+    );
+
+    return Scaffold(
+      backgroundColor: kHomeArtworkBackground,
+      extendBody: true,
+      body: isDiscoverSurface || isMessageSurface || isProfileSurface
+          ? HomeArtworkBackdrop(child: scaffoldBody)
+          : scaffoldBody,
     );
   }
 
   Widget _buildFloatingNav() {
     final leadingItems = _navItems.take(2);
     final trailingItems = _navItems.skip(2);
+    final selectedItem = _selectedNavItem;
+    const navHeight = 64.0;
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 330),
-      child: DeepSeaGlassPanel(
-        padding: const EdgeInsets.all(5),
-        radius: 32,
-        opacity: 0.48,
-        airy: true,
-        child: Row(
+      constraints: const BoxConstraints(maxWidth: 348),
+      child: SizedBox(
+        height: 82,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.bottomCenter,
           children: [
-            ...leadingItems.map(_buildNavButtonSlot),
-            Expanded(child: _AiNavButton(onTap: _openDotChatRoute)),
-            ...trailingItems.map(_buildNavButtonSlot),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: SizedBox(
+                height: navHeight,
+                child: OpticalGlassSurface(
+                  padding: const EdgeInsets.all(5),
+                  radius: 34,
+                  surfaceOpacity: 0.72,
+                  blurSigma: 18,
+                  borderOpacity: 0.72,
+                  innerBorderOpacity: 0.2,
+                  highlightOpacity: 0.46,
+                  bottomShadeOpacity: 0.035,
+                  shadowOpacity: 0.12,
+                  glowOpacity: 0.2,
+                  child: Row(
+                    children: [
+                      ...leadingItems.map(_buildNavButtonSlot),
+                      Expanded(child: _AiNavButton(onTap: _openDotChatRoute)),
+                      ...trailingItems.map(_buildNavButtonSlot),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (selectedItem != null)
+              Positioned.fill(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    const bubbleWidth = 96.0;
+                    const bubbleHeight = 74.0;
+                    const navContentInset = 5.0;
+                    final navWidth = constraints.maxWidth;
+                    final contentWidth = navWidth - (navContentInset * 2);
+                    final slotWidth = contentWidth / 5;
+                    final slotIndex = _navVisualSlotIndex(selectedItem);
+                    final navTop = constraints.maxHeight - navHeight;
+                    final targetLeft = navContentInset +
+                        (slotIndex * slotWidth) +
+                        (slotWidth - bubbleWidth) / 2;
+                    final top = navTop + (navHeight - bubbleHeight) / 2;
+
+                    return Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        AnimatedPositioned(
+                          left: targetLeft,
+                          top: top,
+                          width: bubbleWidth,
+                          height: bubbleHeight,
+                          duration: const Duration(milliseconds: 280),
+                          curve: const Cubic(0.77, 0, 0.175, 1),
+                          child: _SelectedNavBubble(
+                            item: selectedItem,
+                            onTap: () => _handleNavItemTap(selectedItem),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
           ],
         ),
       ),
     );
+  }
+
+  _NavItem? get _selectedNavItem {
+    for (final item in _navItems) {
+      if (item.tabIndex == _currentIndex) return item;
+    }
+    return null;
+  }
+
+  int _navVisualSlotIndex(_NavItem item) {
+    final navIndex = _navItems
+        .indexWhere((candidate) => candidate.tabIndex == item.tabIndex);
+    if (navIndex < 0) return 2;
+    return navIndex < 2 ? navIndex : navIndex + 1;
+  }
+
+  void _handleNavItemTap(_NavItem item) {
+    setState(() {
+      _currentIndex = item.tabIndex;
+      _homeNavHidden = false;
+      if (item.tabIndex != 4) _profileDrawerOpen = false;
+    });
+    if (item.tabIndex == 1 || item.tabIndex == 4) _loadProfile();
   }
 
   Widget _buildNavButtonSlot(_NavItem item) {
@@ -1768,14 +1859,7 @@ class _MainScaffoldState extends State<MainScaffold> {
       child: _NavButton(
         item: item,
         isSelected: _currentIndex == item.tabIndex,
-        onTap: () {
-          setState(() {
-            _currentIndex = item.tabIndex;
-            _homeNavHidden = false;
-            if (item.tabIndex != 4) _profileDrawerOpen = false;
-          });
-          if (item.tabIndex == 1 || item.tabIndex == 4) _loadProfile();
-        },
+        onTap: () => _handleNavItemTap(item),
       ),
     );
   }
@@ -2385,6 +2469,229 @@ class _NavItem {
   });
 }
 
+class _SelectedNavBubble extends StatefulWidget {
+  final _NavItem item;
+  final VoidCallback onTap;
+
+  const _SelectedNavBubble({
+    required this.item,
+    required this.onTap,
+  });
+
+  @override
+  State<_SelectedNavBubble> createState() => _SelectedNavBubbleState();
+}
+
+class _SelectedNavBubbleState extends State<_SelectedNavBubble> {
+  static const _activeColor = kCobalt;
+  bool _pressed = false;
+
+  void _setPressed(bool pressed) {
+    if (_pressed == pressed) return;
+    setState(() => _pressed = pressed);
+  }
+
+  void _handleTap() {
+    Feedback.forTap(context);
+    widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: true,
+      label: widget.item.label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => _setPressed(true),
+        onTapUp: (_) => _setPressed(false),
+        onTapCancel: () => _setPressed(false),
+        onTap: _handleTap,
+        child: AnimatedScale(
+          scale: _pressed ? 0.965 : 1,
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOutCubic,
+          child: OpticalGlassSurface(
+            padding: EdgeInsets.zero,
+            radius: 30,
+            surfaceOpacity: 0.4,
+            blurSigma: 24,
+            elevated: true,
+            emphasized: false,
+            borderOpacity: 0.62,
+            innerBorderOpacity: 0.28,
+            highlightOpacity: 0.86,
+            bottomShadeOpacity: 0.09,
+            shadowOpacity: 0.2,
+            glowOpacity: 0.34,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(30),
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.white.withValues(alpha: 0.38),
+                            Colors.white.withValues(alpha: 0.08),
+                            Colors.white.withValues(alpha: 0.34),
+                          ],
+                          stops: const [0, 0.54, 1],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 10,
+                  bottom: 11,
+                  left: 1,
+                  width: 2.2,
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.78),
+                        borderRadius: BorderRadius.circular(999),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.white.withValues(alpha: 0.62),
+                            blurRadius: 8,
+                            spreadRadius: 1,
+                          ),
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 9,
+                            offset: const Offset(4, 0),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 13,
+                  bottom: 14,
+                  right: 1,
+                  width: 1.4,
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.38),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 1,
+                  left: 18,
+                  right: 18,
+                  height: 4,
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.16),
+                            Colors.white.withValues(alpha: 0.52),
+                            Colors.white.withValues(alpha: 0),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(999),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.12),
+                            blurRadius: 10,
+                            spreadRadius: 0,
+                            offset: const Offset(0, -1),
+                          ),
+                          BoxShadow(
+                            color: Colors.white.withValues(alpha: 0.62),
+                            blurRadius: 7,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 0,
+                  left: 10,
+                  right: 10,
+                  height: 7,
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.white.withValues(alpha: 0.06),
+                            Colors.white.withValues(alpha: 0.64),
+                            kGlassInk.withValues(alpha: 0.08),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(999),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.white.withValues(alpha: 0.58),
+                            blurRadius: 9,
+                            spreadRadius: 1,
+                            offset: const Offset(0, -1),
+                          ),
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.12),
+                            blurRadius: 12,
+                            spreadRadius: 0,
+                            offset: const Offset(0, -2),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      widget.item.activeIcon,
+                      size: 24,
+                      color: _activeColor,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      widget.item.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _activeColor,
+                        fontFamily: kAppFontFamily,
+                        fontFamilyFallback: kAppFontFallback,
+                        fontSize: 11.5,
+                        height: 1,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _NavButton extends StatefulWidget {
   final _NavItem item;
   final bool isSelected;
@@ -2405,9 +2712,7 @@ class _NavButtonState extends State<_NavButton> {
 
   @override
   Widget build(BuildContext context) {
-    final itemColor = widget.isSelected
-        ? kDeepSeaMidnight
-        : kGlassInk.withValues(alpha: 0.56);
+    final itemColor = kGlassInk.withValues(alpha: 0.88);
 
     return Semantics(
       button: true,
@@ -2417,59 +2722,49 @@ class _NavButtonState extends State<_NavButton> {
         onTapDown: (_) => setState(() => _pressed = true),
         onTapUp: (_) => setState(() => _pressed = false),
         onTapCancel: () => setState(() => _pressed = false),
-        onTap: widget.onTap,
+        onTap: () {
+          Feedback.forTap(context);
+          widget.onTap();
+        },
         behavior: HitTestBehavior.opaque,
         child: Center(
           child: AnimatedScale(
             scale: _pressed ? 0.96 : 1.0,
             duration: const Duration(milliseconds: 120),
             curve: Curves.easeOutCubic,
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 180),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeOutCubic,
-              layoutBuilder: (currentChild, previousChildren) => Stack(
-                alignment: Alignment.center,
-                children: [
-                  ...previousChildren,
-                  if (currentChild != null) currentChild
-                ],
-              ),
-              transitionBuilder: (child, animation) => FadeTransition(
-                opacity: animation,
-                child: ScaleTransition(
-                  scale: Tween<double>(begin: 0.96, end: 1).animate(animation),
-                  child: child,
-                ),
-              ),
-              child: widget.isSelected
-                  ? OpticalGlassSurface(
-                      key: ValueKey('selected-${widget.item.tabIndex}'),
-                      padding: EdgeInsets.zero,
-                      radius: 22,
-                      surfaceOpacity: 0.18,
-                      blurSigma: 13,
-                      emphasized: true,
-                      child: SizedBox(
-                        width: 58,
-                        height: 50,
-                        child: Icon(
-                          widget.item.activeIcon,
-                          size: 21,
-                          color: itemColor,
-                        ),
-                      ),
-                    )
-                  : SizedBox(
-                      key: ValueKey('idle-${widget.item.tabIndex}'),
-                      width: 54,
-                      height: 50,
-                      child: Icon(
-                        widget.item.icon,
-                        size: 21,
+            child: AnimatedOpacity(
+              opacity: widget.isSelected ? 0 : 1,
+              duration: const Duration(milliseconds: 140),
+              curve: Curves.easeOutCubic,
+              child: SizedBox(
+                width: 58,
+                height: 54,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      widget.item.icon,
+                      size: 22,
+                      color: itemColor,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      widget.item.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
                         color: itemColor,
+                        fontFamily: kAppFontFamily,
+                        fontFamilyFallback: kAppFontFallback,
+                        fontSize: 11,
+                        height: 1,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0,
                       ),
                     ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -2514,14 +2809,9 @@ class _AiNavButtonState extends State<_AiNavButton> {
                   'AI',
                   style: TextStyle(
                     color: kGlassInk,
-                    fontFamily: 'Didot',
-                    fontFamilyFallback: [
-                      'Bodoni 72',
-                      'Times New Roman',
-                      'serif',
-                    ],
+                    fontFamily: kAppFontFamily,
+                    fontFamilyFallback: kAppFontFallback,
                     fontSize: 18,
-                    fontStyle: FontStyle.italic,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0,
                     height: 1,

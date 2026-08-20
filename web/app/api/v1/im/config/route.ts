@@ -3,8 +3,10 @@ import { getUserFromBearer } from "@/lib/api/auth-user";
 import { errorResponse } from "@/lib/api/route-helpers";
 import { createServiceClient } from "@/lib/api/supabase-service";
 import {
+  consumeTencentImLoginConfigQuota,
   createTencentImLoginConfig,
   TencentImConfigError,
+  TencentImRateLimitError,
 } from "@/lib/api/tencent-im";
 
 export async function GET(req: NextRequest) {
@@ -14,6 +16,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    consumeTencentImLoginConfigQuota(user.id);
     const supabase = createServiceClient();
     const { data: profile } = await supabase
       .from("user_profiles")
@@ -31,8 +34,20 @@ export async function GET(req: NextRequest) {
           : undefined,
     });
 
-    return NextResponse.json({ success: true, data: config });
+    return NextResponse.json(
+      { success: true, data: config },
+      { headers: { "Cache-Control": "private, no-store" } }
+    );
   } catch (error) {
+    if (error instanceof TencentImRateLimitError) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        {
+          status: 429,
+          headers: { "Retry-After": String(error.retryAfterSeconds) },
+        }
+      );
+    }
     if (error instanceof TencentImConfigError) {
       return NextResponse.json(
         { success: false, error: error.message, missing: error.missing },

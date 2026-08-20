@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 const CREATE_TABLES_SQL = `-- 创建更新触发器函数
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -63,15 +63,9 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 5. sms_verifications - 短信验证码表
-CREATE TABLE IF NOT EXISTS sms_verifications (
-    id SERIAL PRIMARY KEY,
-    phone VARCHAR(20) NOT NULL,
-    verification_code VARCHAR(10) NOT NULL,
-    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    verified BOOLEAN DEFAULT false,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+-- 短信验证码表不得在这里以明文方式创建。
+-- 请另行执行 supabase/migrations/20260808195110_harden_sms_auth.sql，
+-- 该迁移会启用 RLS、撤销匿名权限，并创建哈希验证码与原子消费函数。
 
 -- 创建新用户时自动创建 profile
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -88,7 +82,7 @@ CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();`;
 
-export async function POST(req: NextRequest) {
+export async function POST() {
   return NextResponse.json({
     success: true,
     message: "请在 Supabase Dashboard SQL Editor 中执行以下 SQL",
@@ -96,7 +90,8 @@ export async function POST(req: NextRequest) {
     instructions: [
       "1. 打开 https://app.supabase.com/project/nufrgmlhlfmhxsqbybfd",
       "2. 进入 SQL Editor",
-      "3. 复制上面的 SQL 并执行"
+      "3. 复制上面的基础 SQL 并执行",
+      "4. 必须继续执行 supabase/migrations/20260808195110_harden_sms_auth.sql"
     ]
   });
 }
@@ -104,6 +99,7 @@ export async function POST(req: NextRequest) {
 export async function GET() {
   return NextResponse.json({
     message: "使用 POST 请求获取建表 SQL",
-    tables: ["schools", "art_categories", "programs", "user_profiles", "sms_verifications"]
+    tables: ["schools", "art_categories", "programs", "user_profiles"],
+    requiredMigration: "supabase/migrations/20260808195110_harden_sms_auth.sql"
   });
 }

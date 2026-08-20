@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromBearer } from "@/lib/api/auth-user";
+import { auditContent } from "@/lib/api/content-safety";
+import {
+  contentSafetyErrorResponse,
+  rejectedAuditResponse,
+} from "@/lib/api/content-safety-http";
 import { createServiceClient } from "@/lib/api/supabase-service";
 
 type Ctx = { params: Promise<{ id: string; answerIndex: string }> };
@@ -146,6 +151,15 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       return NextResponse.json({ success: false, error: "未找到" }, { status: 404 });
     }
 
+    const audit = await auditContent({
+      userId: user.id,
+      text,
+      scene: "hot_topic_comment",
+      dataId: `hot-${id}-${answerIndex}`,
+    });
+    const rejected = rejectedAuditResponse(audit, "评论");
+    if (rejected) return rejected;
+
     const { data: comment, error } = await supabase
       .from("community_hot_topic_answer_comments")
       .insert({
@@ -168,6 +182,8 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       { status: 201 }
     );
   } catch (error: unknown) {
+    const auditError = contentSafetyErrorResponse(error);
+    if (auditError) return auditError;
     const msg = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }

@@ -7,8 +7,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/backend_api_service.dart';
+import '../../services/conversation_realtime_service.dart';
 import '../../services/supabase_service.dart';
-import '../../services/tencent_im_service.dart';
 import '../../theme/artsee_ui_colors.dart';
 import '../../widgets/common.dart';
 
@@ -21,7 +21,7 @@ const _waOtherBubble = Colors.white;
 const _waMuted = Color(0xFF667781);
 const _waInk = Color(0xFF111B21);
 
-enum LightMessagePeerKind { person, organization }
+enum LightMessagePeerKind { person, organization, group }
 
 class LightMessagePeer {
   final String name;
@@ -33,6 +33,7 @@ class LightMessagePeer {
   final String? responseTime;
   final String? peerUserId;
   final String? imIdentifier;
+  final String? imGroupId;
   final String? profileActionLabel;
   final WidgetBuilder? profileBuilder;
 
@@ -46,6 +47,7 @@ class LightMessagePeer {
     this.responseTime,
     this.peerUserId,
     this.imIdentifier,
+    this.imGroupId,
     this.profileActionLabel,
     this.profileBuilder,
   });
@@ -57,6 +59,7 @@ class LightMessagePeer {
     String identityLabel = '社区用户',
     String? peerUserId,
     String? imIdentifier,
+    String? imGroupId,
     WidgetBuilder? profileBuilder,
   }) {
     return LightMessagePeer(
@@ -65,6 +68,7 @@ class LightMessagePeer {
       handle: handle,
       peerUserId: peerUserId,
       imIdentifier: imIdentifier,
+      imGroupId: imGroupId,
       identityLabel: identityLabel,
       kind: LightMessagePeerKind.person,
       profileActionLabel: '查看主页',
@@ -80,6 +84,7 @@ class LightMessagePeer {
     String? responseTime,
     String? peerUserId,
     String? imIdentifier,
+    String? imGroupId,
     WidgetBuilder? profileBuilder,
   }) {
     return LightMessagePeer(
@@ -91,8 +96,24 @@ class LightMessagePeer {
       responseTime: responseTime ?? '2小时内',
       peerUserId: peerUserId,
       imIdentifier: imIdentifier,
+      imGroupId: imGroupId,
       profileActionLabel: '查看机构页',
       profileBuilder: profileBuilder,
+    );
+  }
+
+  factory LightMessagePeer.group({
+    required String name,
+    String? avatarUrl,
+    String? imGroupId,
+  }) {
+    return LightMessagePeer(
+      name: name,
+      avatarUrl: avatarUrl,
+      identityLabel: '群聊',
+      kind: LightMessagePeerKind.group,
+      imGroupId: imGroupId,
+      profileActionLabel: '群聊信息',
     );
   }
 
@@ -132,6 +153,8 @@ class LightMessagePeer {
     final imIdentifier = conversation['peer_im_identifier']?.toString() ??
         peer?['im_identifier']?.toString() ??
         metadata['peer_im_identifier']?.toString();
+    final imGroupId = conversation['tencent_im_group_id']?.toString() ??
+        metadata['tencent_im_group_id']?.toString();
 
     if (isOrg) {
       return LightMessagePeer.organization(
@@ -141,6 +164,14 @@ class LightMessagePeer {
         responseTime: metadata['response_time']?.toString() ?? '2小时内',
         peerUserId: peerUserId,
         imIdentifier: imIdentifier,
+        imGroupId: imGroupId,
+      );
+    }
+    if (type != 'direct') {
+      return LightMessagePeer.group(
+        name: name,
+        avatarUrl: avatarUrl,
+        imGroupId: imGroupId,
       );
     }
     return LightMessagePeer.person(
@@ -176,7 +207,11 @@ class _LightMessageScreenState extends State<LightMessageScreen> {
   List<Map<String, dynamic>> _messages = const [];
   bool _loading = false;
   bool _sending = false;
+  bool _refreshingMessages = false;
   String? _error;
+  Timer? _readReceiptDebounce;
+  Timer? _realtimeRecoveryTimer;
+  ConversationRealtimeSubscription? _realtimeSubscription;
 
   String? get _conversationId => widget.conversation?['id']?.toString();
 
@@ -191,7 +226,8 @@ class _LightMessageScreenState extends State<LightMessageScreen> {
     super.initState();
     final id = _conversationId;
     if (id != null && id.isNotEmpty) {
-      _loadMessages();
+      _attachRealtime(id);
+      unawaited(_loadMessages());
     } else {
       _messages = [
         {
@@ -201,39 +237,53 @@ class _LightMessageScreenState extends State<LightMessageScreen> {
         }
       ];
     }
-    unawaited(_attachTencentImListener());
   }
 
   @override
   void dispose() {
-    unawaited(TencentImService.removeTextMessageHandler(_handleTencentMessage));
+    unawaited(_realtimeSubscription?.close());
+    _readReceiptDebounce?.cancel();
+    _realtimeRecoveryTimer?.cancel();
     _input.dispose();
     _scroll.dispose();
     super.dispose();
   }
 
-  Future<void> _loadMessages() async {
+  Future<void> _loadMessages({bool showLoading = true}) async {
     final id = _conversationId;
-    if (id == null || id.isEmpty) return;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (id == null || id.isEmpty || _refreshingMessages) return;
+    _refreshingMessages = true;
+    if (showLoading) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final result =
           await BackendApiService.fetchConversationMessages(conversationId: id);
       if (!mounted) return;
       setState(() {
-        _messages = result.data.reversed.toList();
-        _loading = false;
+        _messages = mergeConversationMessages(
+          result.data.reversed,
+          _messages,
+        );
+        if (showLoading) _loading = false;
+        _error = null;
       });
       _scrollToBottom();
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
+      if (showLoading) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      } else {
+        debugPrint('Supabase Realtime message catch-up failed: $e');
+      }
+    } finally {
+      _refreshingMessages = false;
     }
   }
 
@@ -242,26 +292,17 @@ class _LightMessageScreenState extends State<LightMessageScreen> {
     if (text.isEmpty || _sending) return;
     setState(() => _sending = true);
     final id = _conversationId;
-    final peer = _peer;
-    final peerImIdentifier = peer.imIdentifier?.trim();
     try {
       if (id != null && id.isNotEmpty) {
-        Map<String, dynamic> message;
-        if (peerImIdentifier != null && peerImIdentifier.isNotEmpty) {
-          message = await TencentImService.sendC2CText(
-            peerIdentifier: peerImIdentifier,
-            text: text,
-          );
-          unawaited(_persistTencentMessage(id, text, message));
-        } else {
-          message = await BackendApiService.sendConversationMessage(
-            conversationId: id,
-            body: text,
-          );
-        }
+        final message = await BackendApiService.sendConversationMessage(
+          conversationId: id,
+          body: text,
+        );
         if (!mounted) return;
         _input.clear();
-        setState(() => _messages = _appendMessage(_messages, message));
+        setState(() {
+          _messages = mergeConversationMessages(_messages, [message]);
+        });
       } else {
         _input.clear();
         setState(() {
@@ -414,55 +455,54 @@ class _LightMessageScreenState extends State<LightMessageScreen> {
         },
       );
       if (!mounted) return;
-      setState(() => _messages = _appendMessage(_messages, message));
+      setState(() {
+        _messages = mergeConversationMessages(_messages, [message]);
+      });
       _scrollToBottom();
     } finally {
       if (mounted) setState(() => _sending = false);
     }
   }
 
-  Future<void> _attachTencentImListener() async {
-    final peerImIdentifier = _peer.imIdentifier?.trim();
-    if (peerImIdentifier == null || peerImIdentifier.isEmpty) return;
-    try {
-      await TencentImService.addTextMessageHandler(_handleTencentMessage);
-    } catch (e) {
-      debugPrint('Tencent IM listener not attached: $e');
-    }
+  void _attachRealtime(String conversationId) {
+    _realtimeSubscription = ConversationRealtimeService.subscribeToConversation(
+      conversationId: conversationId,
+      onMessage: _handleRealtimeMessage,
+      onStatus: (status, error) {
+        if (!mounted) return;
+        if (status.name == 'subscribed') {
+          _realtimeRecoveryTimer?.cancel();
+          unawaited(_loadMessages(showLoading: false));
+          return;
+        }
+        if (status.name == 'channelError' || status.name == 'timedOut') {
+          debugPrint('Supabase Realtime subscription issue: $error');
+          _realtimeRecoveryTimer?.cancel();
+          _realtimeRecoveryTimer = Timer(
+            const Duration(seconds: 3),
+            () => unawaited(_loadMessages(showLoading: false)),
+          );
+        }
+      },
+    );
   }
 
-  void _handleTencentMessage(Map<String, dynamic> message) {
-    if (!mounted || !_messageMatchesPeer(message)) return;
-    setState(() => _messages = _appendMessage(_messages, message));
+  void _handleRealtimeMessage(Map<String, dynamic> message) {
+    if (!mounted || message['conversation_id']?.toString() != _conversationId) {
+      return;
+    }
+    setState(() {
+      _messages = mergeConversationMessages(_messages, [message]);
+    });
     _scrollToBottom();
-  }
 
-  Future<void> _persistTencentMessage(
-    String conversationId,
-    String body,
-    Map<String, dynamic> message,
-  ) async {
-    try {
-      await BackendApiService.sendConversationMessage(
-        conversationId: conversationId,
-        body: body,
-        metadata: {
-          'provider': 'tencent_im',
-          ..._messageMetadata(message),
-        },
-      );
-    } catch (e) {
-      debugPrint('Tencent IM Supabase persistence failed: $e');
-    }
-  }
-
-  bool _messageMatchesPeer(Map<String, dynamic> message) {
-    final peerImIdentifier = _peer.imIdentifier?.trim();
-    if (peerImIdentifier == null || peerImIdentifier.isEmpty) return false;
-    final metadata = _messageMetadata(message);
-    return metadata['peer_im_identifier']?.toString() == peerImIdentifier ||
-        metadata['sender_im_identifier']?.toString() == peerImIdentifier ||
-        message['sender_id']?.toString() == peerImIdentifier;
+    // GET also advances last_read_at. Debounce the catch-up so bursts of
+    // Realtime events produce one read receipt and one consistency check.
+    _readReceiptDebounce?.cancel();
+    _readReceiptDebounce = Timer(
+      const Duration(milliseconds: 220),
+      () => unawaited(_loadMessages(showLoading: false)),
+    );
   }
 
   void _openProfile() {
@@ -544,27 +584,6 @@ class _LightMessageScreenState extends State<LightMessageScreen> {
   }
 }
 
-List<Map<String, dynamic>> _appendMessage(
-  List<Map<String, dynamic>> messages,
-  Map<String, dynamic> message,
-) {
-  final incomingKey = _messageIdentity(message);
-  if (incomingKey != null &&
-      messages.any((item) => _messageIdentity(item) == incomingKey)) {
-    return messages;
-  }
-  return [...messages, message];
-}
-
-String? _messageIdentity(Map<String, dynamic> message) {
-  final metadata = _messageMetadata(message);
-  final imMsgId = metadata['im_msg_id']?.toString();
-  if (imMsgId != null && imMsgId.isNotEmpty) return 'im:$imMsgId';
-  final id = message['id']?.toString();
-  if (id != null && id.isNotEmpty) return id;
-  return null;
-}
-
 Map<String, dynamic> _messageMetadata(Map<String, dynamic> message) {
   final raw = message['metadata'];
   if (raw is Map) return Map<String, dynamic>.from(raw);
@@ -637,9 +656,10 @@ class _LightMessageTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isOrg = peer.kind == LightMessagePeerKind.organization;
+    final isGroup = peer.kind == LightMessagePeerKind.group;
     final meta = [
       peer.identityLabel,
-      if (!isOrg && peer.handle?.isNotEmpty == true) peer.handle!,
+      if (!isOrg && !isGroup && peer.handle?.isNotEmpty == true) peer.handle!,
       if (isOrg && peer.responseTime?.isNotEmpty == true) peer.responseTime!,
     ].join(' · ');
     return Container(
@@ -663,7 +683,7 @@ class _LightMessageTopBar extends StatelessWidget {
                   peer.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: _waInk,
                     fontSize: 16,
                     fontWeight: FontWeight.w900,
@@ -674,7 +694,7 @@ class _LightMessageTopBar extends StatelessWidget {
                   meta,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: _waMuted,
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
@@ -687,7 +707,11 @@ class _LightMessageTopBar extends StatelessWidget {
             tooltip: peer.profileActionLabel ?? '查看主页',
             onPressed: onOpenProfile,
             icon: Icon(
-              isOrg ? Icons.storefront_outlined : Icons.person_outline_rounded,
+              isOrg
+                  ? Icons.storefront_outlined
+                  : isGroup
+                      ? Icons.group_outlined
+                      : Icons.person_outline_rounded,
               size: 20,
               color: _waInk.withValues(alpha: 0.72),
             ),
@@ -847,7 +871,7 @@ class _MessageBubbleContent extends StatelessWidget {
             child: Image.network(
               url,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _AttachmentFallback(
+              errorBuilder: (_, __, ___) => const _AttachmentFallback(
                 icon: Icons.broken_image_outlined,
                 label: '图片加载失败',
                 color: textColor,
@@ -868,14 +892,18 @@ class _MessageBubbleContent extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.insert_drive_file_outlined, size: 22, color: textColor),
+            const Icon(
+              Icons.insert_drive_file_outlined,
+              size: 22,
+              color: textColor,
+            ),
             const SizedBox(width: 8),
             Flexible(
               child: Text(
                 name.isEmpty ? '文件' : name,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
+                style: const TextStyle(
                   color: textColor,
                   fontSize: 13,
                   height: 1.35,
@@ -890,7 +918,7 @@ class _MessageBubbleContent extends StatelessWidget {
 
     return Text(
       body,
-      style: TextStyle(
+      style: const TextStyle(
         color: textColor,
         fontSize: 14,
         height: 1.45,
@@ -987,7 +1015,7 @@ class _LightMessageInputBar extends StatelessWidget {
                   maxLines: 4,
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => onSend(),
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     hintText: '写一条消息...',
                     border: InputBorder.none,
                     hintStyle: TextStyle(
@@ -996,7 +1024,7 @@ class _LightMessageInputBar extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: _waInk,
                     fontSize: 13,
                     fontWeight: FontWeight.w700,

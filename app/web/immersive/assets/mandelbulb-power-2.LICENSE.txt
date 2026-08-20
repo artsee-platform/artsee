@@ -1,0 +1,11 @@
+Title: Mandelbulb Power 2 (spirulae-splat)
+Author: Harry Chen (https://superspl.at/user?id=harry7557558)
+Source: https://superspl.at/scene/0bcb61c6
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+License URL: https://creativecommons.org/licenses/by/4.0/
+Requirements: Author attribution is required. Commercial use is allowed.
+
+Local asset: mandelbulb-power-2.sog
+SHA-256: 262693095ebb4b52ed58ea92e340544f68a809ed28780eb328c78420ae9757a0
+
+The downloaded SOG bundle also contains its original license.txt.

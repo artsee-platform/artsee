@@ -6,13 +6,18 @@
       "https://artiqore.com",
       "https://www.artiqore.com"
     ],
-    "AllowedMethods": ["PUT", "OPTIONS"],
+    "AllowedMethods": ["GET", "HEAD", "PUT"],
     "AllowedHeaders": [
       "Authorization",
       "Content-Type",
+      "Range",
+      "x-cos-acl",
+      "x-cos-meta-upload-id",
+      "x-cos-meta-expected-size",
+      "x-cos-server-side-encryption",
       "x-cos-security-token"
     ],
-    "ExposeHeaders": ["ETag"],
+    "ExposeHeaders": ["ETag", "Content-Length", "x-cos-hash-crc64ecma"],
     "MaxAgeSeconds": 600
   }
 ]

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserFromBearer } from "@/lib/api/auth-user";
 import { createServiceClient } from "@/lib/api/supabase-service";
 import { SUBMISSION_MATERIALS_BUCKET } from "@/lib/api/submission-materials";
+import { hasSupportedFileSignature } from "@/lib/api/file-validation";
 
 const DEFAULT_MAX_SIZE = 5 * 1024 * 1024; // 5MB
 const MATERIAL_MAX_SIZE = 10 * 1024 * 1024; // 10MB
@@ -58,6 +59,12 @@ export async function POST(req: NextRequest) {
     }
 
     const bytes = new Uint8Array(await file.arrayBuffer());
+    if (!hasSupportedFileSignature(bytes.slice(0, 1024), file.type)) {
+      return NextResponse.json(
+        { success: false, error: "文件实际内容与声明类型不一致" },
+        { status: 400 }
+      );
+    }
     const timestamp = Date.now();
     const safeFolder = folder
       .split("/")
@@ -90,6 +97,14 @@ export async function POST(req: NextRequest) {
       file_type: file.type,
       scene: folder,
       size: file.size,
+      expected_size: file.size,
+      provider: "supabase",
+      bucket,
+      object_key: path,
+      access_level: isDocumentUpload ? "private" : "public",
+      upload_status: "completed",
+      completed_at: new Date().toISOString(),
+      audit_status: file.type.startsWith("image/") ? "pending" : null,
     });
 
     return NextResponse.json({

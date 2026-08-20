@@ -190,7 +190,9 @@ describe("POST /api/v1/me/organizations", () => {
     expect(body.success).toBe(true);
     expect(body.data.role).toBe("owner");
     expect(body.data.organization.id).toBe("org-123");
-    expect(lastOrganizationInsert?.type).toBe("gallery_exhibition");
+    expect(lastOrganizationInsert).toMatchObject({
+      type: "gallery_exhibition",
+    });
   });
 
   it("不再允许创建旧留学机构类型", async () => {

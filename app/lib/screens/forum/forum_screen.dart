@@ -2,16 +2,20 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../config/api_config.dart';
+import '../../config/app_config.dart';
 import '../../models/models.dart';
 import '../../services/backend_api_service.dart';
+import '../../services/conversation_realtime_service.dart';
 import '../../services/supabase_service.dart';
-import '../../services/tencent_im_service.dart';
 import '../../utils/auth_gate.dart';
 import '../../widgets/artsee_ui.dart';
 import '../../widgets/common.dart';
+import '../../widgets/immersive/immersive_web_surface.dart';
+import '../immersive/immersive_viewer_screen.dart';
 import 'ask_question_screen.dart';
 import '../community/community_post_detail_screen.dart';
 import '../messages/add_friend_screen.dart';
@@ -23,7 +27,7 @@ const _whatsAppGreen = kCobalt;
 const _whatsAppGreenLight = kCobalt;
 const _whatsAppAccent = kCobalt;
 const _whatsAppMuted = Color(0xFF667781);
-const _marketFilters = ['全部', '艺术', '工艺', '出版', '定制'];
+const _marketFilters = ['全部', '数字艺术', '艺术', '工艺', '出版', '定制'];
 
 class ForumScreen extends StatefulWidget {
   final VoidCallback? onTabChanged;
@@ -234,12 +238,12 @@ class ForumScreenState extends State<ForumScreen>
     final bottom = mainTabBottomInset(context);
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.dark.copyWith(
-        statusBarColor: Colors.white,
+        statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.dark,
         statusBarBrightness: Brightness.light,
       ),
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
         body: SafeArea(
           bottom: false,
           child: Column(
@@ -254,7 +258,7 @@ class ForumScreenState extends State<ForumScreen>
               ),
               Expanded(
                 child: ColoredBox(
-                  color: Colors.white,
+                  color: Colors.transparent,
                   child: _ChatTab(
                     key: _chatKey,
                     bottom: bottom,
@@ -290,7 +294,7 @@ class _MessagePageHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.white,
+      color: Colors.transparent,
       padding: const EdgeInsets.fromLTRB(18, 10, 14, 14),
       child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 180),
@@ -1968,6 +1972,14 @@ class MarketplaceSurfaceState extends State<MarketplaceSurface> {
     final cityCtrl = TextEditingController();
     final priceCtrl = TextEditingController();
     final imageCtrl = TextEditingController();
+    final mediumCtrl = TextEditingController();
+    final sizeCtrl = TextEditingController();
+    final yearCtrl = TextEditingController();
+    final editionCtrl = TextEditingController();
+    final stockCtrl = TextEditingController();
+    final shippingCtrl = TextEditingController();
+    final returnPolicyCtrl = TextEditingController();
+    final certificateCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
     final formKey = GlobalKey<FormState>();
     var submitting = false;
@@ -1983,13 +1995,18 @@ class MarketplaceSurfaceState extends State<MarketplaceSurface> {
               final category = categoryCtrl.text.trim();
               final city = cityCtrl.text.trim();
               final price = priceCtrl.text.trim();
-              final imageUrl = imageCtrl.text.trim();
+              final imageUrls = imageCtrl.text
+                  .split(RegExp(r'[\n,，]+'))
+                  .map((value) => value.trim())
+                  .where((value) => value.isNotEmpty)
+                  .toSet()
+                  .toList();
               final amountTotal = _marketPriceAmountTotal(price);
               try {
                 await BackendApiService.createPlazaPost(
                   title: titleCtrl.text.trim(),
                   body: noteCtrl.text.trim(),
-                  imageUrls: imageUrl.isEmpty ? const [] : [imageUrl],
+                  imageUrls: imageUrls,
                   kind: 'market',
                   group: category.isEmpty ? '市集' : category,
                   tags: [
@@ -2004,7 +2021,23 @@ class MarketplaceSurfaceState extends State<MarketplaceSurface> {
                     'city': city,
                     'price': price,
                     if (amountTotal != null) 'amount_total': amountTotal,
-                    if (imageUrl.isNotEmpty) 'image_url': imageUrl,
+                    if (imageUrls.isNotEmpty) 'image_url': imageUrls.first,
+                    if (mediumCtrl.text.trim().isNotEmpty)
+                      'medium': mediumCtrl.text.trim(),
+                    if (sizeCtrl.text.trim().isNotEmpty)
+                      'size': sizeCtrl.text.trim(),
+                    if (yearCtrl.text.trim().isNotEmpty)
+                      'year': yearCtrl.text.trim(),
+                    if (editionCtrl.text.trim().isNotEmpty)
+                      'edition': editionCtrl.text.trim(),
+                    if (stockCtrl.text.trim().isNotEmpty)
+                      'stock': stockCtrl.text.trim(),
+                    if (shippingCtrl.text.trim().isNotEmpty)
+                      'shipping': shippingCtrl.text.trim(),
+                    if (returnPolicyCtrl.text.trim().isNotEmpty)
+                      'return_policy': returnPolicyCtrl.text.trim(),
+                    if (certificateCtrl.text.trim().isNotEmpty)
+                      'certificate': certificateCtrl.text.trim(),
                   },
                 );
                 if (!mounted || !dialogContext.mounted) return;
@@ -2059,16 +2092,75 @@ class MarketplaceSurfaceState extends State<MarketplaceSurface> {
                       TextFormField(
                         controller: imageCtrl,
                         decoration: const InputDecoration(
-                          labelText: '商品图片 URL',
-                          hintText: '可选。粘贴一张作品或商品图链接',
+                          labelText: '商品图片 URL（可多张）',
+                          hintText: '每行一张，或用逗号分隔',
                         ),
                         keyboardType: TextInputType.url,
+                        minLines: 2,
+                        maxLines: 4,
                       ),
                       TextFormField(
                         controller: cityCtrl,
                         decoration: const InputDecoration(
                           labelText: '城市或交付方式',
                           hintText: '线上 / 上海 / 伦敦',
+                        ),
+                      ),
+                      TextFormField(
+                        controller: mediumCtrl,
+                        decoration: const InputDecoration(
+                          labelText: '媒介或材质',
+                          hintText: '布面油画 / 陶瓷 / 艺术微喷',
+                        ),
+                      ),
+                      TextFormField(
+                        controller: sizeCtrl,
+                        decoration: const InputDecoration(
+                          labelText: '尺寸',
+                          hintText: '50 × 40 cm',
+                        ),
+                      ),
+                      TextFormField(
+                        controller: yearCtrl,
+                        decoration: const InputDecoration(
+                          labelText: '创作年份',
+                          hintText: '2026',
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                      TextFormField(
+                        controller: editionCtrl,
+                        decoration: const InputDecoration(
+                          labelText: '版本信息',
+                          hintText: '原作 / 3 of 30 / 限量版',
+                        ),
+                      ),
+                      TextFormField(
+                        controller: stockCtrl,
+                        decoration: const InputDecoration(
+                          labelText: '库存',
+                          hintText: '现货 1 件 / 接受预订',
+                        ),
+                      ),
+                      TextFormField(
+                        controller: shippingCtrl,
+                        decoration: const InputDecoration(
+                          labelText: '发货与交付',
+                          hintText: '付款后 7 天内发出 / 包邮',
+                        ),
+                      ),
+                      TextFormField(
+                        controller: returnPolicyCtrl,
+                        decoration: const InputDecoration(
+                          labelText: '售后规则',
+                          hintText: '签收后 7 天内可申请退货 / 定制品不退',
+                        ),
+                      ),
+                      TextFormField(
+                        controller: certificateCtrl,
+                        decoration: const InputDecoration(
+                          labelText: '证书或凭证',
+                          hintText: '含艺术家签名收藏证书',
                         ),
                       ),
                       TextFormField(
@@ -2106,6 +2198,14 @@ class MarketplaceSurfaceState extends State<MarketplaceSurface> {
       cityCtrl.dispose();
       priceCtrl.dispose();
       imageCtrl.dispose();
+      mediumCtrl.dispose();
+      sizeCtrl.dispose();
+      yearCtrl.dispose();
+      editionCtrl.dispose();
+      stockCtrl.dispose();
+      shippingCtrl.dispose();
+      returnPolicyCtrl.dispose();
+      certificateCtrl.dispose();
       noteCtrl.dispose();
     }
   }
@@ -2150,22 +2250,36 @@ class MarketplaceSurfaceState extends State<MarketplaceSurface> {
                 onRetry: widget.onCreateTap ?? openCreateMarketDialog,
               )
             else
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: EdgeInsets.zero,
-                itemCount: displayListings.length,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 18,
-                  mainAxisSpacing: 30,
-                  mainAxisExtent: 274,
-                ),
-                itemBuilder: (context, index) {
-                  final item = displayListings[index];
-                  return _MarketListingCard(
-                    item: item,
-                    onOpen: () => _openListing(item),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  const spacing = 18.0;
+                  final crossAxisCount = switch (constraints.maxWidth) {
+                    >= 1500 => 5,
+                    >= 1120 => 4,
+                    >= 720 => 3,
+                    _ => 2,
+                  };
+                  final itemWidth =
+                      (constraints.maxWidth - spacing * (crossAxisCount - 1)) /
+                          crossAxisCount;
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: EdgeInsets.zero,
+                    itemCount: displayListings.length,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      crossAxisSpacing: spacing,
+                      mainAxisSpacing: 30,
+                      mainAxisExtent: itemWidth + 104,
+                    ),
+                    itemBuilder: (context, index) {
+                      final item = displayListings[index];
+                      return _MarketListingCard(
+                        item: item,
+                        onOpen: () => _openListing(item),
+                      );
+                    },
                   );
                 },
               ),
@@ -2312,6 +2426,9 @@ class MarketplaceSurfaceState extends State<MarketplaceSurface> {
       price: price,
       author: author,
       imageUrl: post.imageUrls.isNotEmpty ? post.imageUrls.first : null,
+      metadata: post.metadata,
+      immersiveAsset:
+          post.immersiveAsset?.isViewable == true ? post.immersiveAsset : null,
       post: post,
     );
   }
@@ -2438,16 +2555,28 @@ class MarketplaceSurfaceState extends State<MarketplaceSurface> {
   }
 
   void _openListing(_MarketListing item) {
+    final source = _posts.isEmpty && !_loading
+        ? _visibleFallbackListings()
+        : _visibleListings();
+    final related =
+        source.where((candidate) => candidate.id != item.id).toList()
+          ..sort((a, b) {
+            final aScore = a.category == item.category ? 0 : 1;
+            final bScore = b.category == item.category ? 0 : 1;
+            return aScore.compareTo(bScore);
+          });
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => _MarketListingDetailScreen(
           item: item,
+          relatedListings: related.take(4).toList(),
           initiallySaved: _isSavedListing(item),
           initiallyInBag: _isPendingListing(item),
-          onSave: _saveListing,
-          onAddToBag: _addListingToBag,
+          onSetSaved: _setListingSaved,
+          onSetInBag: _setListingInBag,
           onConsult: _consultListing,
           onCheckout: _checkoutListing,
+          onOpenRelated: _openListing,
         ),
       ),
     );
@@ -2504,55 +2633,80 @@ class MarketplaceSurfaceState extends State<MarketplaceSurface> {
     });
   }
 
-  Future<bool> _saveListing(_MarketListing item) async {
+  Future<bool> _setListingSaved(
+    _MarketListing item,
+    bool shouldSave,
+  ) async {
     if (item.post != null) {
-      final loggedIn = await ensureLoggedIn(context, message: '请先登录后收藏商品');
+      final loggedIn = await ensureLoggedIn(
+        context,
+        message: shouldSave ? '请先登录后收藏商品' : '请先登录后取消收藏',
+      );
       if (!mounted || !loggedIn) return false;
     }
     try {
       if (item.post != null) {
         await BackendApiService.upsertMarketplaceBagItem(
           listingPostId: item.id,
-          saved: true,
+          saved: shouldSave,
         );
+        if (shouldSave) {
+          await BackendApiService.saveCommunityPost(item.id);
+        } else {
+          await BackendApiService.unsaveCommunityPost(item.id);
+        }
       }
       if (!mounted) return false;
-      _upsertBagEntry(item, saved: true);
+      _upsertBagEntry(item, saved: shouldSave);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已收藏「${item.title}」')),
+        SnackBar(
+          content: Text(
+            shouldSave ? '已收藏「${item.title}」' : '已取消收藏「${item.title}」',
+          ),
+        ),
       );
       return true;
     } catch (e) {
       if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('收藏失败：$e')),
+        SnackBar(content: Text('${shouldSave ? '收藏' : '取消收藏'}失败：$e')),
       );
       return false;
     }
   }
 
-  Future<bool> _addListingToBag(_MarketListing item) async {
+  Future<bool> _setListingInBag(
+    _MarketListing item,
+    bool shouldAdd,
+  ) async {
     if (item.post != null) {
-      final loggedIn = await ensureLoggedIn(context, message: '请先登录后加入购物袋');
+      final loggedIn = await ensureLoggedIn(
+        context,
+        message: shouldAdd ? '请先登录后加入购物袋' : '请先登录后移出购物袋',
+      );
       if (!mounted || !loggedIn) return false;
     }
     try {
       if (item.post != null) {
         await BackendApiService.upsertMarketplaceBagItem(
           listingPostId: item.id,
-          status: 'pending',
+          status: shouldAdd ? 'pending' : 'closed',
         );
       }
       if (!mounted) return false;
-      _upsertBagEntry(item, pending: true);
+      _upsertBagEntry(item, pending: shouldAdd);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已加入购物袋「${item.title}」')),
+        SnackBar(
+          content: Text(
+            shouldAdd ? '已加入购物袋「${item.title}」' : '已移出购物袋「${item.title}」',
+          ),
+        ),
       );
       return true;
     } catch (e) {
       if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('加入购物袋失败：$e')),
+        SnackBar(content: Text('${shouldAdd ? '加入' : '移出'}购物袋失败：$e')),
       );
       return false;
     }
@@ -2773,6 +2927,8 @@ class _MarketListing {
   final String price;
   final String author;
   final String? imageUrl;
+  final Map<String, dynamic> metadata;
+  final ImmersiveAsset? immersiveAsset;
   final AppCommunityPost? post;
 
   const _MarketListing({
@@ -2784,8 +2940,25 @@ class _MarketListing {
     required this.price,
     required this.author,
     this.imageUrl,
+    this.metadata = const {},
+    this.immersiveAsset,
     this.post,
   });
+
+  List<String> get imageUrls {
+    final postImages = post?.imageUrls ?? const <String>[];
+    if (postImages.isNotEmpty) return postImages;
+    final image = imageUrl?.trim();
+    return image == null || image.isEmpty ? const [] : [image];
+  }
+
+  String? meta(List<String> keys) {
+    for (final key in keys) {
+      final value = metadata[key]?.toString().trim();
+      if (value != null && value.isNotEmpty) return value;
+    }
+    return null;
+  }
 }
 
 class _MarketBagEntry {
@@ -2834,13 +3007,39 @@ class _MarketBagEntry {
 
 List<_MarketListing> get _fallbackMarketListings => const [
       _MarketListing(
-        id: 'sample-art-print',
-        title: '限量版画《Blue Room》',
-        body: '艺术家签名限量 30 版，适合收藏、空间陈列或送礼。',
-        category: '艺术',
-        city: '上海',
-        price: '¥1,280',
-        author: 'Studio Echo',
+        id: 'featured-digital-sculpture-mandelbulb-power-2',
+        title: '生成式数字雕塑《Mandelbulb · 二阶》',
+        body: '分形结构生成的数字雕塑，以 200 个高分辨率视角重建为 Gaussian Splat。'
+            '环绕观察时，奶油色与洋红色纹理会沿着有机轮廓不断分叉。'
+            '原作由 harry7557558 发布，依据 CC BY 4.0 展示。',
+        category: '数字艺术',
+        city: '线上数字展陈',
+        price: '非卖品 · 数字典藏',
+        author: 'harry7557558',
+        metadata: {
+          'medium': 'Gaussian Splat · 生成式数字雕塑',
+          'edition': '数字典藏展示版',
+          'delivery': '线上沉浸观看',
+          'certificate': 'CC BY 4.0 授权信息',
+        },
+        imageUrl:
+            'https://s3-eu-west-1.amazonaws.com/images.playcanvas.com/splat/0bcb61c6/v1/xl.webp',
+        immersiveAsset: ImmersiveAsset(
+          id: 'supersplat-mandelbulb-power-2',
+          type: ImmersiveAssetType.gaussian,
+          status: ImmersiveAssetStatus.published,
+          assetUrl:
+              'https://weiyixin99-1411821271.cos.ap-guangzhou.myqcloud.com/'
+              'immersive/mandelbulb-power-2-262693095ebb.sog',
+          posterUrl:
+              'https://s3-eu-west-1.amazonaws.com/images.playcanvas.com/splat/0bcb61c6/v1/xl.webp',
+          title: 'Mandelbulb Power 2 · 生成式数字雕塑',
+          credits: 'harry7557558 · CC BY 4.0',
+          sourceUrl: 'https://superspl.at/scene/0bcb61c6',
+          licenseName: 'Creative Commons Attribution 4.0',
+          licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
+          cameraPosition: [0, 0, 4],
+        ),
       ),
       _MarketListing(
         id: 'sample-craft-ceramic',
@@ -2850,6 +3049,13 @@ List<_MarketListing> get _fallbackMarketListings => const [
         city: '景德镇',
         price: '¥360',
         author: '土与火工坊',
+        metadata: {
+          'material': '手工陶瓷',
+          'size': '约 9 × 9 × 12 cm',
+          'stock': '小批量现货',
+          'shipping': '付款后 3–5 天内发出',
+          'certificate': '含手作工艺说明卡',
+        },
       ),
       _MarketListing(
         id: 'sample-publication-book',
@@ -2859,6 +3065,12 @@ List<_MarketListing> get _fallbackMarketListings => const [
         city: '北京',
         price: '¥128',
         author: '野册出版',
+        metadata: {
+          'medium': '艺术出版物',
+          'edition': '小开本 · 限量印刷',
+          'stock': '现货',
+          'shipping': '付款后 48 小时内发出',
+        },
       ),
       _MarketListing(
         id: 'sample-custom-frame',
@@ -2868,6 +3080,11 @@ List<_MarketListing> get _fallbackMarketListings => const [
         city: '线上 / 广州',
         price: '按尺寸报价',
         author: 'White Cube Works',
+        metadata: {
+          'service': '装裱、亚克力底座与展陈零件定制',
+          'delivery': '确认尺寸与方案后排期制作',
+          'return_policy': '定制商品请在下单前确认最终方案',
+        },
       ),
     ];
 
@@ -3169,16 +3386,66 @@ class _MarketListingThumb extends StatelessWidget {
       borderRadius: BorderRadius.circular(3),
       child: AspectRatio(
         aspectRatio: 1,
-        child: SizedBox(
-          width: double.infinity,
-          child: imageUrl == null
-              ? _MarketFallbackImage(item: item)
-              : Image.network(
-                  imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) =>
-                      _MarketFallbackImage(item: item),
-                ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            imageUrl == null
+                ? _MarketFallbackImage(item: item)
+                : ColoredBox(
+                    color: item.immersiveAsset?.isViewable == true
+                        ? const Color(0xFF050505)
+                        : Colors.transparent,
+                    child: Image.network(
+                      imageUrl,
+                      fit: item.immersiveAsset?.isViewable == true
+                          ? BoxFit.contain
+                          : BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          _MarketFallbackImage(item: item),
+                    ),
+                  ),
+            if (item.immersiveAsset?.isViewable == true)
+              const Positioned(
+                left: 10,
+                top: 10,
+                child: _ImmersiveBadge(),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ImmersiveBadge extends StatelessWidget {
+  const _ImmersiveBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.66),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+      ),
+      child: const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.view_in_ar_rounded, color: Colors.white, size: 13),
+            SizedBox(width: 5),
+            Text(
+              '沉浸 3D',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 9,
+                height: 1,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -3205,21 +3472,25 @@ class _MarketFallbackImage extends StatelessWidget {
 
 class _MarketListingDetailScreen extends StatefulWidget {
   final _MarketListing item;
+  final List<_MarketListing> relatedListings;
   final bool initiallySaved;
   final bool initiallyInBag;
-  final Future<bool> Function(_MarketListing item) onSave;
-  final Future<bool> Function(_MarketListing item) onAddToBag;
+  final Future<bool> Function(_MarketListing item, bool shouldSave) onSetSaved;
+  final Future<bool> Function(_MarketListing item, bool shouldAdd) onSetInBag;
   final Future<void> Function(_MarketListing item) onConsult;
   final Future<void> Function(_MarketListing item) onCheckout;
+  final ValueChanged<_MarketListing> onOpenRelated;
 
   const _MarketListingDetailScreen({
     required this.item,
+    required this.relatedListings,
     required this.initiallySaved,
     required this.initiallyInBag,
-    required this.onSave,
-    required this.onAddToBag,
+    required this.onSetSaved,
+    required this.onSetInBag,
     required this.onConsult,
     required this.onCheckout,
+    required this.onOpenRelated,
   });
 
   @override
@@ -3229,12 +3500,36 @@ class _MarketListingDetailScreen extends StatefulWidget {
 
 class _MarketListingDetailScreenState
     extends State<_MarketListingDetailScreen> {
+  final TextEditingController _commentController = TextEditingController();
+  final FocusNode _commentFocusNode = FocusNode();
+  final GlobalKey _commentsKey = GlobalKey();
   late bool _saved = widget.initiallySaved;
   late bool _inBag = widget.initiallyInBag;
+  late bool _liked = widget.item.post?.likedByMe ?? false;
+  late int _likeCount = widget.item.post?.likeCount ?? 0;
+  late int _saveCount = widget.item.post?.saveCount ?? 0;
+  late int _commentCount = widget.item.post?.commentCount ?? 0;
+  List<AppCommunityComment> _comments = const [];
   bool _saving = false;
   bool _adding = false;
+  bool _liking = false;
+  bool _commentsLoading = false;
+  bool _sendingComment = false;
   bool _consulting = false;
   bool _checkingOut = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadComments();
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    _commentFocusNode.dispose();
+    super.dispose();
+  }
 
   Future<void> _consult() async {
     if (_consulting) return;
@@ -3248,10 +3543,20 @@ class _MarketListingDetailScreenState
 
   Future<void> _save() async {
     if (_saving) return;
+    final shouldSave = !_saved;
     setState(() => _saving = true);
     try {
-      final saved = await widget.onSave(widget.item);
-      if (saved && mounted) setState(() => _saved = true);
+      final updated = await widget.onSetSaved(widget.item, shouldSave);
+      if (updated && mounted) {
+        setState(() {
+          _saved = shouldSave;
+          if (shouldSave) {
+            _saveCount += 1;
+          } else if (_saveCount > 0) {
+            _saveCount -= 1;
+          }
+        });
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -3259,12 +3564,45 @@ class _MarketListingDetailScreenState
 
   Future<void> _addToBag() async {
     if (_adding) return;
+    final shouldAdd = !_inBag;
     setState(() => _adding = true);
     try {
-      final added = await widget.onAddToBag(widget.item);
-      if (added && mounted) setState(() => _inBag = true);
+      final updated = await widget.onSetInBag(widget.item, shouldAdd);
+      if (updated && mounted) setState(() => _inBag = shouldAdd);
     } finally {
       if (mounted) setState(() => _adding = false);
+    }
+  }
+
+  Future<void> _toggleLike() async {
+    if (_liking) return;
+    final post = widget.item.post;
+    if (post == null) {
+      setState(() {
+        _liked = !_liked;
+        _likeCount += _liked ? 1 : -1;
+      });
+      return;
+    }
+    final loggedIn = await ensureLoggedIn(context, message: '请先登录后点赞商品');
+    if (!mounted || !loggedIn) return;
+    setState(() => _liking = true);
+    try {
+      final result = _liked
+          ? await BackendApiService.unlikeCommunityPost(post.id)
+          : await BackendApiService.likeCommunityPost(post.id);
+      if (!mounted) return;
+      setState(() {
+        _liked = result.liked;
+        _likeCount = result.likeCount;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('点赞失败：$e')),
+      );
+    } finally {
+      if (mounted) setState(() => _liking = false);
     }
   }
 
@@ -3278,20 +3616,252 @@ class _MarketListingDetailScreenState
     }
   }
 
+  Future<void> _loadComments() async {
+    final post = widget.item.post;
+    if (post == null) return;
+    setState(() => _commentsLoading = true);
+    try {
+      final comments = await BackendApiService.fetchCommunityComments(
+        post.id,
+        limit: 12,
+      );
+      if (!mounted) return;
+      setState(() {
+        _comments = comments;
+        _commentsLoading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _commentsLoading = false);
+    }
+  }
+
+  Future<void> _sendComment() async {
+    final post = widget.item.post;
+    final text = _commentController.text.trim();
+    if (post == null || text.isEmpty || _sendingComment) return;
+    final loggedIn = await ensureLoggedIn(context, message: '请先登录后评论商品');
+    if (!mounted || !loggedIn) return;
+    setState(() => _sendingComment = true);
+    try {
+      final comment = await BackendApiService.createCommunityComment(
+        postId: post.id,
+        body: text,
+      );
+      if (!mounted) return;
+      _commentController.clear();
+      _commentFocusNode.unfocus();
+      setState(() {
+        _comments = [comment, ..._comments];
+        _commentCount += 1;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('评论失败：$e')),
+      );
+    } finally {
+      if (mounted) setState(() => _sendingComment = false);
+    }
+  }
+
+  void _openSellerProfile() {
+    final item = widget.item;
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => PublicUserProfileScreen(
+          userId: item.post?.authorId,
+          name: item.author,
+          avatarUrl: item.post?.authorAvatarUrl,
+          roleLabel: '市集发布者',
+          bio: '在艺见心发布作品、艺术出版与创作服务。',
+        ),
+      ),
+    );
+  }
+
+  void _openCommentAuthor(AppCommunityComment comment) {
+    final name = comment.authorNickname?.trim().isNotEmpty == true
+        ? comment.authorNickname!.trim()
+        : '艺见心用户';
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => PublicUserProfileScreen(
+          userId: comment.authorId,
+          name: name,
+          avatarUrl: comment.authorAvatarUrl,
+          roleLabel: '市集评论者',
+        ),
+      ),
+    );
+  }
+
+  void _openCommunityPost() {
+    final post = widget.item.post;
+    if (post == null) return;
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => CommunityPostDetailScreen(
+          postId: post.id,
+          initialPost: post,
+          focusAnswer: true,
+        ),
+      ),
+    );
+  }
+
+  void _focusComments() {
+    final current = _commentsKey.currentContext;
+    if (current != null) {
+      Scrollable.ensureVisible(
+        current,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        alignment: 0.08,
+      );
+    }
+    _commentFocusNode.requestFocus();
+  }
+
+  String get _shareUrl {
+    final base = AppConfig.publicSiteBaseUrl.replaceAll(RegExp(r'/+$'), '');
+    return '$base/?marketplace=${Uri.encodeQueryComponent(widget.item.id)}';
+  }
+
+  Future<void> _copyShareLink() async {
+    await Clipboard.setData(
+      ClipboardData(
+        text: '${widget.item.title}\n$_shareUrl',
+      ),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('商品链接已复制')),
+    );
+  }
+
+  Future<void> _openShareLink() async {
+    final opened = await launchUrl(
+      Uri.parse(_shareUrl),
+      mode: LaunchMode.externalApplication,
+    );
+    if (!mounted || opened) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('暂时无法打开商品链接')),
+    );
+  }
+
+  Future<void> _showShareSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _MarketShareSheet(
+        item: widget.item,
+        shareUrl: _shareUrl,
+        onCopy: _copyShareLink,
+        onOpen: _openShareLink,
+        onReport: _reportListing,
+      ),
+    );
+  }
+
+  Future<void> _reportListing() async {
+    final post = widget.item.post;
+    if (post == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('示例商品无需举报')),
+      );
+      return;
+    }
+    final loggedIn = await ensureLoggedIn(context, message: '请先登录后举报商品');
+    if (!mounted || !loggedIn) return;
+    final report = await showDialog<_MarketReportPayload>(
+      context: context,
+      builder: (_) => const _MarketReportDialog(),
+    );
+    if (!mounted || report == null) return;
+    try {
+      await BackendApiService.createContentReport(
+        targetType: 'post',
+        targetId: post.id,
+        reason: report.reason,
+        detail: report.detail,
+        metadata: {
+          'source': 'marketplace_listing',
+          'listing_title': widget.item.title,
+        },
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('举报已提交，平台会尽快处理')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('举报失败：$e')),
+      );
+    }
+  }
+
+  Future<void> _showMoreMenu() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => _MarketMoreSheet(
+        onSeller: () {
+          Navigator.of(sheetContext).pop();
+          _openSellerProfile();
+        },
+        onShare: () {
+          Navigator.of(sheetContext).pop();
+          _showShareSheet();
+        },
+        onReport: () {
+          Navigator.of(sheetContext).pop();
+          _reportListing();
+        },
+      ),
+    );
+  }
+
+  Future<void> _runPrimaryAction() async {
+    if (_isQuotedMarketPrice(widget.item.price)) {
+      await _consult();
+    } else {
+      await _checkout();
+    }
+  }
+
+  void _openImmersiveViewer() {
+    final asset = widget.item.immersiveAsset;
+    if (asset == null || !asset.isViewable) return;
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => ImmersiveViewerScreen(
+          asset: asset,
+          artworkTitle: widget.item.title,
+          fallbackPosterUrl: widget.item.imageUrl,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final item = widget.item;
     final quotedPrice = _isQuotedMarketPrice(item.price);
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.artC.porcelain,
       body: SafeArea(
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 8, 14, 6),
+              padding: const EdgeInsets.fromLTRB(12, 7, 12, 5),
               child: Row(
                 children: [
                   IconButton(
+                    tooltip: '返回',
                     onPressed: () => Navigator.of(context).pop(),
                     icon: Icon(
                       Icons.arrow_back_ios_new_rounded,
@@ -3299,36 +3869,34 @@ class _MarketListingDetailScreenState
                       color: context.artC.ink,
                     ),
                   ),
-                  const Spacer(),
-                  IconButton(
-                    tooltip: '收藏',
-                    onPressed: _saving ? null : _save,
-                    icon: Icon(
-                      _saved
-                          ? Icons.bookmark_rounded
-                          : Icons.bookmark_border_rounded,
-                      size: 22,
-                      color: context.artC.ink.withValues(alpha: 0.54),
+                  Expanded(
+                    child: Text(
+                      '市集详情',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: context.artC.ink.withValues(alpha: 0.72),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0,
+                      ),
                     ),
                   ),
                   IconButton(
-                    tooltip: '加入购物袋',
-                    onPressed: _adding ? null : _addToBag,
+                    tooltip: '分享商品',
+                    onPressed: _showShareSheet,
                     icon: Icon(
-                      _inBag
-                          ? Icons.shopping_bag_rounded
-                          : Icons.shopping_bag_outlined,
-                      size: 22,
-                      color: context.artC.ink.withValues(alpha: 0.54),
+                      Icons.ios_share_rounded,
+                      size: 21,
+                      color: context.artC.ink.withValues(alpha: 0.64),
                     ),
                   ),
                   IconButton(
-                    tooltip: '咨询商品',
-                    onPressed: _consulting ? null : _consult,
+                    tooltip: '更多操作',
+                    onPressed: _showMoreMenu,
                     icon: Icon(
-                      Icons.chat_bubble_outline_rounded,
-                      size: 22,
-                      color: context.artC.ink.withValues(alpha: 0.54),
+                      Icons.more_horiz_rounded,
+                      size: 24,
+                      color: context.artC.ink.withValues(alpha: 0.64),
                     ),
                   ),
                 ],
@@ -3336,60 +3904,86 @@ class _MarketListingDetailScreenState
             ),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(24, 8, 24, 36),
+                padding: const EdgeInsets.fromLTRB(20, 6, 20, 42),
                 children: [
-                  _MarketListingThumb(item: item),
-                  const SizedBox(height: 22),
-                  Text(
-                    item.author,
-                    style: TextStyle(
-                      color: context.artC.ink.withValues(alpha: 0.34),
-                      fontSize: 12,
-                      height: 1.2,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0,
-                    ),
+                  _MarketSellerHeader(
+                    item: item,
+                    onOpenProfile: _openSellerProfile,
+                    onConsult: _consulting ? null : _consult,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 16),
+                  if (item.immersiveAsset?.isViewable == true)
+                    _ImmersiveInlinePreview(
+                      item: item,
+                      onFullscreen: _openImmersiveViewer,
+                    )
+                  else
+                    _MarketDetailGallery(item: item),
+                  if (item.immersiveAsset?.isViewable == true) ...[
+                    const SizedBox(height: 14),
+                    _ImmersiveEntryCard(
+                      credits: item.immersiveAsset?.credits,
+                      onTap: _openImmersiveViewer,
+                    ),
+                  ],
+                  const SizedBox(height: 24),
                   Text(
                     item.title,
                     style: TextStyle(
                       color: context.artC.ink,
-                      fontSize: 24,
-                      height: 1.18,
+                      fontSize: 25,
+                      height: 1.16,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 0,
                     ),
+                  ),
+                  const SizedBox(height: 10),
+                  _MarketEngagementLine(
+                    item: item,
+                    likeCount: _likeCount,
+                    saveCount: _saveCount,
+                    commentCount: _commentCount,
                   ),
                   const SizedBox(height: 12),
                   Text(
                     item.price,
                     style: TextStyle(
-                      color: context.artC.ink
-                          .withValues(alpha: quotedPrice ? 0.52 : 0.84),
-                      fontSize: quotedPrice ? 14 : 17,
+                      color: quotedPrice ? kCobalt : context.artC.ink,
+                      fontSize: quotedPrice ? 15 : 25,
                       height: 1.2,
                       fontWeight:
-                          quotedPrice ? FontWeight.w500 : FontWeight.w800,
-                      letterSpacing: 0,
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-                  Text(
-                    item.body,
-                    style: TextStyle(
-                      color: context.artC.ink.withValues(alpha: 0.58),
-                      fontSize: 14,
-                      height: 1.7,
-                      fontWeight: FontWeight.w600,
+                          quotedPrice ? FontWeight.w800 : FontWeight.w900,
                       letterSpacing: 0,
                     ),
                   ),
                   const SizedBox(height: 26),
-                  _MarketDetailMeta(label: '分类', value: item.category),
-                  _MarketDetailMeta(label: '位置', value: item.city),
-                  _MarketDetailMeta(label: '发布者', value: item.author),
-                  const SizedBox(height: 24),
+                  _MarketSpecificationSection(item: item),
+                  const SizedBox(height: 22),
+                  _MarketDeliverySection(item: item),
+                  const SizedBox(height: 28),
+                  const _MarketSectionTitle(title: '作品描述'),
+                  const SizedBox(height: 12),
+                  Text(
+                    item.body,
+                    style: TextStyle(
+                      color: context.artC.ink.withValues(alpha: 0.72),
+                      fontSize: 14,
+                      height: 1.68,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                  if (item.immersiveAsset?.sourceUrl != null ||
+                      item.immersiveAsset?.licenseUrl != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: _ImmersiveAttributionLinks(
+                        asset: item.immersiveAsset!,
+                      ),
+                    ),
+                  const SizedBox(height: 30),
+                  const _MarketSectionTitle(title: '购买流程'),
+                  const SizedBox(height: 14),
                   _MarketDetailStepLine(
                     index: '01',
                     title: '加入购物袋',
@@ -3408,68 +4002,1147 @@ class _MarketListingDetailScreenState
                     body: '价格、尺寸、交付、定制细节在私信里确认。',
                     active: false,
                   ),
-                  if (item.post != null) ...[
-                    const SizedBox(height: 26),
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.of(context).push<void>(
-                          MaterialPageRoute<void>(
-                            builder: (_) => CommunityPostDetailScreen(
-                              postId: item.post!.id,
-                              initialPost: item.post,
-                            ),
-                          ),
-                        );
-                      },
-                      behavior: HitTestBehavior.opaque,
-                      child: Text(
-                        '查看发布记录 →',
-                        style: TextStyle(
-                          color: context.artC.ink.withValues(alpha: 0.58),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0,
-                        ),
-                      ),
+                  const SizedBox(height: 22),
+                  _MarketCommentsSection(
+                    key: _commentsKey,
+                    item: item,
+                    comments: _comments,
+                    commentCount: _commentCount,
+                    loading: _commentsLoading,
+                    sending: _sendingComment,
+                    controller: _commentController,
+                    focusNode: _commentFocusNode,
+                    onSend: _sendComment,
+                    onOpenAll: _openCommunityPost,
+                    onAuthorTap: _openCommentAuthor,
+                  ),
+                  if (widget.relatedListings.isNotEmpty) ...[
+                    const SizedBox(height: 34),
+                    _MarketRelatedListings(
+                      items: widget.relatedListings,
+                      onOpen: widget.onOpenRelated,
                     ),
                   ],
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 10, 24, 18),
-              child: SizedBox(
-                height: 48,
-                width: double.infinity,
-                child: TextButton.icon(
-                  onPressed: _checkingOut ? null : _checkout,
-                  icon: Icon(
-                    Icons.shopping_cart_checkout_rounded,
-                    size: 20,
-                    color: _checkingOut
-                        ? Colors.white.withValues(alpha: 0.62)
-                        : Colors.white,
+            _MarketDetailBottomBar(
+              liked: _liked,
+              saved: _saved,
+              inBag: _inBag,
+              likeCount: _likeCount,
+              saveCount: _saveCount,
+              commentCount: _commentCount,
+              liking: _liking,
+              saving: _saving,
+              adding: _adding,
+              primaryBusy: _checkingOut || _consulting,
+              primaryLabel: quotedPrice ? '先咨询' : '直接购买',
+              onLike: _toggleLike,
+              onSave: _save,
+              onComment: _focusComments,
+              onBag: _addToBag,
+              onPrimary: _runPrimaryAction,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MarketSellerHeader extends StatelessWidget {
+  final _MarketListing item;
+  final VoidCallback onOpenProfile;
+  final VoidCallback? onConsult;
+
+  const _MarketSellerHeader({
+    required this.item,
+    required this.onOpenProfile,
+    required this.onConsult,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final avatarUrl = item.post?.authorAvatarUrl;
+    return Row(
+      children: [
+        Expanded(
+          child: Semantics(
+            button: true,
+            label: '查看${item.author}的主页',
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onOpenProfile,
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 23,
+                        backgroundColor:
+                            context.artC.silver.withValues(alpha: 0.18),
+                        child: ClipOval(
+                          child: avatarUrl != null && avatarUrl.isNotEmpty
+                              ? Image.network(
+                                  avatarUrl,
+                                  width: 46,
+                                  height: 46,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) =>
+                                      _MarketSellerInitial(name: item.author),
+                                )
+                              : _MarketSellerInitial(name: item.author),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.author,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: context.artC.ink,
+                                fontSize: 16,
+                                height: 1.15,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0,
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              '${item.category} · ${item.city}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: context.artC.ink.withValues(alpha: 0.52),
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  label: Text(
-                    _checkingOut ? '创建订单中' : '直接购买',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0,
-                    ),
-                  ),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    backgroundColor: context.artC.ink,
-                    disabledForegroundColor:
-                        Colors.white.withValues(alpha: 0.62),
-                    disabledBackgroundColor:
-                        context.artC.ink.withValues(alpha: 0.44),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        OutlinedButton.icon(
+          onPressed: onConsult,
+          icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16),
+          label: const Text('联系'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: context.artC.ink,
+            minimumSize: const Size(78, 40),
+            padding: const EdgeInsets.symmetric(horizontal: 13),
+            side: BorderSide(
+              color: context.artC.silver.withValues(alpha: 0.52),
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            textStyle: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MarketSellerInitial extends StatelessWidget {
+  final String name;
+
+  const _MarketSellerInitial({required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = name.trim().isEmpty ? '艺' : name.trim().substring(0, 1);
+    return SizedBox(
+      width: 46,
+      height: 46,
+      child: ColoredBox(
+        color: kCobalt.withValues(alpha: 0.09),
+        child: Center(
+          child: Text(
+            initial,
+            style: const TextStyle(
+              color: kCobalt,
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MarketDetailGallery extends StatefulWidget {
+  final _MarketListing item;
+
+  const _MarketDetailGallery({required this.item});
+
+  @override
+  State<_MarketDetailGallery> createState() => _MarketDetailGalleryState();
+}
+
+class _MarketDetailGalleryState extends State<_MarketDetailGallery> {
+  int _page = 0;
+
+  void _openFullscreen(int page) {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => _MarketFullscreenGallery(
+          item: widget.item,
+          initialPage: page,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final images = widget.item.imageUrls;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: AspectRatio(
+        aspectRatio: 4 / 5,
+        child: ColoredBox(
+          color: context.artC.silver.withValues(alpha: 0.10),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (images.isEmpty)
+                _MarketFallbackImage(item: widget.item)
+              else
+                PageView.builder(
+                  itemCount: images.length,
+                  onPageChanged: (page) => setState(() => _page = page),
+                  itemBuilder: (_, index) => GestureDetector(
+                    onTap: () => _openFullscreen(index),
+                    child: Image.network(
+                      images[index],
+                      fit: BoxFit.contain,
+                      semanticLabel:
+                          '${widget.item.title}，图片 ${index + 1}/${images.length}',
+                      errorBuilder: (_, __, ___) =>
+                          _MarketFallbackImage(item: widget.item),
                     ),
                   ),
                 ),
+              Positioned(
+                right: 10,
+                bottom: 10,
+                child: Material(
+                  color: Colors.black.withValues(alpha: 0.58),
+                  shape: const CircleBorder(),
+                  child: IconButton(
+                    tooltip: '全屏查看作品',
+                    onPressed: () => _openFullscreen(_page),
+                    icon: const Icon(
+                      Icons.fullscreen_rounded,
+                      color: Colors.white,
+                      size: 21,
+                    ),
+                  ),
+                ),
+              ),
+              if (images.length > 1)
+                Positioned(
+                  left: 12,
+                  bottom: 14,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.58),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      child: Text(
+                        '${_page + 1} / ${images.length}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          height: 1,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MarketFullscreenGallery extends StatefulWidget {
+  final _MarketListing item;
+  final int initialPage;
+
+  const _MarketFullscreenGallery({
+    required this.item,
+    required this.initialPage,
+  });
+
+  @override
+  State<_MarketFullscreenGallery> createState() =>
+      _MarketFullscreenGalleryState();
+}
+
+class _MarketFullscreenGalleryState extends State<_MarketFullscreenGallery> {
+  late final PageController _controller =
+      PageController(initialPage: widget.initialPage);
+  late int _page = widget.initialPage;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final images = widget.item.imageUrls;
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        title: Text(
+          images.length > 1
+              ? '${_page + 1} / ${images.length}'
+              : widget.item.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+        ),
+      ),
+      body: images.isEmpty
+          ? Center(child: _MarketFallbackImage(item: widget.item))
+          : PageView.builder(
+              controller: _controller,
+              itemCount: images.length,
+              onPageChanged: (page) => setState(() => _page = page),
+              itemBuilder: (_, index) => InteractiveViewer(
+                minScale: 1,
+                maxScale: 4,
+                child: Center(
+                  child: Image.network(
+                    images[index],
+                    fit: BoxFit.contain,
+                    semanticLabel:
+                        '${widget.item.title}，全屏图片 ${index + 1}/${images.length}',
+                    errorBuilder: (_, __, ___) =>
+                        _MarketFallbackImage(item: widget.item),
+                  ),
+                ),
+              ),
+            ),
+    );
+  }
+}
+
+class _MarketEngagementLine extends StatelessWidget {
+  final _MarketListing item;
+  final int likeCount;
+  final int saveCount;
+  final int commentCount;
+
+  const _MarketEngagementLine({
+    required this.item,
+    required this.likeCount,
+    required this.saveCount,
+    required this.commentCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final post = item.post;
+    final entries = <({IconData icon, String label})>[
+      if (post != null)
+        (
+          icon: Icons.schedule_rounded,
+          label: timeAgo(post.createdAt),
+        ),
+      (
+        icon: Icons.visibility_outlined,
+        label: '${_marketCompactCount(post?.viewCount ?? 0)} 浏览',
+      ),
+      (
+        icon: Icons.favorite_border_rounded,
+        label: '${_marketCompactCount(likeCount)} 赞',
+      ),
+      (
+        icon: Icons.bookmark_border_rounded,
+        label: '${_marketCompactCount(saveCount)} 收藏',
+      ),
+      (
+        icon: Icons.chat_bubble_outline_rounded,
+        label: '${_marketCompactCount(commentCount)} 评论',
+      ),
+    ];
+    return Wrap(
+      spacing: 12,
+      runSpacing: 7,
+      children: entries
+          .map(
+            (entry) => Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  entry.icon,
+                  size: 14,
+                  color: context.artC.ink.withValues(alpha: 0.42),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  entry.label,
+                  style: TextStyle(
+                    color: context.artC.ink.withValues(alpha: 0.52),
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ],
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
+class _MarketSectionTitle extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+
+  const _MarketSectionTitle({
+    required this.title,
+    this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            color: context.artC.ink,
+            fontSize: 16,
+            height: 1.15,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0,
+          ),
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              subtitle!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: context.artC.ink.withValues(alpha: 0.44),
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _MarketSpecificationSection extends StatelessWidget {
+  final _MarketListing item;
+
+  const _MarketSpecificationSection({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final specs = <({String label, String? value})>[
+      (label: '分类', value: item.category),
+      (
+        label: '媒介',
+        value: item.meta(const ['medium', 'media', 'material']),
+      ),
+      (
+        label: '尺寸',
+        value: item.meta(const ['dimensions', 'dimension', 'size']),
+      ),
+      (
+        label: '年份',
+        value: item.meta(const ['year', 'created_year', 'creation_year']),
+      ),
+      (
+        label: '版本',
+        value: item.meta(const ['edition', 'version']),
+      ),
+      (
+        label: '库存',
+        value: item.meta(const ['stock', 'inventory']),
+      ),
+      (label: '所在地', value: item.city),
+      if (item.immersiveAsset?.licenseName != null)
+        (label: '授权', value: item.immersiveAsset!.licenseName),
+    ].where((entry) => entry.value?.trim().isNotEmpty == true).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _MarketSectionTitle(title: '作品信息'),
+        const SizedBox(height: 13),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border.symmetric(
+              horizontal: BorderSide(
+                color: context.artC.silver.withValues(alpha: 0.34),
+              ),
+            ),
+          ),
+          child: Column(
+            children: [
+              for (var index = 0; index < specs.length; index++)
+                _MarketSpecificationRow(
+                  label: specs[index].label,
+                  value: specs[index].value!,
+                  showDivider: index < specs.length - 1,
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MarketSpecificationRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool showDivider;
+
+  const _MarketSpecificationRow({
+    required this.label,
+    required this.value,
+    required this.showDivider,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 11),
+      decoration: showDivider
+          ? BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: context.artC.silver.withValues(alpha: 0.24),
+                ),
+              ),
+            )
+          : null,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 62,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: context.artC.ink.withValues(alpha: 0.50),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                color: context.artC.ink.withValues(alpha: 0.78),
+                fontSize: 12,
+                height: 1.38,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MarketDeliverySection extends StatelessWidget {
+  final _MarketListing item;
+
+  const _MarketDeliverySection({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = <({IconData icon, String label, String? value})>[
+      (
+        icon: Icons.local_shipping_outlined,
+        label: '交付',
+        value: item.meta(
+          const ['shipping', 'delivery', 'dispatch_time', 'delivery_time'],
+        ),
+      ),
+      (
+        icon: Icons.crop_free_rounded,
+        label: '装裱',
+        value: item.meta(const ['framing', 'frame', 'service']),
+      ),
+      (
+        icon: Icons.verified_outlined,
+        label: '凭证',
+        value: item.meta(const ['certificate', 'certificate_info']),
+      ),
+      (
+        icon: Icons.receipt_long_outlined,
+        label: '票据',
+        value: item.meta(const ['invoice', 'invoice_option']),
+      ),
+      (
+        icon: Icons.assignment_return_outlined,
+        label: '售后',
+        value: item.meta(const ['return_policy', 'refund_policy']),
+      ),
+    ].where((entry) => entry.value?.trim().isNotEmpty == true).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _MarketSectionTitle(title: '交付与保障'),
+        const SizedBox(height: 12),
+        if (entries.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+            decoration: BoxDecoration(
+              color: context.artC.silver.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              '发布者暂未填写结构化交付信息，购买前请先确认库存、发货、装裱与售后规则。',
+              style: TextStyle(
+                color: context.artC.ink.withValues(alpha: 0.62),
+                fontSize: 11.5,
+                height: 1.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          )
+        else
+          Wrap(
+            runSpacing: 10,
+            children: entries
+                .map(
+                  (entry) => _MarketDeliveryLine(
+                    icon: entry.icon,
+                    label: entry.label,
+                    value: entry.value!,
+                  ),
+                )
+                .toList(),
+          ),
+      ],
+    );
+  }
+}
+
+class _MarketDeliveryLine extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _MarketDeliveryLine({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 30,
+          height: 30,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: kCobalt.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(icon, size: 16, color: kCobalt),
+        ),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 42,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: context.artC.ink.withValues(alpha: 0.50),
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 5),
+            child: Text(
+              value,
+              style: TextStyle(
+                color: context.artC.ink.withValues(alpha: 0.76),
+                fontSize: 11.5,
+                height: 1.45,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MarketCommentsSection extends StatelessWidget {
+  final _MarketListing item;
+  final List<AppCommunityComment> comments;
+  final int commentCount;
+  final bool loading;
+  final bool sending;
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final VoidCallback onSend;
+  final VoidCallback onOpenAll;
+  final ValueChanged<AppCommunityComment> onAuthorTap;
+
+  const _MarketCommentsSection({
+    super.key,
+    required this.item,
+    required this.comments,
+    required this.commentCount,
+    required this.loading,
+    required this.sending,
+    required this.controller,
+    required this.focusNode,
+    required this.onSend,
+    required this.onOpenAll,
+    required this.onAuthorTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleComments = comments.take(4).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Divider(
+          height: 1,
+          color: context.artC.silver.withValues(alpha: 0.34),
+        ),
+        const SizedBox(height: 28),
+        Row(
+          children: [
+            Expanded(
+              child: _MarketSectionTitle(
+                title: '精选评论',
+                subtitle: _commentCountLabel,
+              ),
+            ),
+            if (item.post != null)
+              TextButton(
+                onPressed: onOpenAll,
+                style: TextButton.styleFrom(
+                  foregroundColor: context.artC.ink.withValues(alpha: 0.62),
+                  minimumSize: const Size(0, 36),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+                child: const Text(
+                  '查看全部',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        if (item.post != null)
+          Container(
+            constraints: const BoxConstraints(minHeight: 48),
+            decoration: BoxDecoration(
+              color: context.artC.silver.withValues(alpha: 0.11),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: context.artC.silver.withValues(alpha: 0.22),
+              ),
+            ),
+            child: TextField(
+              controller: controller,
+              focusNode: focusNode,
+              minLines: 1,
+              maxLines: 3,
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => onSend(),
+              style: TextStyle(
+                color: context.artC.ink,
+                fontSize: 13,
+                height: 1.4,
+                fontWeight: FontWeight.w700,
+              ),
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                hintText: '说说你对这件作品的看法…',
+                hintStyle: TextStyle(
+                  color: context.artC.ink.withValues(alpha: 0.40),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+                contentPadding: const EdgeInsets.fromLTRB(14, 13, 8, 11),
+                suffixIcon: IconButton(
+                  tooltip: '发布评论',
+                  onPressed: sending ? null : onSend,
+                  icon: sending
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.arrow_upward_rounded, size: 19),
+                ),
+              ),
+            ),
+          ),
+        if (item.post != null) const SizedBox(height: 18),
+        if (loading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 18),
+            child: Center(
+              child: SizedBox(
+                width: 19,
+                height: 19,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          )
+        else if (visibleComments.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Text(
+              item.post == null ? '示例商品暂时没有评论。' : '还没有评论，欢迎写下第一句反馈。',
+              style: TextStyle(
+                color: context.artC.ink.withValues(alpha: 0.48),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          )
+        else
+          ...visibleComments.map(
+            (comment) => _MarketCommentRow(
+              comment: comment,
+              onAuthorTap: () => onAuthorTap(comment),
+            ),
+          ),
+      ],
+    );
+  }
+
+  String get _commentCountLabel =>
+      commentCount > 0 ? '共 $commentCount 条' : '期待第一条';
+}
+
+class _MarketCommentRow extends StatelessWidget {
+  final AppCommunityComment comment;
+  final VoidCallback onAuthorTap;
+
+  const _MarketCommentRow({
+    required this.comment,
+    required this.onAuthorTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final name = comment.authorNickname?.trim().isNotEmpty == true
+        ? comment.authorNickname!.trim()
+        : '艺见心用户';
+    final avatarUrl = comment.authorAvatarUrl;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GestureDetector(
+            onTap: onAuthorTap,
+            child: CircleAvatar(
+              radius: 19,
+              backgroundColor: context.artC.silver.withValues(alpha: 0.16),
+              child: ClipOval(
+                child: avatarUrl != null && avatarUrl.isNotEmpty
+                    ? Image.network(
+                        avatarUrl,
+                        width: 38,
+                        height: 38,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            _MarketSellerInitial(name: name),
+                      )
+                    : _MarketSellerInitial(name: name),
+              ),
+            ),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                GestureDetector(
+                  onTap: onAuthorTap,
+                  child: Text(
+                    name,
+                    style: TextStyle(
+                      color: context.artC.ink,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  timeAgo(comment.createdAt),
+                  style: TextStyle(
+                    color: context.artC.ink.withValues(alpha: 0.42),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  comment.body,
+                  style: TextStyle(
+                    color: context.artC.ink.withValues(alpha: 0.74),
+                    fontSize: 13,
+                    height: 1.52,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (comment.likeCount > 0) ...[
+            const SizedBox(width: 8),
+            Column(
+              children: [
+                Icon(
+                  Icons.favorite_border_rounded,
+                  size: 17,
+                  color: context.artC.ink.withValues(alpha: 0.34),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  _marketCompactCount(comment.likeCount),
+                  style: TextStyle(
+                    color: context.artC.ink.withValues(alpha: 0.42),
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MarketRelatedListings extends StatelessWidget {
+  final List<_MarketListing> items;
+  final ValueChanged<_MarketListing> onOpen;
+
+  const _MarketRelatedListings({
+    required this.items,
+    required this.onOpen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _MarketSectionTitle(
+          title: '相关作品',
+          subtitle: '按同类目与当前市集内容推荐',
+        ),
+        const SizedBox(height: 16),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            const spacing = 14.0;
+            final columns = constraints.maxWidth >= 680 ? 3 : 2;
+            final itemWidth =
+                (constraints.maxWidth - spacing * (columns - 1)) / columns;
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: items.length,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: columns,
+                crossAxisSpacing: spacing,
+                mainAxisSpacing: 24,
+                mainAxisExtent: itemWidth + 104,
+              ),
+              itemBuilder: (_, index) {
+                final item = items[index];
+                return _MarketListingCard(
+                  item: item,
+                  onOpen: () => onOpen(item),
+                );
+              },
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _MarketDetailBottomBar extends StatelessWidget {
+  final bool liked;
+  final bool saved;
+  final bool inBag;
+  final int likeCount;
+  final int saveCount;
+  final int commentCount;
+  final bool liking;
+  final bool saving;
+  final bool adding;
+  final bool primaryBusy;
+  final String primaryLabel;
+  final VoidCallback onLike;
+  final VoidCallback onSave;
+  final VoidCallback onComment;
+  final VoidCallback onBag;
+  final VoidCallback onPrimary;
+
+  const _MarketDetailBottomBar({
+    required this.liked,
+    required this.saved,
+    required this.inBag,
+    required this.likeCount,
+    required this.saveCount,
+    required this.commentCount,
+    required this.liking,
+    required this.saving,
+    required this.adding,
+    required this.primaryBusy,
+    required this.primaryLabel,
+    required this.onLike,
+    required this.onSave,
+    required this.onComment,
+    required this.onBag,
+    required this.onPrimary,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: context.artC.porcelain.withValues(alpha: 0.98),
+        border: Border(
+          top: BorderSide(
+            color: context.artC.silver.withValues(alpha: 0.34),
+          ),
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 9, 12, 10),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          children: [
+            Expanded(
+              flex: 4,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _MarketBottomAction(
+                      icon: liked
+                          ? Icons.favorite_rounded
+                          : Icons.favorite_border_rounded,
+                      label: _marketCompactCount(likeCount),
+                      active: liked,
+                      busy: liking,
+                      onTap: onLike,
+                    ),
+                  ),
+                  Expanded(
+                    child: _MarketBottomAction(
+                      icon: saved
+                          ? Icons.star_rounded
+                          : Icons.star_border_rounded,
+                      label: _marketCompactCount(saveCount),
+                      active: saved,
+                      busy: saving,
+                      onTap: onSave,
+                    ),
+                  ),
+                  Expanded(
+                    child: _MarketBottomAction(
+                      icon: Icons.chat_bubble_outline_rounded,
+                      label: _marketCompactCount(commentCount),
+                      onTap: onComment,
+                    ),
+                  ),
+                  Expanded(
+                    child: _MarketBottomAction(
+                      icon: inBag
+                          ? Icons.shopping_bag_rounded
+                          : Icons.shopping_bag_outlined,
+                      label: inBag ? '已加入' : '购物袋',
+                      active: inBag,
+                      busy: adding,
+                      onTap: onBag,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              flex: 3,
+              child: _MarketPrimaryButton(
+                label: primaryBusy ? '处理中' : primaryLabel,
+                enabled: !primaryBusy,
+                onTap: onPrimary,
               ),
             ),
           ],
@@ -3479,45 +5152,947 @@ class _MarketListingDetailScreenState
   }
 }
 
-class _MarketDetailMeta extends StatelessWidget {
+class _MarketBottomAction extends StatelessWidget {
+  final IconData icon;
   final String label;
-  final String value;
+  final bool active;
+  final bool busy;
+  final VoidCallback onTap;
 
-  const _MarketDetailMeta({
+  const _MarketBottomAction({
+    required this.icon,
     required this.label,
-    required this.value,
+    required this.onTap,
+    this.active = false,
+    this.busy = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 52,
+    return Semantics(
+      button: true,
+      selected: active,
+      label: label,
+      child: InkResponse(
+        onTap: busy ? null : onTap,
+        radius: 24,
+        child: SizedBox(
+          height: 48,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              busy
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(
+                      icon,
+                      size: 21,
+                      color: active
+                          ? kCobalt
+                          : context.artC.ink.withValues(alpha: 0.72),
+                    ),
+              const SizedBox(height: 3),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: active
+                      ? kCobalt
+                      : context.artC.ink.withValues(alpha: 0.60),
+                  fontSize: 9,
+                  height: 1,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MarketPrimaryButton extends StatefulWidget {
+  final String label;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _MarketPrimaryButton({
+    required this.label,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  State<_MarketPrimaryButton> createState() => _MarketPrimaryButtonState();
+}
+
+class _MarketPrimaryButtonState extends State<_MarketPrimaryButton> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value || !widget.enabled) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    return Semantics(
+      button: true,
+      enabled: widget.enabled,
+      label: widget.label,
+      child: GestureDetector(
+        onTapDown: (_) => _setPressed(true),
+        onTapUp: (_) => _setPressed(false),
+        onTapCancel: () => _setPressed(false),
+        onTap: widget.enabled ? widget.onTap : null,
+        child: AnimatedScale(
+          scale: _pressed ? 0.975 : 1,
+          duration:
+              reduceMotion ? Duration.zero : const Duration(milliseconds: 140),
+          curve: Curves.easeOutCubic,
+          child: Container(
+            height: 48,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: widget.enabled
+                  ? context.artC.ink
+                  : context.artC.ink.withValues(alpha: 0.44),
+              borderRadius: BorderRadius.circular(6),
+            ),
             child: Text(
-              label,
-              style: TextStyle(
-                color: context.artC.ink.withValues(alpha: 0.28),
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
+              widget.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
                 letterSpacing: 0,
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MarketShareSheet extends StatelessWidget {
+  final _MarketListing item;
+  final String shareUrl;
+  final Future<void> Function() onCopy;
+  final Future<void> Function() onOpen;
+  final Future<void> Function() onReport;
+
+  const _MarketShareSheet({
+    required this.item,
+    required this.shareUrl,
+    required this.onCopy,
+    required this.onOpen,
+    required this.onReport,
+  });
+
+  Future<void> _run(
+    BuildContext context,
+    Future<void> Function() action,
+  ) async {
+    Navigator.of(context).pop();
+    await Future<void>.delayed(Duration.zero);
+    await action();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: context.artC.porcelain,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.10),
+            blurRadius: 26,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Align(
+                alignment: Alignment.center,
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: context.artC.silver.withValues(alpha: 0.62),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const _MarketSectionTitle(title: '分享这件作品'),
+              const SizedBox(height: 6),
+              Text(
+                item.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: context.artC.ink.withValues(alpha: 0.58),
+                  fontSize: 12,
+                  height: 1.4,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Container(
+                    width: 92,
+                    height: 92,
+                    padding: const EdgeInsets.all(7),
+                    color: Colors.white,
+                    child: QrImageView(
+                      data: shareUrl,
+                      version: QrVersions.auto,
+                      padding: EdgeInsets.zero,
+                      eyeStyle: QrEyeStyle(
+                        eyeShape: QrEyeShape.square,
+                        color: context.artC.ink,
+                      ),
+                      dataModuleStyle: QrDataModuleStyle(
+                        dataModuleShape: QrDataModuleShape.square,
+                        color: context.artC.ink,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      '扫码打开作品页，或复制链接发给朋友。',
+                      style: TextStyle(
+                        color: context.artC.ink.withValues(alpha: 0.62),
+                        fontSize: 12,
+                        height: 1.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: _MarketShareAction(
+                      icon: Icons.link_rounded,
+                      label: '复制链接',
+                      onTap: () => _run(context, onCopy),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _MarketShareAction(
+                      icon: Icons.open_in_browser_rounded,
+                      label: '浏览器打开',
+                      onTap: () => _run(context, onOpen),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _MarketShareAction(
+                      icon: Icons.flag_outlined,
+                      label: '举报',
+                      onTap: () => _run(context, onReport),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MarketShareAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _MarketShareAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: context.artC.silver.withValues(alpha: 0.10),
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: SizedBox(
+          height: 72,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 22, color: context.artC.ink),
+              const SizedBox(height: 7),
+              Text(
+                label,
+                style: TextStyle(
+                  color: context.artC.ink.withValues(alpha: 0.74),
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MarketMoreSheet extends StatelessWidget {
+  final VoidCallback onSeller;
+  final VoidCallback onShare;
+  final VoidCallback onReport;
+
+  const _MarketMoreSheet({
+    required this.onSeller,
+    required this.onShare,
+    required this.onReport,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: context.artC.porcelain,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.person_outline_rounded),
+                title: const Text('查看发布者主页'),
+                onTap: onSeller,
+              ),
+              ListTile(
+                leading: const Icon(Icons.ios_share_rounded),
+                title: const Text('分享商品'),
+                onTap: onShare,
+              ),
+              ListTile(
+                leading: const Icon(Icons.flag_outlined),
+                title: const Text('举报商品'),
+                onTap: onReport,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MarketReportPayload {
+  final String reason;
+  final String detail;
+
+  const _MarketReportPayload({
+    required this.reason,
+    required this.detail,
+  });
+}
+
+class _MarketReportDialog extends StatefulWidget {
+  const _MarketReportDialog();
+
+  @override
+  State<_MarketReportDialog> createState() => _MarketReportDialogState();
+}
+
+class _MarketReportDialogState extends State<_MarketReportDialog> {
+  final TextEditingController _detailController = TextEditingController();
+  String _reason = 'false_info';
+
+  @override
+  void dispose() {
+    _detailController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const reasons = [
+      ('false_info', '商品信息不实'),
+      ('scam', '疑似诈骗'),
+      ('copyright', '涉嫌侵权'),
+      ('spam', '垃圾或广告内容'),
+      ('inappropriate', '不适宜内容'),
+      ('other', '其他问题'),
+    ];
+    return AlertDialog(
+      title: const Text('举报商品'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          DropdownButtonFormField<String>(
+            initialValue: _reason,
+            decoration: const InputDecoration(labelText: '举报原因'),
+            items: reasons
+                .map(
+                  (reason) => DropdownMenuItem<String>(
+                    value: reason.$1,
+                    child: Text(reason.$2),
+                  ),
+                )
+                .toList(),
+            onChanged: (value) {
+              if (value != null) setState(() => _reason = value);
+            },
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _detailController,
+            minLines: 3,
+            maxLines: 5,
+            maxLength: 500,
+            decoration: const InputDecoration(
+              labelText: '补充说明',
+              hintText: '请简要说明你遇到的问题',
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(
+            _MarketReportPayload(
+              reason: _reason,
+              detail: _detailController.text.trim(),
+            ),
+          ),
+          child: const Text('提交举报'),
+        ),
+      ],
+    );
+  }
+}
+
+class _ImmersiveInlinePreview extends StatefulWidget {
+  final _MarketListing item;
+  final VoidCallback onFullscreen;
+
+  const _ImmersiveInlinePreview({
+    required this.item,
+    required this.onFullscreen,
+  });
+
+  @override
+  State<_ImmersiveInlinePreview> createState() =>
+      _ImmersiveInlinePreviewState();
+}
+
+class _ImmersiveInlinePreviewState extends State<_ImmersiveInlinePreview> {
+  bool _loaded = false;
+  bool _interactionEnabled = false;
+
+  void _startInlineViewer() {
+    setState(() {
+      _loaded = true;
+      _interactionEnabled = true;
+    });
+  }
+
+  void _toggleInteraction() {
+    setState(() => _interactionEnabled = !_interactionEnabled);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.item;
+    final asset = item.immersiveAsset!;
+    final viewerUri = asset.buildViewerUri(
+      viewerBaseUri: Uri.parse(AppConfig.immersiveViewerUrl),
+      fallbackTitle: item.title,
+      fallbackPosterUrl: item.imageUrl,
+    );
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: ColoredBox(
+        color: const Color(0xFF080808),
+        child: Column(
+          children: [
+            AspectRatio(
+              aspectRatio: 1,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (!_loaded)
+                    _ImmersiveInlinePoster(
+                      item: item,
+                      onStart: _startInlineViewer,
+                    )
+                  else
+                    IgnorePointer(
+                      ignoring: !_interactionEnabled,
+                      child: ImmersiveWebSurface(
+                        viewerUri: viewerUri,
+                        title: '${item.title}当前页 3D 查看器',
+                      ),
+                    ),
+                  if (_loaded)
+                    Positioned(
+                      left: 12,
+                      top: 12,
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.68),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(color: Colors.white12),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 7,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _interactionEnabled
+                                      ? Icons.touch_app_rounded
+                                      : Icons.lock_outline_rounded,
+                                  color: Colors.white70,
+                                  size: 13,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _interactionEnabled ? '3D 交互中' : '交互已锁定',
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (_loaded && !_interactionEnabled)
+                    const Positioned.fill(
+                      child: IgnorePointer(
+                        child: ColoredBox(
+                          color: Color(0x16000000),
+                          child: Center(
+                            child: _InlineInteractionLockedHint(),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (_loaded)
+              _ImmersiveInlineToolbar(
+                interactionEnabled: _interactionEnabled,
+                onToggleInteraction: _toggleInteraction,
+                onFullscreen: widget.onFullscreen,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ImmersiveInlinePoster extends StatelessWidget {
+  final _MarketListing item;
+  final VoidCallback onStart;
+
+  const _ImmersiveInlinePoster({
+    required this.item,
+    required this.onStart,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = item.imageUrl;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (imageUrl == null)
+          _MarketFallbackImage(item: item)
+        else
+          Image.network(
+            imageUrl,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => _MarketFallbackImage(item: item),
+          ),
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0x12000000),
+                Color(0x00000000),
+                Color(0x70000000),
+              ],
+              stops: [0, 0.55, 1],
+            ),
+          ),
+        ),
+        Positioned(
+          left: 18,
+          right: 18,
+          bottom: 18,
+          child: Column(
+            children: [
+              Material(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(999),
+                child: InkWell(
+                  onTap: onStart,
+                  borderRadius: BorderRadius.circular(999),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.threesixty_rounded,
+                          color: Colors.black,
+                          size: 18,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          '在当前页查看 3D',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 9),
+              const Text(
+                '约 69 MB · 点击后加载',
+                style: TextStyle(
+                  color: Colors.white60,
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ImmersiveInlineToolbar extends StatelessWidget {
+  final bool interactionEnabled;
+  final VoidCallback onToggleInteraction;
+  final VoidCallback onFullscreen;
+
+  const _ImmersiveInlineToolbar({
+    required this.interactionEnabled,
+    required this.onToggleInteraction,
+    required this.onFullscreen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 48,
+      child: Row(
+        children: [
           Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                color: context.artC.ink.withValues(alpha: 0.58),
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0,
+            child: TextButton.icon(
+              onPressed: onToggleInteraction,
+              icon: Icon(
+                interactionEnabled
+                    ? Icons.lock_outline_rounded
+                    : Icons.touch_app_rounded,
+                size: 16,
+              ),
+              label: Text(
+                interactionEnabled ? '锁定交互，恢复页面滑动' : '继续操作 3D',
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white70,
+                alignment: Alignment.centerLeft,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                textStyle: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+          Container(width: 1, height: 20, color: Colors.white12),
+          TextButton.icon(
+            onPressed: onFullscreen,
+            icon: const Icon(Icons.fullscreen_rounded, size: 18),
+            label: const Text('全屏'),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              textStyle: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _InlineInteractionLockedHint extends StatelessWidget {
+  const _InlineInteractionLockedHint();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.68),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        child: Text(
+          '现在可以上下滑动页面',
+          style: TextStyle(
+            color: Colors.white70,
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ImmersiveEntryCard extends StatefulWidget {
+  final String? credits;
+  final VoidCallback onTap;
+
+  const _ImmersiveEntryCard({
+    required this.credits,
+    required this.onTap,
+  });
+
+  @override
+  State<_ImmersiveEntryCard> createState() => _ImmersiveEntryCardState();
+}
+
+class _ImmersiveEntryCardState extends State<_ImmersiveEntryCard> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    return Semantics(
+      button: true,
+      label: '进入作品沉浸观看',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => _setPressed(true),
+        onTapUp: (_) => _setPressed(false),
+        onTapCancel: () => _setPressed(false),
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          scale: _pressed ? 0.985 : 1,
+          duration:
+              reduceMotion ? Duration.zero : const Duration(milliseconds: 140),
+          curve: Curves.easeOutCubic,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(17, 16, 14, 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF101010),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.view_in_ar_rounded,
+                    color: Colors.white,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 13),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '艺见心 · 数字典藏',
+                        style: TextStyle(
+                          color: Colors.white38,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      const Text(
+                        '全屏沉浸观看',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.credits?.trim().isNotEmpty == true
+                            ? '获得更大视野并观察作品细节 · ${widget.credits}'
+                            : '获得更大视野并观察作品材质与结构细节',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 10.5,
+                          height: 1.35,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.arrow_forward_rounded,
+                  color: Colors.white54,
+                  size: 19,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ImmersiveAttributionLinks extends StatelessWidget {
+  final ImmersiveAsset asset;
+
+  const _ImmersiveAttributionLinks({required this.asset});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 2, bottom: 12),
+      child: Wrap(
+        spacing: 14,
+        runSpacing: 8,
+        children: [
+          if (asset.sourceUrl != null)
+            _ExternalCreditLink(
+              label: '查看原始作品 ↗',
+              url: asset.sourceUrl!,
+            ),
+          if (asset.licenseUrl != null)
+            _ExternalCreditLink(
+              label: '查看授权条款 ↗',
+              url: asset.licenseUrl!,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExternalCreditLink extends StatelessWidget {
+  final String label;
+  final String url;
+
+  const _ExternalCreditLink({required this.label, required this.url});
+
+  Future<void> _open() async {
+    final uri = Uri.tryParse(url);
+    if (uri == null || (uri.scheme != 'https' && uri.scheme != 'http')) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      onPressed: _open,
+      style: TextButton.styleFrom(
+        padding: EdgeInsets.zero,
+        minimumSize: const Size(0, 32),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        foregroundColor: context.artC.ink.withValues(alpha: 0.62),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+        ),
       ),
     );
   }
@@ -4137,6 +6712,22 @@ bool _isQuotedMarketPrice(String price) {
       raw.contains('沟通') ||
       raw.contains('委托') ||
       raw.contains('custom');
+}
+
+String _marketCompactCount(int value) {
+  if (value >= 1000000) {
+    final number = value / 1000000;
+    return '${number.toStringAsFixed(number >= 10 ? 0 : 1)}m';
+  }
+  if (value >= 10000) {
+    final number = value / 10000;
+    return '${number.toStringAsFixed(number >= 10 ? 0 : 1)}w';
+  }
+  if (value >= 1000) {
+    final number = value / 1000;
+    return '${number.toStringAsFixed(number >= 10 ? 0 : 1)}k';
+  }
+  return '$value';
 }
 
 int? _marketPriceAmountTotal(String price) {
@@ -5486,34 +8077,45 @@ class _ChatTab extends StatefulWidget {
 class _ChatTabState extends State<_ChatTab> {
   List<Map<String, dynamic>> _items = const [];
   bool _loading = true;
-  bool _imConnecting = false;
   bool _needsLogin = false;
   String? _error;
   String _selectedFilter = '全部';
+  ConversationRealtimeSubscription? _realtimeSubscription;
+  Timer? _realtimeRefreshDebounce;
 
   @override
   void initState() {
     super.initState();
     _load();
-    unawaited(_warmTencentIm());
+    _attachInboxRealtime();
   }
 
-  Future<void> _load() async {
+  @override
+  void dispose() {
+    _realtimeRefreshDebounce?.cancel();
+    unawaited(_realtimeSubscription?.close());
+    super.dispose();
+  }
+
+  Future<void> _load({bool showLoading = true}) async {
     if (!SupabaseService.isLoggedIn) {
+      unawaited(_realtimeSubscription?.close());
+      _realtimeSubscription = null;
       setState(() {
         _items = const [];
         _loading = false;
-        _imConnecting = false;
         _needsLogin = true;
         _error = null;
       });
       return;
     }
-    setState(() {
-      _loading = true;
-      _needsLogin = false;
-      _error = null;
-    });
+    if (showLoading) {
+      setState(() {
+        _loading = true;
+        _needsLogin = false;
+        _error = null;
+      });
+    }
     try {
       final result = await BackendApiService.fetchConversations(limit: 30);
       if (!mounted) return;
@@ -5524,39 +8126,54 @@ class _ChatTabState extends State<_ChatTab> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
+      if (showLoading) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      } else {
+        debugPrint('Supabase Realtime inbox refresh failed: $e');
+      }
     }
   }
 
   Future<void> _refreshAll() async {
-    unawaited(_warmTencentIm());
+    _attachInboxRealtime();
     await _load();
   }
 
   Future<void> _loginAndReload() async {
     final ok = await ensureLoggedIn(context, message: '请先登录后查看私信');
     if (!mounted || !ok) return;
+    _attachInboxRealtime();
     await _refreshAll();
   }
 
-  Future<void> _warmTencentIm() async {
-    if (_imConnecting) return;
-    if (!SupabaseService.isLoggedIn) {
-      return;
-    }
+  void _attachInboxRealtime() {
+    if (_realtimeSubscription != null) return;
+    final userId = SupabaseService.currentUser?.id;
+    if (userId == null || userId.isEmpty) return;
+    _realtimeSubscription = ConversationRealtimeService.subscribeToInbox(
+      userId: userId,
+      onChanged: _scheduleRealtimeRefresh,
+      onStatus: (status, error) {
+        if (!mounted) return;
+        if (status.name == 'subscribed') {
+          _scheduleRealtimeRefresh();
+        } else if (status.name == 'channelError' || status.name == 'timedOut') {
+          debugPrint('Supabase Realtime inbox subscription issue: $error');
+        }
+      },
+    );
+  }
 
-    setState(() => _imConnecting = true);
-    try {
-      await TencentImService.ensureLoggedIn();
-      if (!mounted) return;
-      setState(() => _imConnecting = false);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _imConnecting = false);
-    }
+  void _scheduleRealtimeRefresh() {
+    if (!mounted) return;
+    _realtimeRefreshDebounce?.cancel();
+    _realtimeRefreshDebounce = Timer(
+      const Duration(milliseconds: 180),
+      () => unawaited(_load(showLoading: false)),
+    );
   }
 
   bool _matchesConversationFilter(Map<String, dynamic> conversation) {
@@ -6397,7 +9014,8 @@ class _RelatedCircleCard extends StatelessWidget {
                 fontSize: compact ? 14.5 : 16,
                 height: compact ? 1.18 : 1.24,
                 fontWeight: FontWeight.w900,
-                fontFamily: 'Noto Serif SC',
+                fontFamily: kAppFontFamily,
+                fontFamilyFallback: kAppFontFallback,
               ),
             ),
             SizedBox(height: compact ? 6 : 8),
@@ -7003,7 +9621,8 @@ class _QuestionPostCard extends StatelessWidget {
                 fontSize: 16,
                 height: 1.24,
                 fontWeight: FontWeight.w900,
-                fontFamily: 'Noto Serif SC',
+                fontFamily: kAppFontFamily,
+                fontFamilyFallback: kAppFontFallback,
               ),
             ),
             if (body != null && body.isNotEmpty) ...[
@@ -7122,7 +9741,8 @@ class _HotTopicCard extends StatelessWidget {
                 fontSize: 16,
                 height: 1.25,
                 fontWeight: FontWeight.w900,
-                fontFamily: 'Noto Serif SC',
+                fontFamily: kAppFontFamily,
+                fontFamilyFallback: kAppFontFallback,
               ),
             ),
             const SizedBox(height: 12),
@@ -7348,7 +9968,8 @@ class _HotTopicDiscussionHero extends StatelessWidget {
               fontSize: 24,
               height: 1.16,
               fontWeight: FontWeight.w900,
-              fontFamily: 'Noto Serif SC',
+              fontFamily: kAppFontFamily,
+              fontFamilyFallback: kAppFontFallback,
             ),
           ),
           const SizedBox(height: 14),
@@ -8586,7 +11207,8 @@ class _CircleCard extends StatelessWidget {
               height: 1.16,
               fontWeight: FontWeight.w900,
               color: context.artC.ink,
-              fontFamily: 'Noto Serif SC',
+              fontFamily: kAppFontFamily,
+              fontFamilyFallback: kAppFontFallback,
             ),
           ),
           const SizedBox(height: 4),
@@ -9310,7 +11932,8 @@ class _CircleDetailHero extends StatelessWidget {
                         fontSize: 25,
                         height: 1.12,
                         fontWeight: FontWeight.w900,
-                        fontFamily: 'Noto Serif SC',
+                        fontFamily: kAppFontFamily,
+                        fontFamilyFallback: kAppFontFallback,
                       ),
                     ),
                   ],
@@ -10292,7 +12915,8 @@ class _SalonCard extends StatelessWidget {
                       height: 1.18,
                       fontWeight: FontWeight.w900,
                       color: context.artC.ink,
-                      fontFamily: 'Noto Serif SC',
+                      fontFamily: kAppFontFamily,
+                      fontFamilyFallback: kAppFontFallback,
                     ),
                   ),
                   const SizedBox(height: 7),
@@ -10615,7 +13239,8 @@ class _SalonDetailHero extends StatelessWidget {
                       fontSize: 27,
                       height: 1.08,
                       fontWeight: FontWeight.w900,
-                      fontFamily: 'Noto Serif SC',
+                      fontFamily: kAppFontFamily,
+                      fontFamilyFallback: kAppFontFallback,
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -10869,7 +13494,8 @@ class _SalonInvitationCard extends StatelessWidget {
                     color: context.artC.ink,
                     fontSize: 16,
                     fontWeight: FontWeight.w900,
-                    fontFamily: 'Noto Serif SC',
+                    fontFamily: kAppFontFamily,
+                    fontFamilyFallback: kAppFontFallback,
                   ),
                 ),
               ),
@@ -10948,7 +13574,8 @@ class _SalonHostCard extends StatelessWidget {
                     fontSize: 16,
                     height: 1.25,
                     fontWeight: FontWeight.w900,
-                    fontFamily: 'Noto Serif SC',
+                    fontFamily: kAppFontFamily,
+                    fontFamilyFallback: kAppFontFallback,
                   ),
                 ),
                 const SizedBox(height: 7),
@@ -11325,7 +13952,8 @@ class _ReservationSheet extends StatelessWidget {
                 color: context.artC.ink,
                 fontSize: 22,
                 fontWeight: FontWeight.w900,
-                fontFamily: 'Noto Serif SC',
+                fontFamily: kAppFontFamily,
+                fontFamilyFallback: kAppFontFallback,
               ),
             ),
             const SizedBox(height: 12),

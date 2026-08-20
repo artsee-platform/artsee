@@ -3,6 +3,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/api_config.dart';
+import 'supabase_service.dart';
+import 'tencent_captcha_models.dart';
 
 class AuthService {
   static String get apiBaseUrl =>
@@ -13,17 +15,24 @@ class AuthService {
   AuthService._internal();
 
   // 发送短信验证码
-  Future<Map<String, dynamic>> sendSmsCode(String phone) async {
+  Future<Map<String, dynamic>> sendSmsCode(
+    String phone, {
+    TencentCaptchaProof? captcha,
+  }) async {
     try {
-      final response = await http.post(
-        Uri.parse('$apiBaseUrl/auth/send-sms'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'phone': phone,
-          'country_code': '+86',
-          'purpose': 'login',
-        }),
-      );
+      final response = await http
+          .post(
+            Uri.parse('$apiBaseUrl/auth/send-sms'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'phone': phone,
+              'country_code': '+86',
+              'purpose': 'login',
+              if (captcha != null) 'captcha_ticket': captcha.ticket,
+              if (captcha != null) 'captcha_randstr': captcha.randstr,
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
 
       return jsonDecode(response.body);
     } catch (e) {
@@ -34,24 +43,32 @@ class AuthService {
   // 验证短信验证码并登录
   Future<Map<String, dynamic>> verifySmsCode(String phone, String code) async {
     try {
-      // 开发模式：验证码固定为 123456
-      if (code != '123456') {
-        return {'success': false, 'error': '验证码错误'};
-      }
-
-      final response = await http.post(
-        Uri.parse('$apiBaseUrl/auth/verify-sms'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'phone': phone,
-          'code': code,
-          'country_code': '+86',
-        }),
-      );
+      final response = await http
+          .post(
+            Uri.parse('$apiBaseUrl/auth/verify-sms'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'phone': phone,
+              'code': code,
+              'country_code': '+86',
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
 
       final data = jsonDecode(response.body);
 
       if (data['success'] == true && data['user'] != null) {
+        final session = data['session'];
+        if (session is! Map ||
+            session['refresh_token']?.toString().isEmpty != false ||
+            session['access_token']?.toString().isEmpty != false) {
+          return {'success': false, 'error': '登录会话无效，请重新获取验证码'};
+        }
+        await SupabaseService.restoreSession(
+          refreshToken: session['refresh_token'].toString(),
+          accessToken: session['access_token'].toString(),
+        );
+
         // 添加 role 到用户数据
         final userData = Map<String, dynamic>.from(data['user']);
         userData['role'] = userData['role'] ?? 'user';
@@ -103,6 +120,7 @@ class AuthService {
 
   // 退出登录
   Future<void> logout() async {
+    await SupabaseService.signOut();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('user');
   }

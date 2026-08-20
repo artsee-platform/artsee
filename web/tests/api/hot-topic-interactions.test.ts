@@ -12,6 +12,7 @@ type Ctx = { params: Promise<{ id: string; answerIndex: string }> };
 
 const USER_ID = "10000000-0000-4000-8000-000000000001";
 const TOPIC_ID = "20000000-0000-4000-8000-000000000001";
+const auditMock = vi.hoisted(() => vi.fn());
 
 let likes: Row[] = [];
 let comments: Row[] = [];
@@ -37,6 +38,11 @@ vi.mock("@/lib/api/auth-user", () => ({
     if (h === "Bearer valid-token") return { id: USER_ID } as { id: string };
     return null;
   },
+}));
+
+vi.mock("@/lib/api/content-safety", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api/content-safety")>()),
+  auditContent: auditMock,
 }));
 
 class QueryStub {
@@ -161,6 +167,13 @@ describe("hot topic answer interactions", () => {
   beforeEach(() => {
     likes = [];
     comments = [];
+    auditMock.mockReset();
+    auditMock.mockResolvedValue({
+      provider: "tencent_cloud",
+      suggestion: "pass",
+      audit_status: "approved",
+      items: [],
+    });
   });
 
   it("likes a published hot topic answer", async () => {
@@ -180,6 +193,25 @@ describe("hot topic answer interactions", () => {
     expect(body.data.body).toBe("说得很清楚");
     expect(body.data.user_profiles.nickname).toBe("测试用户");
     expect(body.comment_count).toBe(1);
+    expect(auditMock).toHaveBeenCalledWith({
+      userId: USER_ID,
+      text: "说得很清楚",
+      scene: "hot_topic_comment",
+      dataId: `hot-${TOPIC_ID}-1`,
+    });
+  });
+
+  it("does not publish a comment that needs review", async () => {
+    auditMock.mockResolvedValueOnce({
+      provider: "tencent_cloud",
+      suggestion: "review",
+      audit_status: "reviewing",
+      items: [],
+    });
+
+    const res = await commentAnswer(req({ body: "待复审内容" }), ctx("1"));
+    expect(res.status).toBe(422);
+    expect(comments).toHaveLength(0);
   });
 
   it("rejects unknown answer indexes", async () => {

@@ -42,3 +42,15 @@ android {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // Keep every native channel wrapper aligned with tencent_cloud_chat_push.
+    // The matching credentials remain in ignored vendor/TIMPush config files.
+    implementation("com.tencent.timpush:huawei:8.7.7201")
+    implementation("com.tencent.timpush:xiaomi:8.7.7201")
+    implementation("com.tencent.timpush:oppo:8.7.7201")
+    implementation("com.tencent.timpush:vivo:8.7.7201")
+    implementation("com.tencent.timpush:honor:8.7.7201")
+    implementation("com.tencent.timpush:meizu:8.7.7201")
+    implementation("com.tencent.timpush:fcm:8.7.7201")
+}

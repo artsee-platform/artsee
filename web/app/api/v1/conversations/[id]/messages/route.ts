@@ -2,11 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserFromBearer } from "@/lib/api/auth-user";
 import { createServiceClient } from "@/lib/api/supabase-service";
 import { errorResponse, parsePagination } from "@/lib/api/route-helpers";
+import { auditContent, collectAuditText } from "@/lib/api/content-safety";
+import {
+  contentSafetyErrorResponse,
+  rejectedAuditResponse,
+} from "@/lib/api/content-safety-http";
 
 type Row = Record<string, unknown>;
 
 const ATTACHMENT_MESSAGE_TYPES = new Set(["image", "file"]);
-const ALLOWED_MESSAGE_TYPES = new Set(["text", "image", "file", "system"]);
+const ALLOWED_MESSAGE_TYPES = new Set(["text", "image", "file"]);
 
 function cleanText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -20,7 +25,7 @@ function objectValue(value: unknown) {
 function isHttpUrl(value: string) {
   try {
     const url = new URL(value);
-    return url.protocol === "https:" || url.protocol === "http:";
+    return url.protocol === "https:";
   } catch {
     return false;
   }
@@ -124,15 +129,58 @@ export async function POST(
     }
 
     const supabase = createServiceClient();
-    const { data: member } = await supabase
+    const { data: member, error: participantError } = await supabase
       .from("conversation_participants")
       .select("conversation_id")
       .eq("conversation_id", id)
       .eq("user_id", user.id)
       .maybeSingle();
+    if (participantError) return errorResponse(participantError);
     if (!member) {
       return NextResponse.json({ success: false, error: "无权发送该会话消息" }, { status: 403 });
     }
+
+    const auditText = collectAuditText(
+      messageType === "image" ? "" : text,
+      attachmentName
+    );
+    const audit = await auditContent({
+      userId: user.id,
+      text: auditText || undefined,
+      imageUrls: messageType === "image" ? [attachmentUrl] : [],
+      scene: "private_message",
+    });
+    const rejected = rejectedAuditResponse(audit, "消息");
+    if (rejected) return rejected;
+
+    const safeAudit = {
+      provider: audit.provider,
+      suggestion: audit.suggestion,
+      audit_status: audit.audit_status,
+      items: audit.items.map((item) => ({
+        type: item.type,
+        suggestion: item.suggestion,
+        label: item.label,
+        sub_label: item.sub_label,
+        score: item.score,
+        request_id: item.request_id,
+      })),
+    };
+    const initialMetadata = {
+      ...metadata,
+      ...(hasAttachment
+        ? {
+            attachment_url: attachmentUrl,
+            attachment_name: attachmentName || null,
+            content_type: contentType || null,
+            size: Number.isFinite(size) && size > 0 ? size : null,
+            provider: cleanText(metadata.provider) || "tencent_cos",
+          }
+        : {}),
+      content_audit: safeAudit,
+      realtime_status: "persisted",
+      transport_provider: "supabase_realtime",
+    };
 
     const { data, error } = await supabase
       .from("messages")
@@ -141,18 +189,7 @@ export async function POST(
         sender_id: user.id,
         body: text,
         message_type: messageType,
-        metadata: {
-          ...metadata,
-          ...(hasAttachment
-            ? {
-                attachment_url: attachmentUrl,
-                attachment_name: attachmentName || null,
-                content_type: contentType || null,
-                size: Number.isFinite(size) && size > 0 ? size : null,
-                provider: cleanText(metadata.provider) || "tencent_cos",
-              }
-            : {}),
-        },
+        metadata: initialMetadata,
       })
       .select()
       .single();
@@ -165,6 +202,8 @@ export async function POST(
 
     return NextResponse.json({ success: true, data }, { status: 201 });
   } catch (e) {
+    const auditError = contentSafetyErrorResponse(e);
+    if (auditError) return auditError;
     return errorResponse(e);
   }
 }

@@ -1,4 +1,7 @@
 // Data models matching Supabase schema
+import 'immersive_asset.dart';
+
+export 'immersive_asset.dart';
 
 class AppCase {
   final String id;
@@ -109,6 +112,8 @@ class AppCommunityPost {
     this.authorNickname,
     this.authorAvatarUrl,
   });
+
+  ImmersiveAsset? get immersiveAsset => ImmersiveAsset.fromMetadata(metadata);
 
   factory AppCommunityPost.fromJson(Map<String, dynamic> json) {
     final up = json['user_profiles'];

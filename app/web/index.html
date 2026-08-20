@@ -31,6 +31,10 @@
 
   <title>Artiqore 艺见心</title>
   <link rel="manifest" href="manifest.json">
+  <!-- Required by Tencent's Flutter Web bridge. Versions are pinned to the
+       JavaScript runtime used by tencent_cloud_chat_sdk 8.7.7201+3. -->
+  <script src="node_modules/tim-upload-plugin/index.js"></script>
+  <script src="node_modules/@tencentcloud/chat/index.js"></script>
   <style>
     html, body { margin: 0; height: 100%; background: #F8F9FA; }
     input, textarea, .flt-text-editing {

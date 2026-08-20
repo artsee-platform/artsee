@@ -4484,6 +4484,7 @@ class _OrganizationEditSheetState extends State<_OrganizationEditSheet> {
   late bool _supportsOnline;
   late bool _supportsOffline;
   bool _saving = false;
+  bool _geocoding = false;
   String? _error;
 
   @override
@@ -4533,7 +4534,7 @@ class _OrganizationEditSheetState extends State<_OrganizationEditSheet> {
   }
 
   Future<void> _save() async {
-    if (_saving) return;
+    if (_saving || _geocoding) return;
     final id = widget.organization['id']?.toString() ?? '';
     if (id.isEmpty) {
       setState(() => _error = '机构 ID 缺失');
@@ -4581,6 +4582,51 @@ class _OrganizationEditSheetState extends State<_OrganizationEditSheet> {
       setState(() {
         _error = e.toString().replaceFirst('Exception: ', '');
         _saving = false;
+      });
+    }
+  }
+
+  Future<void> _geocodeAddress() async {
+    if (_saving || _geocoding) return;
+    final address = _address.text.trim();
+    if (address.length < 2) {
+      setState(() => _error = '请先填写完整的线下地址');
+      return;
+    }
+    setState(() {
+      _geocoding = true;
+      _error = null;
+    });
+    try {
+      final result = await BackendApiService.geocodeAddressWithAmap(
+        address: address,
+        city: _city.text,
+      );
+      final latitude = result['latitude'];
+      final longitude = result['longitude'];
+      if (latitude is! num || longitude is! num) {
+        throw Exception('高德地图未返回有效坐标');
+      }
+      _latitude.text = _coordinateText(latitude);
+      _longitude.text = _coordinateText(longitude);
+      final province = _cleanText(result['province']);
+      final city = _cleanText(result['city']);
+      if (_province.text.trim().isEmpty && province.isNotEmpty) {
+        _province.text = province;
+      }
+      if (_city.text.trim().isEmpty && city.isNotEmpty) {
+        _city.text = city;
+      }
+      if (!mounted) return;
+      setState(() => _geocoding = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已通过高德地图填入经纬度')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString().replaceFirst('Exception: ', '');
+        _geocoding = false;
       });
     }
   }
@@ -4696,7 +4742,7 @@ class _OrganizationEditSheetState extends State<_OrganizationEditSheet> {
                           child: _OrganizationTextField(
                             controller: _province,
                             label: '省份',
-                            enabled: !_saving,
+                            enabled: !_saving && !_geocoding,
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -4704,7 +4750,7 @@ class _OrganizationEditSheetState extends State<_OrganizationEditSheet> {
                           child: _OrganizationTextField(
                             controller: _city,
                             label: '城市',
-                            enabled: !_saving,
+                            enabled: !_saving && !_geocoding,
                           ),
                         ),
                       ],
@@ -4716,7 +4762,7 @@ class _OrganizationEditSheetState extends State<_OrganizationEditSheet> {
                           child: _OrganizationTextField(
                             controller: _latitude,
                             label: '纬度',
-                            enabled: !_saving,
+                            enabled: !_saving && !_geocoding,
                             keyboardType: TextInputType.number,
                           ),
                         ),
@@ -4725,7 +4771,7 @@ class _OrganizationEditSheetState extends State<_OrganizationEditSheet> {
                           child: _OrganizationTextField(
                             controller: _longitude,
                             label: '经度',
-                            enabled: !_saving,
+                            enabled: !_saving && !_geocoding,
                             keyboardType: TextInputType.number,
                           ),
                         ),
@@ -4765,7 +4811,25 @@ class _OrganizationEditSheetState extends State<_OrganizationEditSheet> {
                     _OrganizationTextField(
                       controller: _address,
                       label: '线下地址',
-                      enabled: !_saving,
+                      hint: '填写省、市、区和详细门牌地址',
+                      enabled: !_saving && !_geocoding,
+                    ),
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed:
+                            _saving || _geocoding ? null : _geocodeAddress,
+                        icon: _geocoding
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.location_searching_rounded),
+                        label: Text(_geocoding ? '高德解析中' : '用高德地图定位'),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     _OrganizationTextField(
@@ -4809,7 +4873,7 @@ class _OrganizationEditSheetState extends State<_OrganizationEditSheet> {
                   height: 48,
                   child: FilledButton.icon(
                     style: FilledButton.styleFrom(backgroundColor: kCobalt),
-                    onPressed: _saving ? null : _save,
+                    onPressed: _saving || _geocoding ? null : _save,
                     icon: _saving
                         ? const SizedBox(
                             width: 18,
@@ -5691,6 +5755,14 @@ String _checkoutOrderId(Map<String, dynamic> checkout) {
 
 String _cleanText(dynamic value) {
   return value?.toString().trim() ?? '';
+}
+
+String _coordinateText(num value) {
+  return value
+      .toDouble()
+      .toStringAsFixed(6)
+      .replaceFirst(RegExp(r'0+$'), '')
+      .replaceFirst(RegExp(r'\.$'), '');
 }
 
 String _firstCleanText(

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { POST as postUpload } from "@/app/api/v1/upload/route";
 import { POST as signMaterial } from "@/app/api/v1/uploads/materials/sign/route";
@@ -7,16 +7,33 @@ const tokenUsers: Record<string, string> = {
   "valid-token": "user-123",
   "other-token": "user-456",
   "admin-token": "admin-1",
+  "org-owner-token": "org-owner-1",
 };
 
 const profiles: Record<string, Record<string, unknown>> = {
   "user-123": { id: "user-123", role: "user", status: "active" },
   "user-456": { id: "user-456", role: "user", status: "active" },
   "admin-1": { id: "admin-1", role: "admin", status: "active" },
+  "org-owner-1": { id: "org-owner-1", role: "user", status: "active" },
 };
+
+const uploadFiles: Array<Record<string, unknown>> = [];
+const contracts: Array<Record<string, unknown>> = [];
+const organizationMembers: Array<Record<string, unknown>> = [];
+
+beforeEach(() => {
+  uploadFiles.length = 0;
+  contracts.length = 0;
+  organizationMembers.length = 0;
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 class QueryStub {
   private filters: Array<{ field: string; value: unknown }> = [];
+  private inFilters: Array<{ field: string; values: unknown[] }> = [];
 
   constructor(private readonly table: string) {}
 
@@ -29,11 +46,28 @@ class QueryStub {
     return this;
   }
 
+  in(field: string, values: unknown[]) {
+    this.inFilters.push({ field, values });
+    return this;
+  }
+
   async maybeSingle() {
-    if (this.table !== "user_profiles") return { data: null, error: null };
-    const rows = Object.values(profiles);
+    const rows =
+      this.table === "user_profiles"
+        ? Object.values(profiles)
+        : this.table === "upload_files"
+          ? uploadFiles
+          : this.table === "contracts"
+            ? contracts
+            : this.table === "organization_members"
+              ? organizationMembers
+              : [];
     const row =
-      rows.find((item) => this.filters.every(({ field, value }) => item[field] === value)) ??
+      rows.find(
+        (item) =>
+          this.filters.every(({ field, value }) => item[field] === value) &&
+          this.inFilters.every(({ field, values }) => values.includes(item[field]))
+      ) ??
       null;
     return { data: row, error: null };
   }
@@ -99,7 +133,7 @@ describe("POST /api/v1/upload", () => {
 
   it("不支持的文件类型返回 400", async () => {
     const form = new FormData();
-    const blob = new Blob(["fake-pdf"], { type: "application/pdf" });
+    const blob = new Blob(["%PDF-1.7\nfake-pdf"], { type: "application/pdf" });
     form.append("file", new File([blob], "test.pdf", { type: "application/pdf" }));
 
     const req = new NextRequest("http://localhost/api/v1/upload", {
@@ -115,7 +149,7 @@ describe("POST /api/v1/upload", () => {
 
   it("补充材料场景支持 PDF 上传", async () => {
     const form = new FormData();
-    const blob = new Blob(["fake-pdf"], { type: "application/pdf" });
+    const blob = new Blob(["%PDF-1.7\nfake-pdf"], { type: "application/pdf" });
     form.append("file", new File([blob], "portfolio.pdf", { type: "application/pdf" }));
     form.append("folder", "submission-materials/opportunities/opportunity-1");
 
@@ -134,7 +168,7 @@ describe("POST /api/v1/upload", () => {
 
   it("合同存档场景支持 PDF 上传", async () => {
     const form = new FormData();
-    const blob = new Blob(["fake-contract"], { type: "application/pdf" });
+    const blob = new Blob(["%PDF-1.7\nfake-contract"], { type: "application/pdf" });
     form.append("file", new File([blob], "contract.pdf", { type: "application/pdf" }));
     form.append("folder", "contracts/org-1");
 
@@ -153,7 +187,9 @@ describe("POST /api/v1/upload", () => {
 
   it("上传成功返回 200 和公开 URL", async () => {
     const form = new FormData();
-    const blob = new Blob(["fake-image"], { type: "image/png" });
+    const blob = new Blob([
+      new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    ], { type: "image/png" });
     form.append("file", new File([blob], "test.png", { type: "image/png" }));
     form.append("folder", "community");
 
@@ -173,6 +209,76 @@ describe("POST /api/v1/upload", () => {
 });
 
 describe("POST /api/v1/uploads/materials/sign", () => {
+  it("signs a completed private COS upload owned by the current user", async () => {
+    vi.stubEnv("TENCENT_CLOUD_SECRET_ID", "secret-id");
+    vi.stubEnv("TENCENT_CLOUD_SECRET_KEY", "secret-key");
+    vi.stubEnv("TENCENT_COS_BUCKET", "artsee-test-1250000000");
+    vi.stubEnv("TENCENT_COS_REGION", "ap-guangzhou");
+    const key = "uploads/user-123/submission-materials/opportunities/item-1/file.pdf";
+    uploadFiles.push({
+      id: "upload-1",
+      user_id: "user-123",
+      file_url: `https://artsee-test-1250000000.cos.ap-guangzhou.myqcloud.com/${key}`,
+      object_key: key,
+      provider: "tencent_cos",
+      scene: "submission-materials/opportunities/item-1",
+      access_level: "private",
+      upload_status: "completed",
+    });
+
+    const req = new NextRequest("http://localhost/api/v1/uploads/materials/sign", {
+      method: "POST",
+      headers: { authorization: "Bearer valid-token" },
+      body: JSON.stringify({ url: uploadFiles[0].file_url }),
+    });
+    const res = await signMaterial(req);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.provider).toBe("tencent_cos");
+    expect(json.signed_url).toContain("q-sign-algorithm=sha1");
+  });
+
+  it("allows an active organization owner to sign its contract file", async () => {
+    vi.stubEnv("TENCENT_CLOUD_SECRET_ID", "secret-id");
+    vi.stubEnv("TENCENT_CLOUD_SECRET_KEY", "secret-key");
+    vi.stubEnv("TENCENT_COS_BUCKET", "artsee-test-1250000000");
+    vi.stubEnv("TENCENT_COS_REGION", "ap-guangzhou");
+    const key = "uploads/user-123/contracts/org-1/contract.pdf";
+    const fileUrl = `https://artsee-test-1250000000.cos.ap-guangzhou.myqcloud.com/${key}`;
+    uploadFiles.push({
+      id: "upload-2",
+      user_id: "user-123",
+      file_url: fileUrl,
+      object_key: key,
+      provider: "tencent_cos",
+      scene: "contracts/org-1",
+      access_level: "private",
+      upload_status: "completed",
+    });
+    contracts.push({
+      id: "contract-1",
+      user_id: "user-123",
+      organization_id: "org-1",
+      file_url: fileUrl,
+    });
+    organizationMembers.push({
+      id: "membership-1",
+      organization_id: "org-1",
+      user_id: "org-owner-1",
+      status: "active",
+      role: "owner",
+    });
+
+    const req = new NextRequest("http://localhost/api/v1/uploads/materials/sign", {
+      method: "POST",
+      headers: { authorization: "Bearer org-owner-token" },
+      body: JSON.stringify({ url: fileUrl, contract_id: "contract-1" }),
+    });
+    const res = await signMaterial(req);
+    expect(res.status).toBe(200);
+  });
+
   it("requires login", async () => {
     const req = new NextRequest("http://localhost/api/v1/uploads/materials/sign", {
       method: "POST",

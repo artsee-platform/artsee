@@ -26,7 +26,7 @@ vi.mock("@/lib/api/tencent-im", () => ({
       super(`missing ${missing.join(",")}`);
     }
   },
-  buildTencentImIdentifier: (id: string) => `artsee_${id}`,
+  buildTencentImIdentifier: (id: string) => `u_${id}`,
   ensureTencentImFriendship: vi.fn(async () => ({ status: "synced" })),
 }));
 
@@ -195,8 +195,8 @@ describe("friends API", () => {
       ])
     );
     expect(body.data.status).toBe("active");
-    expect(body.data.im_identifier).toBe("artsee_user-2");
-    expect(body.data.conversation.peer_im_identifier).toBe("artsee_user-2");
+    expect(body.data.im_identifier).toBe("u_user-2");
+    expect(body.data.conversation.peer_im_identifier).toBe("u_user-2");
   });
 
   it("lists current user's friends", async () => {
@@ -217,6 +217,6 @@ describe("friends API", () => {
     expect(res.status).toBe(200);
     expect(body.data).toHaveLength(1);
     expect(body.data[0].profile.nickname).toBe("林清越");
-    expect(body.data[0].im_identifier).toBe("artsee_user-2");
+    expect(body.data[0].im_identifier).toBe("u_user-2");
   });
 });

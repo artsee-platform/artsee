@@ -219,12 +219,12 @@ class ArtseeActivityRecommendationHeader extends StatelessWidget {
           '为你推荐',
           style: TextStyle(
             color: context.artC.ink,
-            fontSize: 22,
-            height: 1,
-            fontWeight: FontWeight.w900,
+            fontSize: 20,
+            height: 1.2,
+            fontWeight: FontWeight.w800,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 2),
         PopupMenuButton<String>(
           initialValue: selectedFilter,
           onSelected: onSelected,
@@ -238,25 +238,28 @@ class ArtseeActivityRecommendationHeader extends StatelessWidget {
                 ),
               )
               .toList(),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                filterLabel,
-                style: TextStyle(
-                  color: context.artC.ink.withValues(alpha: 0.38),
-                  fontSize: 18,
-                  height: 1,
-                  fontWeight: FontWeight.w900,
+          child: SizedBox(
+            height: 28,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  filterLabel,
+                  style: TextStyle(
+                    color: context.artC.ink.withValues(alpha: 0.46),
+                    fontSize: 15,
+                    height: 1.2,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 4),
-              Icon(
-                Icons.unfold_more_rounded,
-                color: context.artC.ink.withValues(alpha: 0.22),
-                size: 22,
-              ),
-            ],
+                const SizedBox(width: 2),
+                Icon(
+                  Icons.unfold_more_rounded,
+                  color: context.artC.ink.withValues(alpha: 0.26),
+                  size: 18,
+                ),
+              ],
+            ),
           ),
         ),
       ],

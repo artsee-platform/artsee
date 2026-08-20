@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/backend_api_service.dart';
+import '../../widgets/common.dart';
 import '../../widgets/deep_sea_ui.dart';
 
 class CreatorCenterScreen extends StatefulWidget {
@@ -56,8 +57,8 @@ class _CreatorCenterScreenState extends State<CreatorCenterScreen> {
             color: kDeepSeaInk,
             fontSize: 17,
             fontWeight: FontWeight.w900,
-            fontFamily: 'SF Pro Text',
-            fontFamilyFallback: ['PingFang SC', 'Noto Sans SC'],
+            fontFamily: kAppFontFamily,
+            fontFamilyFallback: kAppFontFallback,
           ),
         ),
         actions: [
@@ -372,8 +373,8 @@ class _CreatorProgressCard extends StatelessWidget {
                 style: TextStyle(
                   color: kDeepSeaInk,
                   fontWeight: FontWeight.w900,
-                  fontFamily: 'SF Pro Text',
-                  fontFamilyFallback: ['PingFang SC', 'Noto Sans SC'],
+                  fontFamily: kAppFontFamily,
+                  fontFamilyFallback: kAppFontFallback,
                 ),
               ),
             ),
@@ -545,8 +546,8 @@ class _CreatorMetricTile extends StatelessWidget {
               fontSize: 11,
               fontWeight: FontWeight.w800,
               color: kDeepSeaMuted.withValues(alpha: 0.82),
-              fontFamily: 'SF Pro Text',
-              fontFamilyFallback: const ['PingFang SC', 'Noto Sans SC'],
+              fontFamily: kAppFontFamily,
+              fontFamilyFallback: kAppFontFallback,
             ),
           ),
           const SizedBox(height: 4),
@@ -556,8 +557,8 @@ class _CreatorMetricTile extends StatelessWidget {
               fontSize: 18,
               fontWeight: FontWeight.w900,
               color: kDeepSeaGlow,
-              fontFamily: 'SF Pro Display',
-              fontFamilyFallback: ['SF Pro Text', 'Noto Sans SC'],
+              fontFamily: kAppFontFamily,
+              fontFamilyFallback: kAppFontFallback,
             ),
           ),
         ],
@@ -593,8 +594,8 @@ class _ProgressLine extends StatelessWidget {
                   fontSize: 12,
                   fontWeight: FontWeight.w900,
                   color: kDeepSeaInk.withValues(alpha: 0.82),
-                  fontFamily: 'SF Pro Text',
-                  fontFamilyFallback: const ['PingFang SC', 'Noto Sans SC'],
+                  fontFamily: kAppFontFamily,
+                  fontFamilyFallback: kAppFontFallback,
                 ),
               ),
             ),
@@ -604,8 +605,8 @@ class _ProgressLine extends StatelessWidget {
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
                 color: kDeepSeaMuted.withValues(alpha: 0.82),
-                fontFamily: 'SF Pro Text',
-                fontFamilyFallback: const ['PingFang SC', 'Noto Sans SC'],
+                fontFamily: kAppFontFamily,
+                fontFamilyFallback: kAppFontFallback,
               ),
             ),
           ],

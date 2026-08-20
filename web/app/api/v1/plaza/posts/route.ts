@@ -1,30 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { recordCreatorContent } from "@/lib/api/creator-level";
 import { requireUser } from "@/lib/api/authz";
-import { auditContent } from "@/lib/api/content-safety";
+import {
+  auditContent,
+  auditReasonFromItems,
+  collectAuditText,
+  contentStatusForAudit,
+} from "@/lib/api/content-safety";
+import { contentSafetyErrorResponse } from "@/lib/api/content-safety-http";
 import { createServiceClient } from "@/lib/api/supabase-service";
-import { TencentCloudConfigError } from "@/lib/api/tencent-cloud";
+import { recordUploadAuditResults } from "@/lib/api/upload-audit";
 import { attachPlazaPostState } from "@/lib/api/plaza";
 import {
   createPlazaAiReplyIfEnabled,
   PlazaAiConfigError,
 } from "@/lib/api/plaza-ai-reply";
 export { GET } from "@/app/api/v1/plaza/feed/route";
-
-function postStatusForAudit(auditStatus: string) {
-  if (auditStatus === "approved") return "published";
-  if (auditStatus === "rejected") return "rejected";
-  return "reviewing";
-}
-
-function auditReasonFromItems(
-  items: Array<{ label: string | null; sub_label: string | null }>
-) {
-  return items
-    .map((item) => [item.label, item.sub_label].filter(Boolean).join("/"))
-    .filter(Boolean)
-    .join(", ");
-}
 
 function objectValue(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -282,7 +273,7 @@ export async function POST(req: NextRequest) {
 
     const audit = await auditContent({
       userId: auth.user.id,
-      text: [title, text].filter(Boolean).join("\n\n"),
+      text: collectAuditText(title, text, metadata),
       imageUrls,
       scene: "plaza_post",
     });
@@ -290,8 +281,14 @@ export async function POST(req: NextRequest) {
       kind === "market" && audit.audit_status !== "rejected"
         ? "reviewing"
         : audit.audit_status;
-    const status = postStatusForAudit(auditStatus);
+    const status = contentStatusForAudit(auditStatus);
     const supabase = createServiceClient();
+    await recordUploadAuditResults(
+      supabase,
+      auth.user.id,
+      imageUrls,
+      audit
+    );
     const { data: row, error } = await supabase
       .from("community_posts")
       .insert({
@@ -341,12 +338,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, data, ai_reply: aiReply }, { status: 201 });
   } catch (e: unknown) {
-    if (e instanceof TencentCloudConfigError) {
-      return NextResponse.json(
-        { success: false, error: e.message, missing: e.missing },
-        { status: 503 }
-      );
-    }
+    const auditError = contentSafetyErrorResponse(e);
+    if (auditError) return auditError;
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }

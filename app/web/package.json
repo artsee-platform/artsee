@@ -1,0 +1,8 @@
+{
+  "name": "artsee-flutter-web-runtime",
+  "private": true,
+  "dependencies": {
+    "@tencentcloud/chat": "3.3.0",
+    "tim-upload-plugin": "1.3.0"
+  }
+}

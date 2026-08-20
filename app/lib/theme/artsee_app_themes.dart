@@ -23,7 +23,8 @@ ThemeData buildArtseeLightTheme() {
       error: Color(0xFFDC2626),
       onError: Colors.white,
     ),
-    fontFamily: 'Noto Sans SC',
+    fontFamily: kAppFontFamily,
+    fontFamilyFallback: kAppFontFallback,
     textTheme: const TextTheme(
       headlineLarge: TextStyle(
           fontSize: 28, fontWeight: FontWeight.w700, color: kInk, height: 1.2),
@@ -48,7 +49,7 @@ ThemeData buildArtseeLightTheme() {
         fontSize: 9,
         fontWeight: FontWeight.w600,
         color: kInk,
-        letterSpacing: 0.5,
+        letterSpacing: 0,
       ),
     ),
     appBarTheme: const AppBarTheme(
@@ -61,7 +62,9 @@ ThemeData buildArtseeLightTheme() {
         fontSize: 17,
         fontWeight: FontWeight.w700,
         color: kInk,
-        letterSpacing: 0.5,
+        letterSpacing: 0,
+        fontFamily: kAppFontFamily,
+        fontFamilyFallback: kAppFontFallback,
       ),
       iconTheme: IconThemeData(color: kInk, size: 22),
       actionsIconTheme: IconThemeData(color: kInk, size: 22),
@@ -71,9 +74,19 @@ ThemeData buildArtseeLightTheme() {
       selectedItemColor: kCobalt,
       unselectedItemColor: kSilver,
       selectedLabelStyle: TextStyle(
-          fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0.3),
-      unselectedLabelStyle:
-          TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
+        fontSize: 10,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0,
+        fontFamily: kAppFontFamily,
+        fontFamilyFallback: kAppFontFallback,
+      ),
+      unselectedLabelStyle: TextStyle(
+        fontSize: 10,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 0,
+        fontFamily: kAppFontFamily,
+        fontFamilyFallback: kAppFontFallback,
+      ),
       type: BottomNavigationBarType.fixed,
       elevation: 8,
       showSelectedLabels: true,
@@ -96,7 +109,13 @@ ThemeData buildArtseeLightTheme() {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(kRadiusMedium),
         ),
-        textStyle: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        textStyle: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0,
+          fontFamily: kAppFontFamily,
+          fontFamilyFallback: kAppFontFallback,
+        ),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -107,13 +126,25 @@ ThemeData buildArtseeLightTheme() {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(kRadiusMedium),
         ),
-        textStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        textStyle: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0,
+          fontFamily: kAppFontFamily,
+          fontFamilyFallback: kAppFontFallback,
+        ),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: kCobalt,
-        textStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        textStyle: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0,
+          fontFamily: kAppFontFamily,
+          fontFamilyFallback: kAppFontFallback,
+        ),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
@@ -145,16 +176,39 @@ ThemeData buildArtseeLightTheme() {
       labelColor: kCobalt,
       unselectedLabelColor: kSilver,
       indicatorColor: kCobalt,
-      labelStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-      unselectedLabelStyle:
-          TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+      labelStyle: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0,
+        fontFamily: kAppFontFamily,
+        fontFamilyFallback: kAppFontFallback,
+      ),
+      unselectedLabelStyle: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 0,
+        fontFamily: kAppFontFamily,
+        fontFamilyFallback: kAppFontFallback,
+      ),
     ),
     chipTheme: ChipThemeData(
       backgroundColor: kSilver.withOpacity(0.5),
       selectedColor: kCobalt,
-      labelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+      labelStyle: TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 0,
+        fontFamily: kAppFontFamily,
+        fontFamilyFallback: kAppFontFallback,
+      ),
       secondaryLabelStyle: TextStyle(
-          fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        color: Colors.white,
+        letterSpacing: 0,
+        fontFamily: kAppFontFamily,
+        fontFamilyFallback: kAppFontFallback,
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(kRadiusSmall),
@@ -168,9 +222,21 @@ ThemeData buildArtseeLightTheme() {
     listTileTheme: const ListTileThemeData(
       contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       minLeadingWidth: 24,
-      titleTextStyle:
-          TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: kInk),
-      subtitleTextStyle: TextStyle(fontSize: 12, color: kSilver),
+      titleTextStyle: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: kInk,
+        letterSpacing: 0,
+        fontFamily: kAppFontFamily,
+        fontFamilyFallback: kAppFontFallback,
+      ),
+      subtitleTextStyle: TextStyle(
+        fontSize: 12,
+        color: kSilver,
+        letterSpacing: 0,
+        fontFamily: kAppFontFamily,
+        fontFamilyFallback: kAppFontFallback,
+      ),
     ),
     scaffoldBackgroundColor: kPorcelain,
   );
@@ -204,7 +270,8 @@ ThemeData buildArtseeDarkTheme() {
       error: Color(0xFFF87171),
       onError: Color(0xFF1A0505),
     ),
-    fontFamily: 'Noto Sans SC',
+    fontFamily: kAppFontFamily,
+    fontFamilyFallback: kAppFontFallback,
     textTheme: const TextTheme(
       headlineLarge: TextStyle(
           fontSize: 28, fontWeight: FontWeight.w700, color: _dInk, height: 1.2),
@@ -229,7 +296,7 @@ ThemeData buildArtseeDarkTheme() {
         fontSize: 9,
         fontWeight: FontWeight.w600,
         color: _dInk,
-        letterSpacing: 0.5,
+        letterSpacing: 0,
       ),
     ),
     appBarTheme: const AppBarTheme(
@@ -242,7 +309,9 @@ ThemeData buildArtseeDarkTheme() {
         fontSize: 17,
         fontWeight: FontWeight.w700,
         color: _dInk,
-        letterSpacing: 0.5,
+        letterSpacing: 0,
+        fontFamily: kAppFontFamily,
+        fontFamilyFallback: kAppFontFallback,
       ),
       iconTheme: IconThemeData(color: _dInk, size: 22),
       actionsIconTheme: IconThemeData(color: _dInk, size: 22),
@@ -252,9 +321,19 @@ ThemeData buildArtseeDarkTheme() {
       selectedItemColor: kCobaltMuted,
       unselectedItemColor: _dSilver,
       selectedLabelStyle: TextStyle(
-          fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0.3),
-      unselectedLabelStyle:
-          TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
+        fontSize: 10,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0,
+        fontFamily: kAppFontFamily,
+        fontFamilyFallback: kAppFontFallback,
+      ),
+      unselectedLabelStyle: TextStyle(
+        fontSize: 10,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 0,
+        fontFamily: kAppFontFamily,
+        fontFamilyFallback: kAppFontFallback,
+      ),
       type: BottomNavigationBarType.fixed,
       elevation: 8,
       showSelectedLabels: true,
@@ -277,7 +356,13 @@ ThemeData buildArtseeDarkTheme() {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(kRadiusMedium),
         ),
-        textStyle: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        textStyle: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0,
+          fontFamily: kAppFontFamily,
+          fontFamilyFallback: kAppFontFallback,
+        ),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -288,13 +373,25 @@ ThemeData buildArtseeDarkTheme() {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(kRadiusMedium),
         ),
-        textStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        textStyle: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0,
+          fontFamily: kAppFontFamily,
+          fontFamilyFallback: kAppFontFallback,
+        ),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: kCobaltMuted,
-        textStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        textStyle: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0,
+          fontFamily: kAppFontFamily,
+          fontFamilyFallback: kAppFontFallback,
+        ),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
@@ -326,17 +423,40 @@ ThemeData buildArtseeDarkTheme() {
       labelColor: kCobaltMuted,
       unselectedLabelColor: _dSilver,
       indicatorColor: kCobaltMuted,
-      labelStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-      unselectedLabelStyle:
-          TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+      labelStyle: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0,
+        fontFamily: kAppFontFamily,
+        fontFamilyFallback: kAppFontFallback,
+      ),
+      unselectedLabelStyle: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 0,
+        fontFamily: kAppFontFamily,
+        fontFamilyFallback: kAppFontFallback,
+      ),
     ),
     chipTheme: ChipThemeData(
       backgroundColor: const Color(0xFF222831),
       selectedColor: kCobalt,
-      labelStyle:
-          TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: _dInk),
+      labelStyle: TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w500,
+        color: _dInk,
+        letterSpacing: 0,
+        fontFamily: kAppFontFamily,
+        fontFamilyFallback: kAppFontFallback,
+      ),
       secondaryLabelStyle: TextStyle(
-          fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        color: Colors.white,
+        letterSpacing: 0,
+        fontFamily: kAppFontFamily,
+        fontFamilyFallback: kAppFontFallback,
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(kRadiusSmall),
@@ -350,9 +470,21 @@ ThemeData buildArtseeDarkTheme() {
     listTileTheme: const ListTileThemeData(
       contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       minLeadingWidth: 24,
-      titleTextStyle:
-          TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _dInk),
-      subtitleTextStyle: TextStyle(fontSize: 12, color: Color(0xFF9AA0A8)),
+      titleTextStyle: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: _dInk,
+        letterSpacing: 0,
+        fontFamily: kAppFontFamily,
+        fontFamilyFallback: kAppFontFallback,
+      ),
+      subtitleTextStyle: TextStyle(
+        fontSize: 12,
+        color: Color(0xFF9AA0A8),
+        letterSpacing: 0,
+        fontFamily: kAppFontFamily,
+        fontFamilyFallback: kAppFontFallback,
+      ),
     ),
     scaffoldBackgroundColor: _dBg,
   );

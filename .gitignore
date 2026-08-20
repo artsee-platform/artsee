@@ -71,3 +71,6 @@ supabase/.temp/
 .mcp.json
 
 /tmp
+
+# Local source copies for large curated media already stored on Tencent COS.
+/.local-assets/

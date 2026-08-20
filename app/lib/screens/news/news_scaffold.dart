@@ -246,13 +246,8 @@ class NewsScaffoldState extends State<NewsScaffold>
   Widget build(BuildContext context) {
     final bottom = mainTabBottomInset(context);
     return Scaffold(
-      backgroundColor: kInkWashPaper,
-      body: DeepSeaBackdrop(
-        artworkAsset: kPageArtworkAsset,
-        blurSigma: 3,
-        scrimOpacity: 0.05,
-        backgroundColor: kInkWashPaper,
-        scrimColor: Colors.white,
+      backgroundColor: kHomeArtworkBackground,
+      body: HomeArtworkBackdrop(
         child: Stack(
           children: [
             SafeArea(
@@ -938,7 +933,7 @@ class _ToolboxTabState extends State<_ToolboxTab> {
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
-      color: Colors.white,
+      color: Colors.transparent,
       child: RefreshIndicator(
         color: kCobalt,
         onRefresh: _loadData,
@@ -2786,7 +2781,8 @@ class _DarkHeroCard extends StatelessWidget {
                     height: 1.05,
                     fontWeight: FontWeight.w900,
                     fontStyle: FontStyle.italic,
-                    fontFamily: 'Noto Serif SC',
+                    fontFamily: kAppFontFamily,
+                    fontFamilyFallback: kAppFontFallback,
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -2972,7 +2968,8 @@ class _FeatureArticle extends StatelessWidget {
                     height: 1.08,
                     fontWeight: FontWeight.w900,
                     fontStyle: FontStyle.italic,
-                    fontFamily: 'Noto Serif SC',
+                    fontFamily: kAppFontFamily,
+                    fontFamilyFallback: kAppFontFallback,
                   ),
                 ),
                 if (summary != null && summary.isNotEmpty) ...[
