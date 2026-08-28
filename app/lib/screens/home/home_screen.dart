@@ -1922,6 +1922,7 @@ typedef _AskQuestionLauncher = Future<void> Function({
 });
 
 typedef _LeadPostAction = Future<bool> Function(AppCommunityPost post);
+typedef _CommunityPostChanged = void Function(AppCommunityPost post);
 
 enum _DebateSide { pro, con, watch }
 
@@ -2299,6 +2300,8 @@ class _HomeDopamineFeedState extends State<_HomeDopamineFeed> {
   List<Map<String, dynamic>> _plazaCircles = const [];
   final Map<String, String> _plazaCircleJoinStatusOverrides = {};
   final Set<String> _leadActionBusyPostIds = {};
+  final Set<String> _plazaLikeBusyPostIds = {};
+  final Set<String> _plazaSaveBusyPostIds = {};
   bool _legacyPlazaLoading = false;
   bool _plazaCirclesLoading = false;
   String? _legacyPlazaError;
@@ -2472,6 +2475,83 @@ class _HomeDopamineFeedState extends State<_HomeDopamineFeed> {
     };
   }
 
+  AppCommunityPost _latestLegacyPost(AppCommunityPost post) {
+    for (final current in _legacyPlazaPosts) {
+      if (current.id == post.id) return current;
+    }
+    return post;
+  }
+
+  void _replaceLegacyPlazaPost(AppCommunityPost updated) {
+    final index = _legacyPlazaPosts.indexWhere((post) => post.id == updated.id);
+    if (index == -1) return;
+    final next = List<AppCommunityPost>.of(_legacyPlazaPosts);
+    next[index] = updated;
+    setState(() => _legacyPlazaPosts = next);
+  }
+
+  Future<void> _togglePlazaPostLike(AppCommunityPost post) async {
+    if (_plazaLikeBusyPostIds.contains(post.id)) return;
+    final loggedIn = await ensureLoggedIn(context, message: '请先登录后点赞');
+    if (!mounted || !loggedIn) return;
+    setState(() => _plazaLikeBusyPostIds.add(post.id));
+    try {
+      final current = _latestLegacyPost(post);
+      final result = current.likedByMe
+          ? await BackendApiService.unlikeCommunityPost(current.id)
+          : await BackendApiService.likeCommunityPost(current.id);
+      if (!mounted) return;
+      final updated = _latestLegacyPost(post).copyWith(
+        likedByMe: result.liked,
+        likeCount: result.likeCount,
+      );
+      _replaceLegacyPlazaPost(updated);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.liked ? '已点赞' : '已取消点赞')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('点赞失败：$e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _plazaLikeBusyPostIds.remove(post.id));
+      }
+    }
+  }
+
+  Future<void> _togglePlazaPostSave(AppCommunityPost post) async {
+    if (_plazaSaveBusyPostIds.contains(post.id)) return;
+    final loggedIn = await ensureLoggedIn(context, message: '请先登录后收藏');
+    if (!mounted || !loggedIn) return;
+    setState(() => _plazaSaveBusyPostIds.add(post.id));
+    try {
+      final current = _latestLegacyPost(post);
+      final result = current.savedByMe
+          ? await BackendApiService.unsaveCommunityPost(current.id)
+          : await BackendApiService.saveCommunityPost(current.id);
+      if (!mounted) return;
+      final updated = _latestLegacyPost(post).copyWith(
+        savedByMe: result.saved,
+        saveCount: result.saveCount,
+      );
+      _replaceLegacyPlazaPost(updated);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.saved ? '已收藏' : '已取消收藏')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('收藏失败：$e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _plazaSaveBusyPostIds.remove(post.id));
+      }
+    }
+  }
+
   Future<void> _openTopicDetail(
     _DebateTopic topic, {
     _StanceSubmission? initialSubmission,
@@ -2482,12 +2562,17 @@ class _HomeDopamineFeedState extends State<_HomeDopamineFeed> {
           topic: topic,
           onAskQuestion: widget.onAskQuestion,
           initialSubmission: initialSubmission,
+          post: topic.leadPost,
+          onPostChanged: _replaceLegacyPlazaPost,
           leadPost: widget.institutionLeadMode ? topic.leadPost : null,
-          onToggleLeadSave: _togglePlazaLeadSave,
-          onConvertLead: (post) => _openPlazaLeadReply(
-            post,
-            consultIntent: true,
-          ),
+          onToggleLeadSave:
+              widget.institutionLeadMode ? _togglePlazaLeadSave : null,
+          onConvertLead: widget.institutionLeadMode
+              ? (post) => _openPlazaLeadReply(
+                    post,
+                    consultIntent: true,
+                  )
+              : null,
         ),
       ),
     );
@@ -2499,11 +2584,14 @@ class _HomeDopamineFeedState extends State<_HomeDopamineFeed> {
         builder: (_) => _PlazaRatingDetailScreen(
           item: item,
           leadPost: widget.institutionLeadMode ? item.leadPost : null,
-          onToggleLeadSave: _togglePlazaLeadSave,
-          onConvertLead: (post) => _openPlazaLeadReply(
-            post,
-            consultIntent: true,
-          ),
+          onToggleLeadSave:
+              widget.institutionLeadMode ? _togglePlazaLeadSave : null,
+          onConvertLead: widget.institutionLeadMode
+              ? (post) => _openPlazaLeadReply(
+                    post,
+                    consultIntent: true,
+                  )
+              : null,
         ),
       ),
     );
@@ -2615,6 +2703,11 @@ class _HomeDopamineFeedState extends State<_HomeDopamineFeed> {
           _plazaFeedCardSpacing(
             child: _DebateTopicCard(
               topic: topic,
+              post: post,
+              likeBusy: _plazaLikeBusyPostIds.contains(post.id),
+              saveBusy: _plazaSaveBusyPostIds.contains(post.id),
+              onLike: () => _togglePlazaPostLike(post),
+              onSave: () => _togglePlazaPostSave(post),
               onTap: () => _openTopicDetail(topic),
             ),
           ),
@@ -2628,6 +2721,11 @@ class _HomeDopamineFeedState extends State<_HomeDopamineFeed> {
           _plazaFeedCardSpacing(
             child: _PlazaRatingCard(
               item: rating,
+              post: post,
+              likeBusy: _plazaLikeBusyPostIds.contains(post.id),
+              saveBusy: _plazaSaveBusyPostIds.contains(post.id),
+              onLike: () => _togglePlazaPostLike(post),
+              onSave: () => _togglePlazaPostSave(post),
               onTap: () => _openRatingDetail(rating),
             ),
           ),
@@ -5403,28 +5501,26 @@ class _PlazaFeedTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            child: Row(
-              children: [
-                for (var i = 0; i < _plazaFeedTabLabels.length; i++) ...[
-                  _PlazaFeedTab(
-                    label: _plazaFeedTabLabels[i],
-                    active: selectedIndex == i,
-                    onTap: () => onSelected(i),
-                  ),
-                  if (i != _plazaFeedTabLabels.length - 1)
-                    const SizedBox(width: 8),
-                ],
-              ],
+    return SizedBox(
+      height: 34,
+      child: Row(
+        children: [
+          for (var i = 0; i < _plazaFeedTabLabels.length; i++)
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: i == 0 ? 0 : 2,
+                  right: i == _plazaFeedTabLabels.length - 1 ? 0 : 2,
+                ),
+                child: _PlazaFeedTab(
+                  label: _plazaFeedTabLabels[i],
+                  active: selectedIndex == i,
+                  onTap: () => onSelected(i),
+                ),
+              ),
             ),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -5457,37 +5553,31 @@ class _PlazaFeedTab extends StatelessWidget {
     );
     return _PressableScale(
       onTap: onTap,
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 180),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeOutCubic,
-        transitionBuilder: (child, animation) => FadeTransition(
-          opacity: animation,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.97, end: 1).animate(animation),
-            child: child,
-          ),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        height: 32,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: active
+              ? Colors.white.withValues(alpha: 0.20)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(999),
+          border: active
+              ? Border.all(color: Colors.white.withValues(alpha: 0.38))
+              : null,
+          boxShadow: active
+              ? [
+                  BoxShadow(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    blurRadius: 8,
+                    spreadRadius: -5,
+                    offset: const Offset(0, -1),
+                  ),
+                ]
+              : null,
         ),
-        child: active
-            ? OpticalGlassSurface(
-                key: ValueKey('active-$label'),
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                radius: 999,
-                surfaceOpacity: 0.16,
-                blurSigma: 10,
-                child: SizedBox(
-                  height: 32,
-                  child: Center(child: labelText),
-                ),
-              )
-            : Padding(
-                key: ValueKey('inactive-$label'),
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: SizedBox(
-                  height: 32,
-                  child: Center(child: labelText),
-                ),
-              ),
+        child: labelText,
       ),
     );
   }
@@ -6921,21 +7011,39 @@ IconData _plazaCircleIcon(Map<String, dynamic> circle, int index) {
   return Icons.school_outlined;
 }
 
-class _DebateTopicCard extends StatelessWidget {
+class _DebateTopicCard extends StatefulWidget {
   final _DebateTopic topic;
+  final AppCommunityPost? post;
+  final bool likeBusy;
+  final bool saveBusy;
+  final VoidCallback? onLike;
+  final VoidCallback? onSave;
   final VoidCallback onTap;
 
   const _DebateTopicCard({
     required this.topic,
+    this.post,
+    this.likeBusy = false,
+    this.saveBusy = false,
+    this.onLike,
+    this.onSave,
     required this.onTap,
   });
 
   @override
+  State<_DebateTopicCard> createState() => _DebateTopicCardState();
+}
+
+class _DebateTopicCardState extends State<_DebateTopicCard>
+    with _PlazaCardActionTapShield<_DebateTopicCard> {
+  @override
   Widget build(BuildContext context) {
+    final topic = widget.topic;
     final hotReply = _plazaTopicHotReply(topic);
     final summary = hotReply.trim().isNotEmpty ? hotReply : topic.lead;
+    final sourcePost = widget.post ?? topic.leadPost;
     return _PressableInsetCard(
-      onTap: onTap,
+      onTap: guardedCardTap(widget.onTap),
       builder: (pressed) => _PlazaOverviewGlassCard(
         pressed: pressed,
         child: Row(
@@ -6973,6 +7081,18 @@ class _DebateTopicCard extends StatelessWidget {
                     upLabel: _plazaTopicLikeLabel(topic),
                     favoriteLabel: topic.floor,
                     commentLabel: topic.comments,
+                    upActive: sourcePost?.likedByMe ?? false,
+                    favoriteActive: sourcePost?.savedByMe ?? false,
+                    upBusy: widget.likeBusy,
+                    favoriteBusy: widget.saveBusy,
+                    onUpTap: sourcePost == null
+                        ? null
+                        : guardedActionTap(widget.onLike),
+                    onFavoriteTap: sourcePost == null
+                        ? null
+                        : guardedActionTap(widget.onSave),
+                    onCommentTap: guardedActionTap(widget.onTap),
+                    onBackgroundTap: guardedActionTap(() {}),
                   ),
                 ],
               ),
@@ -6986,6 +7106,33 @@ class _DebateTopicCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+mixin _PlazaCardActionTapShield<T extends StatefulWidget> on State<T> {
+  bool _ignoreNextCardTap = false;
+
+  VoidCallback guardedCardTap(VoidCallback onTap) {
+    return () {
+      if (_ignoreNextCardTap) {
+        _ignoreNextCardTap = false;
+        return;
+      }
+      onTap();
+    };
+  }
+
+  VoidCallback? guardedActionTap(VoidCallback? onTap) {
+    if (onTap == null) return null;
+    return () {
+      _ignoreNextCardTap = true;
+      unawaited(
+        Future<void>.delayed(const Duration(milliseconds: 220), () {
+          if (mounted) _ignoreNextCardTap = false;
+        }),
+      );
+      onTap();
+    };
   }
 }
 
@@ -7187,56 +7334,124 @@ class _PlazaOverviewActionRow extends StatelessWidget {
   final String upLabel;
   final String favoriteLabel;
   final String commentLabel;
+  final bool upActive;
+  final bool favoriteActive;
+  final bool upBusy;
+  final bool favoriteBusy;
+  final VoidCallback? onUpTap;
+  final VoidCallback? onFavoriteTap;
+  final VoidCallback? onCommentTap;
+  final VoidCallback? onBackgroundTap;
 
   const _PlazaOverviewActionRow({
     required this.upLabel,
     required this.favoriteLabel,
     required this.commentLabel,
+    this.upActive = false,
+    this.favoriteActive = false,
+    this.upBusy = false,
+    this.favoriteBusy = false,
+    this.onUpTap,
+    this.onFavoriteTap,
+    this.onCommentTap,
+    this.onBackgroundTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        _PlazaOverviewActionIcon(
-          icon: Icons.change_history_rounded,
-          label: upLabel,
-        ),
-        const SizedBox(width: 22),
-        _PlazaOverviewActionIcon(
-          icon: Icons.star_border_rounded,
-          label: favoriteLabel,
-        ),
-        const SizedBox(width: 22),
-        _PlazaOverviewActionIcon(
-          icon: Icons.chat_bubble_outline_rounded,
-          label: commentLabel,
-        ),
-      ],
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: onBackgroundTap,
+      child: Row(
+        children: [
+          _PlazaOverviewActionIcon(
+            icon: Icons.change_history_rounded,
+            activeIcon: Icons.arrow_drop_up_rounded,
+            label: upLabel,
+            tooltip: upActive ? '取消点赞' : '点赞',
+            active: upActive,
+            busy: upBusy,
+            onTap: onUpTap,
+          ),
+          const SizedBox(width: 22),
+          _PlazaOverviewActionIcon(
+            icon:
+                favoriteActive ? Icons.star_rounded : Icons.star_border_rounded,
+            label: favoriteLabel,
+            tooltip: favoriteActive ? '取消收藏' : '收藏',
+            active: favoriteActive,
+            busy: favoriteBusy,
+            onTap: onFavoriteTap,
+          ),
+          const SizedBox(width: 22),
+          _PlazaOverviewActionIcon(
+            icon: Icons.chat_bubble_outline_rounded,
+            label: commentLabel,
+            tooltip: '查看评论',
+            onTap: onCommentTap,
+          ),
+        ],
+      ),
     );
   }
 }
 
 class _PlazaOverviewActionIcon extends StatelessWidget {
   final IconData icon;
+  final IconData? activeIcon;
   final String label;
+  final String tooltip;
+  final bool active;
+  final bool busy;
+  final VoidCallback? onTap;
 
   const _PlazaOverviewActionIcon({
     required this.icon,
+    this.activeIcon,
     required this.label,
+    this.tooltip = '',
+    this.active = false,
+    this.busy = false,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Flexible(
-      fit: FlexFit.loose,
+    final color = active
+        ? kGlassAccent.withValues(alpha: 0.94)
+        : kGlassMuted.withValues(alpha: 0.82);
+    final effectiveTap = busy ? () {} : onTap;
+    final displayIcon = active ? activeIcon ?? icon : icon;
+    final content = AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeOutCubic,
+      constraints: const BoxConstraints(minWidth: 44, minHeight: 32),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+      decoration: BoxDecoration(
+        color: active ? color.withValues(alpha: 0.12) : Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            size: 17,
-            color: kGlassMuted.withValues(alpha: 0.82),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 140),
+            child: busy
+                ? SizedBox(
+                    key: const ValueKey('busy'),
+                    width: 17,
+                    height: 17,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(color),
+                    ),
+                  )
+                : Icon(
+                    displayIcon,
+                    key: ValueKey(displayIcon),
+                    size: active && activeIcon != null ? 21 : 17,
+                    color: color,
+                  ),
           ),
           const SizedBox(width: 4),
           Flexible(
@@ -7245,14 +7460,28 @@ class _PlazaOverviewActionIcon extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: _homeFeedInfoStyle(
-                color: kGlassMuted.withValues(alpha: 0.76),
+                color: active ? color : kGlassMuted.withValues(alpha: 0.76),
                 fontSize: 11.9,
                 height: 1.05,
-                fontWeight: FontWeight.w400,
+                fontWeight: active ? FontWeight.w600 : FontWeight.w400,
               ),
             ),
           ),
         ],
+      ),
+    );
+    final wrapped = effectiveTap == null
+        ? content
+        : _PressableScale(
+            onTap: effectiveTap,
+            pressedScale: 0.9,
+            child: content,
+          );
+    return Flexible(
+      fit: FlexFit.loose,
+      child: Tooltip(
+        message: tooltip,
+        child: wrapped,
       ),
     );
   }
@@ -7399,19 +7628,37 @@ String _plazaTopicTime(_DebateTopic topic) {
   return times[topic.title.hashCode.abs() % times.length];
 }
 
-class _PlazaRatingCard extends StatelessWidget {
+class _PlazaRatingCard extends StatefulWidget {
   final _PlazaRatingItem item;
+  final AppCommunityPost? post;
+  final bool likeBusy;
+  final bool saveBusy;
+  final VoidCallback? onLike;
+  final VoidCallback? onSave;
   final VoidCallback onTap;
 
   const _PlazaRatingCard({
     required this.item,
+    this.post,
+    this.likeBusy = false,
+    this.saveBusy = false,
+    this.onLike,
+    this.onSave,
     required this.onTap,
   });
 
   @override
+  State<_PlazaRatingCard> createState() => _PlazaRatingCardState();
+}
+
+class _PlazaRatingCardState extends State<_PlazaRatingCard>
+    with _PlazaCardActionTapShield<_PlazaRatingCard> {
+  @override
   Widget build(BuildContext context) {
+    final item = widget.item;
+    final sourcePost = widget.post ?? item.leadPost;
     return _PressableInsetCard(
-      onTap: onTap,
+      onTap: guardedCardTap(widget.onTap),
       builder: (pressed) => _PlazaOverviewGlassCard(
         pressed: pressed,
         child: Row(
@@ -7446,6 +7693,18 @@ class _PlazaRatingCard extends StatelessWidget {
                     upLabel: item.likes,
                     favoriteLabel: _compactPlazaMetric(item.ratingCount),
                     commentLabel: item.comments,
+                    upActive: sourcePost?.likedByMe ?? false,
+                    favoriteActive: sourcePost?.savedByMe ?? false,
+                    upBusy: widget.likeBusy,
+                    favoriteBusy: widget.saveBusy,
+                    onUpTap: sourcePost == null
+                        ? null
+                        : guardedActionTap(widget.onLike),
+                    onFavoriteTap: sourcePost == null
+                        ? null
+                        : guardedActionTap(widget.onSave),
+                    onCommentTap: guardedActionTap(widget.onTap),
+                    onBackgroundTap: guardedActionTap(() {}),
                   ),
                 ],
               ),
@@ -8724,6 +8983,8 @@ class _DebateTopicDetailScreen extends StatefulWidget {
   final _DebateTopic topic;
   final _AskQuestionLauncher onAskQuestion;
   final _StanceSubmission? initialSubmission;
+  final AppCommunityPost? post;
+  final _CommunityPostChanged? onPostChanged;
   final AppCommunityPost? leadPost;
   final _LeadPostAction? onToggleLeadSave;
   final _LeadPostAction? onConvertLead;
@@ -8732,6 +8993,8 @@ class _DebateTopicDetailScreen extends StatefulWidget {
     required this.topic,
     required this.onAskQuestion,
     this.initialSubmission,
+    this.post,
+    this.onPostChanged,
     this.leadPost,
     this.onToggleLeadSave,
     this.onConvertLead,
@@ -8746,10 +9009,15 @@ class _DebateTopicDetailScreenState extends State<_DebateTopicDetailScreen> {
   late final List<_DebateThreadComment> _comments;
   final Set<String> _likedCommentIds = {};
   _DebateCommentFilter _filter = _DebateCommentFilter.all;
+  AppCommunityPost? _post;
   bool _postLiked = false;
   bool _postSaved = false;
+  bool _postLikeBusy = false;
+  bool _postSaveBusy = false;
   bool _leadSaved = false;
   bool _leadBusy = false;
+  int _postLikeCount = 0;
+  int _postSaveCount = 0;
   int _commentSeed = 0;
 
   _DebateTopic get topic => widget.topic;
@@ -8757,7 +9025,12 @@ class _DebateTopicDetailScreenState extends State<_DebateTopicDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _leadSaved = widget.leadPost?.savedByMe ?? false;
+    _post = widget.post;
+    _postLiked = _post?.likedByMe ?? false;
+    _postSaved = _post?.savedByMe ?? false;
+    _postLikeCount = _post?.likeCount ?? 0;
+    _postSaveCount = _post?.saveCount ?? 0;
+    _leadSaved = widget.leadPost?.savedByMe ?? _postSaved;
     final comments = [
       _DebateThreadComment(
         id: 'seed-pro',
@@ -8840,7 +9113,13 @@ class _DebateTopicDetailScreenState extends State<_DebateTopicDetailScreen> {
     final success = await action(post);
     if (!mounted) return;
     setState(() {
-      if (success) _leadSaved = !_leadSaved;
+      if (success) {
+        _leadSaved = !_leadSaved;
+        if (_post?.id == post.id) {
+          _postSaved = _leadSaved;
+          _post = _post?.copyWith(savedByMe: _leadSaved);
+        }
+      }
       _leadBusy = false;
     });
   }
@@ -8938,18 +9217,97 @@ class _DebateTopicDetailScreenState extends State<_DebateTopicDetailScreen> {
     });
   }
 
-  void _togglePostLike() {
-    setState(() => _postLiked = !_postLiked);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(_postLiked ? '已赞这篇帖子' : '已取消赞')),
-    );
+  Future<void> _togglePostLike() async {
+    if (_postLikeBusy) return;
+    final post = _post;
+    if (post == null) {
+      setState(() {
+        _postLiked = !_postLiked;
+        _postLikeCount = math.max(0, _postLikeCount + (_postLiked ? 1 : -1));
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_postLiked ? '已赞这篇帖子' : '已取消赞')),
+      );
+      return;
+    }
+    final loggedIn = await ensureLoggedIn(context, message: '请先登录后点赞');
+    if (!mounted || !loggedIn) return;
+    setState(() => _postLikeBusy = true);
+    try {
+      final result = _postLiked
+          ? await BackendApiService.unlikeCommunityPost(post.id)
+          : await BackendApiService.likeCommunityPost(post.id);
+      if (!mounted) return;
+      final updated = post.copyWith(
+        likedByMe: result.liked,
+        likeCount: result.likeCount,
+        savedByMe: _postSaved,
+        saveCount: _postSaveCount,
+      );
+      setState(() {
+        _post = updated;
+        _postLiked = result.liked;
+        _postLikeCount = result.likeCount;
+        _postLikeBusy = false;
+      });
+      widget.onPostChanged?.call(updated);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.liked ? '已点赞' : '已取消点赞')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _postLikeBusy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('点赞失败：$e')),
+      );
+    }
   }
 
-  void _togglePostSave() {
-    setState(() => _postSaved = !_postSaved);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(_postSaved ? '已收藏到我的广场' : '已取消收藏')),
-    );
+  Future<void> _togglePostSave() async {
+    if (_postSaveBusy) return;
+    final post = _post;
+    if (post == null) {
+      setState(() {
+        _postSaved = !_postSaved;
+        _postSaveCount = math.max(0, _postSaveCount + (_postSaved ? 1 : -1));
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_postSaved ? '已收藏到我的广场' : '已取消收藏')),
+      );
+      return;
+    }
+    final loggedIn = await ensureLoggedIn(context, message: '请先登录后收藏');
+    if (!mounted || !loggedIn) return;
+    setState(() => _postSaveBusy = true);
+    try {
+      final result = _postSaved
+          ? await BackendApiService.unsaveCommunityPost(post.id)
+          : await BackendApiService.saveCommunityPost(post.id);
+      if (!mounted) return;
+      final updated = post.copyWith(
+        savedByMe: result.saved,
+        saveCount: result.saveCount,
+        likedByMe: _postLiked,
+        likeCount: _postLikeCount,
+      );
+      setState(() {
+        _post = updated;
+        _postSaved = result.saved;
+        _postSaveCount = result.saveCount;
+        _leadSaved = result.saved;
+        _postSaveBusy = false;
+      });
+      widget.onPostChanged?.call(updated);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.saved ? '已收藏' : '已取消收藏')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _postSaveBusy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('收藏失败：$e')),
+      );
+    }
   }
 
   Future<void> _openShareSheet() async {
@@ -9016,6 +9374,8 @@ class _DebateTopicDetailScreenState extends State<_DebateTopicDetailScreen> {
                         onlyMine: _filter == _DebateCommentFilter.mine,
                         liked: _postLiked,
                         saved: _postSaved,
+                        likeBusy: _postLikeBusy,
+                        saveBusy: _postSaveBusy,
                         onReply: () => _openStanceSheet(
                           initialSide: _DebateSide.watch,
                           initialDraft: '我想接着这个话题说：',
@@ -9642,6 +10002,8 @@ class _PlazaTopicReplyActions extends StatelessWidget {
   final bool onlyMine;
   final bool liked;
   final bool saved;
+  final bool likeBusy;
+  final bool saveBusy;
   final VoidCallback onReply;
   final VoidCallback onShare;
   final VoidCallback onLike;
@@ -9652,6 +10014,8 @@ class _PlazaTopicReplyActions extends StatelessWidget {
     required this.onlyMine,
     required this.liked,
     required this.saved,
+    this.likeBusy = false,
+    this.saveBusy = false,
     required this.onReply,
     required this.onShare,
     required this.onLike,
@@ -9696,6 +10060,7 @@ class _PlazaTopicReplyActions extends StatelessWidget {
                     ? Icons.thumb_up_alt_rounded
                     : Icons.thumb_up_alt_outlined,
                 active: liked,
+                busy: likeBusy,
                 color:
                     liked ? const Color(0xFFD95D3E) : const Color(0xFF2478B8),
                 onTap: onLike,
@@ -9704,6 +10069,7 @@ class _PlazaTopicReplyActions extends StatelessWidget {
                 label: saved ? '已收藏' : '收藏',
                 icon: saved ? Icons.bookmark_rounded : Icons.bookmark_border,
                 active: saved,
+                busy: saveBusy,
                 onTap: onSave,
               ),
               _PlazaDetailAction(
@@ -9725,6 +10091,7 @@ class _PlazaDetailAction extends StatelessWidget {
   final Color color;
   final bool filled;
   final bool active;
+  final bool busy;
   final VoidCallback? onTap;
 
   const _PlazaDetailAction({
@@ -9733,6 +10100,7 @@ class _PlazaDetailAction extends StatelessWidget {
     this.color = const Color(0xFF2478B8),
     this.filled = false,
     this.active = false,
+    this.busy = false,
     this.onTap,
   });
 
@@ -9759,7 +10127,17 @@ class _PlazaDetailAction extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (icon != null) ...[
+          if (busy) ...[
+            SizedBox(
+              width: 15,
+              height: 15,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(foreground),
+              ),
+            ),
+            const SizedBox(width: 5),
+          ] else if (icon != null) ...[
             Icon(icon, color: foreground, size: 15),
             const SizedBox(width: 5),
           ],
@@ -9781,7 +10159,7 @@ class _PlazaDetailAction extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: onTap,
+          onTap: busy ? null : onTap,
           borderRadius: BorderRadius.circular(999),
           child: child,
         ),

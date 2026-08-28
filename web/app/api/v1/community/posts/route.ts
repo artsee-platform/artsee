@@ -12,6 +12,15 @@ import {
 import { contentSafetyErrorResponse } from "@/lib/api/content-safety-http";
 import { recordUploadAuditResults } from "@/lib/api/upload-audit";
 
+function titleFromText(text: string) {
+  const firstLine = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean);
+  if (!firstLine) return "";
+  return firstLine.length > 32 ? `${firstLine.slice(0, 32)}...` : firstLine;
+}
+
 /** GET /api/v1/community/posts — 图文社区列表（数据库 community_posts） */
 export async function GET(req: NextRequest) {
   try {
@@ -126,7 +135,7 @@ export async function POST(req: NextRequest) {
       .from("community_posts")
       .insert({
         author_id: auth.user.id,
-        title: title || "作品分享",
+        title: title || titleFromText(text) || "作品分享",
         body: text || null,
         image_urls: imageUrls,
         status,

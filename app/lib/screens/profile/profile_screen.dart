@@ -1324,8 +1324,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _openCommunityPost(AppCommunityPost post) async {
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
         builder: (_) => CommunityPostDetailScreen(
           postId: post.id,
           initialPost: post,
@@ -2941,8 +2941,8 @@ class _ProfileMarketplaceBagScreenState
       );
       return;
     }
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
+    Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
         builder: (_) => CommunityPostDetailScreen(
           postId: post.id,
           initialPost: post,

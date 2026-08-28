@@ -870,8 +870,8 @@ class _SchoolDetailScreenState extends State<SchoolDetailScreen> {
     return _SchoolDetailPressable(
       pressedScale: 0.985,
       onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute<void>(
+        Navigator.of(context).push<bool>(
+          MaterialPageRoute<bool>(
             builder: (_) => CommunityPostDetailScreen(
               postId: post.id,
               initialPost: post,

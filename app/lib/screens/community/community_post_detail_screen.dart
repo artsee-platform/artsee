@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/models.dart';
 import '../../services/backend_api_service.dart';
+import '../../services/supabase_service.dart';
 import '../../widgets/artsee_ui.dart';
 import '../../widgets/common.dart';
 import '../../widgets/deep_sea_ui.dart';
@@ -35,6 +36,7 @@ class _CommunityPostDetailScreenState extends State<CommunityPostDetailScreen> {
   bool _commentsLoading = true;
   bool _likeBusy = false;
   bool _saveBusy = false;
+  bool _deleteBusy = false;
   bool _sendingComment = false;
   bool _liked = false;
   bool _saved = false;
@@ -214,6 +216,12 @@ class _CommunityPostDetailScreenState extends State<CommunityPostDetailScreen> {
 
   bool get _isQa => _post?.metadata['kind'] == 'qa';
 
+  bool get _isAuthor {
+    final authorId = _post?.authorId ?? widget.initialPost?.authorId;
+    final userId = SupabaseService.currentUser?.id;
+    return authorId != null && userId != null && authorId == userId;
+  }
+
   bool get _isPlazaPost {
     final metadata = _post?.metadata ?? widget.initialPost?.metadata ?? {};
     final surface = metadata['surface']?.toString().trim().toLowerCase();
@@ -278,6 +286,47 @@ class _CommunityPostDetailScreenState extends State<CommunityPostDetailScreen> {
     _commentFocusNode.requestFocus();
   }
 
+  Future<void> _deletePost() async {
+    if (_deleteBusy || !_isAuthor || _post == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(_isQa ? '删除这个问题？' : '删除这条动态？'),
+        content: const Text('删除后将无法恢复，其他用户也不会再看到这条内容。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFB3261E),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+    setState(() => _deleteBusy = true);
+    try {
+      await BackendApiService.deleteCommunityPost(widget.postId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_isQa ? '问题已删除' : '动态已删除')),
+      );
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _deleteBusy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('删除失败：$e')),
+      );
+    }
+  }
+
   @override
   void dispose() {
     _commentCtrl.dispose();
@@ -324,6 +373,46 @@ class _CommunityPostDetailScreenState extends State<CommunityPostDetailScreen> {
                 );
               },
             ),
+            if (_isAuthor)
+              _deleteBusy
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 13),
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: context.artC.ink,
+                        ),
+                      ),
+                    )
+                  : PopupMenuButton<String>(
+                      tooltip: '更多',
+                      icon: Icon(
+                        Icons.more_horiz_rounded,
+                        color: context.artC.ink,
+                        size: 24,
+                      ),
+                      onSelected: (value) {
+                        if (value == 'delete') _deletePost();
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem<String>(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.delete_outline_rounded,
+                                size: 20,
+                                color: Color(0xFFB3261E),
+                              ),
+                              SizedBox(width: 10),
+                              Text('删除'),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
             const SizedBox(width: 4),
           ],
         ),

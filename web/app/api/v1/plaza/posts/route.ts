@@ -38,6 +38,15 @@ function stringValue(value: unknown, fallback = "") {
   return text || fallback;
 }
 
+function titleFromText(text: string) {
+  const firstLine = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean);
+  if (!firstLine) return "";
+  return firstLine.length > 32 ? `${firstLine.slice(0, 32)}...` : firstLine;
+}
+
 const RATING_TARGET_CATEGORIES = [
   "艺术家",
   "作品",
@@ -263,6 +272,11 @@ export async function POST(req: NextRequest) {
         })
       );
     }
+    const rawAutoAiReply = body.auto_ai_reply ?? baseMetadata.auto_ai_reply;
+    const autoAiReply =
+      rawAutoAiReply === undefined
+        ? kind === "qa" && promoteToPlaza
+        : boolValue(rawAutoAiReply);
 
     if (!title && !text && imageUrls.length === 0) {
       return NextResponse.json(
@@ -293,7 +307,7 @@ export async function POST(req: NextRequest) {
       .from("community_posts")
       .insert({
         author_id: auth.user.id,
-        title: title || "广场动态",
+        title: title || titleFromText(text) || "广场动态",
         body: text || null,
         image_urls: imageUrls,
         status,
@@ -322,7 +336,7 @@ export async function POST(req: NextRequest) {
 
     const [data] = await attachPlazaPostState(supabase, [row], auth.user.id);
     let aiReply = null;
-    if (status === "published") {
+    if (status === "published" && autoAiReply) {
       aiReply = await createPlazaAiReplyIfEnabled(supabase, {
         postId: String(row.id),
         post: row,

@@ -83,12 +83,14 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         kind: 'post',
         group: _postType,
         tags: tags,
+        autoAiReply: false,
         metadata: {
           'kind': 'post',
           'post_type': _postType,
           'tags': tags,
           'visibility': _visibility,
           'sync_to_portfolio': _syncToPortfolio,
+          'auto_ai_reply': false,
         },
       );
       if (!mounted) return;

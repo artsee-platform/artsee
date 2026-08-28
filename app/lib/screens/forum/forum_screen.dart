@@ -3695,11 +3695,11 @@ class _MarketListingDetailScreenState
     );
   }
 
-  void _openCommunityPost() {
+  Future<void> _openCommunityPost() async {
     final post = widget.item.post;
     if (post == null) return;
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
         builder: (_) => CommunityPostDetailScreen(
           postId: post.id,
           initialPost: post,
@@ -7189,8 +7189,8 @@ class _QaCommunityTabState extends State<_QaCommunityTab> {
   }
 
   void _openQuestionPost(AppCommunityPost post) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
+    Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
         builder: (_) => CommunityPostDetailScreen(
           postId: post.id,
           initialPost: post,
@@ -7607,8 +7607,8 @@ class _CircleTabState extends State<_CircleTab> {
       post.metadata['category']?.toString() ?? '艺术留学';
 
   void _openQuestionPost(AppCommunityPost post) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
+    Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
         builder: (_) => CommunityPostDetailScreen(
           postId: post.id,
           initialPost: post,

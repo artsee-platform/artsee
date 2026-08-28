@@ -145,6 +145,23 @@ describe("community post content audit", () => {
     );
   });
 
+  it("uses the body preview as title when a text-only post has no title", async () => {
+    mocks.auditContent.mockResolvedValueOnce(auditResult("approved"));
+
+    const res = await postCommunity(
+      postReq({
+        title: "",
+        body: "a",
+        image_urls: [],
+      })
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.data.title).toBe("a");
+    expect(mocks.insertedPosts[0].title).toBe("a");
+  });
+
   it("keeps review posts out of the public feed and skips creator credit", async () => {
     mocks.auditContent.mockResolvedValueOnce(
       auditResult("reviewing", { label: "Ad", sub_label: "Suspected" })

@@ -31,6 +31,41 @@ void main() {
     expect(p.auditReason, 'Ad/Suspected');
   });
 
+  test('AppCommunityPost.copyWith 更新互动状态并保留原字段', () {
+    final p = AppCommunityPost.fromJson({
+      'id': 'a-copy',
+      'title': '广场动态',
+      'body': '正文',
+      'image_urls': ['https://x.com/1.jpg'],
+      'metadata': {'kind': 'debate'},
+      'like_count': 2,
+      'comment_count': 1,
+      'save_count': 3,
+      'view_count': 10,
+      'liked_by_me': false,
+      'saved_by_me': false,
+      'created_at': '2026-01-01T00:00:00Z',
+      'author_id': 'user-1',
+      'user_profiles': {'nickname': '小明', 'avatar_url': 'https://x/a.png'},
+    });
+
+    final updated = p.copyWith(
+      likedByMe: true,
+      likeCount: 4,
+      savedByMe: true,
+      saveCount: 5,
+    );
+
+    expect(updated.id, 'a-copy');
+    expect(updated.imageUrls, ['https://x.com/1.jpg']);
+    expect(updated.metadata['kind'], 'debate');
+    expect(updated.authorNickname, '小明');
+    expect(updated.likedByMe, true);
+    expect(updated.likeCount, 4);
+    expect(updated.savedByMe, true);
+    expect(updated.saveCount, 5);
+  });
+
   test('AppCommunityPost.fromJson 兼容旧作品图片字段', () {
     final p = AppCommunityPost.fromJson({
       'id': 'a2',

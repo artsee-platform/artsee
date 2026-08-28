@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import {
+  DELETE as deleteCommunityPost,
   GET as getCommunityPost,
   PATCH as patchCommunityPost,
 } from "@/app/api/v1/community/posts/[id]/route";
@@ -8,7 +9,7 @@ import { POST as postCommunityComment } from "@/app/api/v1/community/posts/[id]/
 import { POST as postCommunityCircle } from "@/app/api/v1/community/circles/route";
 
 type Row = Record<string, unknown>;
-type Mode = "select" | "insert" | "update" | "upsert";
+type Mode = "select" | "insert" | "update" | "upsert" | "delete";
 
 const USER_ID = "10000000-0000-4000-8000-000000000001";
 const POST_ID = "20000000-0000-4000-8000-000000000001";
@@ -97,6 +98,11 @@ class QueryStub {
     return this;
   }
 
+  delete() {
+    this.mode = "delete";
+    return this;
+  }
+
   upsert(payload: Row) {
     this.mode = "upsert";
     this.payload = payload;
@@ -141,6 +147,12 @@ class QueryStub {
       const row = this.rows().find((candidate) => this.matches(candidate));
       if (row) Object.assign(row, this.payload);
       return { data: row ?? null, error: null };
+    }
+    if (this.mode === "delete") {
+      const rows = this.rows();
+      const kept = rows.filter((row) => !this.matches(row));
+      rows.splice(0, rows.length, ...kept);
+      return { data: null, error: null };
     }
     return {
       data: this.rows().filter((row) => this.matches(row)),
@@ -272,6 +284,21 @@ describe("content safety route enforcement", () => {
     );
     expect(res.status).toBe(400);
     expect(auditMock).not.toHaveBeenCalled();
+  });
+
+  it("lets the author delete their post", async () => {
+    const res = await deleteCommunityPost(
+      request(`/api/v1/community/posts/${POST_ID}`, {
+        method: "DELETE",
+        token: "author-token",
+      }),
+      postContext()
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(posts).toHaveLength(0);
   });
 
   it("publishes only comments explicitly approved by moderation", async () => {

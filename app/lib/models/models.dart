@@ -113,6 +113,48 @@ class AppCommunityPost {
     this.authorAvatarUrl,
   });
 
+  AppCommunityPost copyWith({
+    String? id,
+    String? title,
+    String? body,
+    List<String>? imageUrls,
+    String? status,
+    String? auditStatus,
+    String? auditReason,
+    Map<String, dynamic>? metadata,
+    int? likeCount,
+    int? commentCount,
+    int? saveCount,
+    int? viewCount,
+    bool? likedByMe,
+    bool? savedByMe,
+    String? createdAt,
+    String? authorId,
+    String? authorNickname,
+    String? authorAvatarUrl,
+  }) {
+    return AppCommunityPost(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      body: body ?? this.body,
+      imageUrls: imageUrls ?? this.imageUrls,
+      status: status ?? this.status,
+      auditStatus: auditStatus ?? this.auditStatus,
+      auditReason: auditReason ?? this.auditReason,
+      metadata: metadata ?? this.metadata,
+      likeCount: likeCount ?? this.likeCount,
+      commentCount: commentCount ?? this.commentCount,
+      saveCount: saveCount ?? this.saveCount,
+      viewCount: viewCount ?? this.viewCount,
+      likedByMe: likedByMe ?? this.likedByMe,
+      savedByMe: savedByMe ?? this.savedByMe,
+      createdAt: createdAt ?? this.createdAt,
+      authorId: authorId ?? this.authorId,
+      authorNickname: authorNickname ?? this.authorNickname,
+      authorAvatarUrl: authorAvatarUrl ?? this.authorAvatarUrl,
+    );
+  }
+
   ImmersiveAsset? get immersiveAsset => ImmersiveAsset.fromMetadata(metadata);
 
   factory AppCommunityPost.fromJson(Map<String, dynamic> json) {

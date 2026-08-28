@@ -1141,15 +1141,18 @@ class _CommunityFeedTabState extends State<_CommunityFeedTab> {
     }
   }
 
-  void _openPost(AppCommunityPost post) {
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
+  Future<void> _openPost(AppCommunityPost post) async {
+    final deleted = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
         builder: (_) => CommunityPostDetailScreen(
           postId: post.id,
           initialPost: post,
         ),
       ),
     );
+    if (mounted && deleted == true) {
+      _load();
+    }
   }
 
   @override

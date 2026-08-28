@@ -142,6 +142,61 @@ describe("plaza rating target posts", () => {
     expect(metadata.tags).toEqual(["艺术家", "名人"]);
   });
 
+  it("does not auto-create AI replies for regular user posts", async () => {
+    const res = await postPlaza(
+      postReq({
+        title: "",
+        body: "a",
+        kind: "post",
+      })
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(201);
+    expect(body.success).toBe(true);
+    expect(mocks.insertedPosts[0].title).toBe("a");
+    expect(mocks.createPlazaAiReplyIfEnabled).not.toHaveBeenCalled();
+  });
+
+  it("auto-creates AI replies for promoted QA posts by default", async () => {
+    const res = await postPlaza(
+      postReq({
+        title: "作品集机构是在帮忙还是制造焦虑？",
+        kind: "qa",
+        metadata: {
+          promote_to_plaza: true,
+          source: "plaza_question",
+        },
+      })
+    );
+
+    expect(res.status).toBe(201);
+    expect(mocks.createPlazaAiReplyIfEnabled).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        postId: "plaza-post-1",
+        trigger: "post_created",
+      })
+    );
+  });
+
+  it("respects explicit auto_ai_reply false for promoted QA posts", async () => {
+    const res = await postPlaza(
+      postReq({
+        title: "这个问题不需要 AI 首评",
+        kind: "qa",
+        auto_ai_reply: false,
+        metadata: {
+          promote_to_plaza: true,
+          source: "plaza_question",
+        },
+      })
+    );
+
+    expect(res.status).toBe(201);
+    expect(mocks.createPlazaAiReplyIfEnabled).not.toHaveBeenCalled();
+  });
+
   it("rejects unsupported rating target categories", async () => {
     const res = await postPlaza(
       postReq({

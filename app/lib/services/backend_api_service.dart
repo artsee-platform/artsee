@@ -399,6 +399,17 @@ class BackendApiService {
     return AppCommunityPost.fromJson(body['data'] as Map<String, dynamic>);
   }
 
+  static Future<void> deleteCommunityPost(String id) async {
+    final decoded = await _requestJson(
+      'DELETE',
+      '/api/v1/community/posts/$id',
+      withAuth: true,
+    );
+    if (decoded['success'] != true) {
+      throw Exception(decoded['error'] ?? '删除失败');
+    }
+  }
+
   static Future<({bool liked, int likeCount})> likeCommunityPost(
       String id) async {
     final r = await http.post(
@@ -2039,6 +2050,7 @@ class BackendApiService {
     String? group,
     List<String>? tags,
     Map<String, dynamic>? metadata,
+    bool? autoAiReply,
   }) async {
     final decoded = await _requestJson(
       'POST',
@@ -2052,6 +2064,7 @@ class BackendApiService {
         if (group != null && group.trim().isNotEmpty) 'group': group.trim(),
         if (tags != null) 'tags': tags,
         if (metadata != null) 'metadata': metadata,
+        if (autoAiReply != null) 'auto_ai_reply': autoAiReply,
       },
     );
     return (decoded['data'] as Map<String, dynamic>? ?? {});
